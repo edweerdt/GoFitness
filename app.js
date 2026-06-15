@@ -339,12 +339,15 @@ const app = {
                 const el = document.createElement('div');
                 el.className = 'glass-panel';
                 el.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
-                        <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="flex:1; cursor:pointer;" onclick="this.parentElement.nextElementSibling.classList.toggle('hidden')">
                             <div style="font-weight:600;">${log.sessionName || 'Sessie'}</div>
                             <div class="text-sm text-muted">${dateStr} • ${log.duration} min • ${log.exercisesCompleted} oefeningen</div>
                         </div>
-                        <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
+                        <div style="display:flex; gap:12px; align-items:center;">
+                            <span class="material-icons-round text-muted" style="font-size:1.2rem; cursor:pointer;" onclick="this.parentElement.parentElement.nextElementSibling.classList.toggle('hidden')">expand_more</span>
+                            <span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteLogModal('${log.id}')">delete_outline</span>
+                        </div>
                     </div>
                     <div class="hidden history-details">
                         ${summaryHtml}
@@ -543,6 +546,25 @@ const app = {
         
         document.getElementById('bottom-nav').classList.remove('hidden');
         this.navigate('home');
+    },
+
+    showDeleteLogModal(logId) {
+        this.logToDelete = logId;
+        document.getElementById('modal-delete-log').classList.remove('hidden');
+    },
+
+    hideDeleteLogModal() {
+        this.logToDelete = null;
+        document.getElementById('modal-delete-log').classList.add('hidden');
+    },
+
+    confirmDeleteLog() {
+        if (!this.logToDelete) return;
+        store.logs = store.logs.filter(l => l.id !== this.logToDelete);
+        store.save();
+        this.hideDeleteLogModal();
+        this.renderProgress();
+        this.renderHome(); // Update home stats if needed
     },
 
     // --- IMPORT / EXPORT ---
