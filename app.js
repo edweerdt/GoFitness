@@ -290,53 +290,72 @@ const app = {
             return;
         }
 
-        const sortedLogs = [...store.logs].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-        sortedLogs.forEach(log => {
-            const dateStr = new Date(log.date).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
-            
-            let summaryHtml = '';
-            if (log.exercises && log.exercises.length > 0) {
-                log.exercises.forEach(ex => {
-                    let exDetails = [];
-                    if (ex.details) {
-                        ex.details.forEach(d => {
-                            let text = `Set ${d.setNumber}:`;
-                            if (d.weight) text += ` ${d.weight}kg`;
-                            if (d.reps) text += ` x ${d.reps}`;
-                            exDetails.push(text);
-                        });
-                    }
-                    
-                    summaryHtml += `
-                        <div class="mt-2 pt-2" style="border-top: 1px solid rgba(0,0,0,0.05);">
-                            <div style="font-weight:600; font-size:0.9rem;">${ex.name} (${ex.setsCompleted}/${ex.totalSets} sets)</div>
-                            <div class="text-sm text-muted" style="margin-top:2px;">
-                                ${exDetails.length > 0 ? exDetails.join(', ') : 'Afgevinkt (geen details)'}
-                            </div>
-                        </div>
-                    `;
-                });
-            } else {
-                summaryHtml = '<div class="text-sm text-muted mt-2">Geen details beschikbaar (oude sessie).</div>';
-            }
-
-            const el = document.createElement('div');
-            el.className = 'glass-panel';
-            el.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
-                    <div>
-                        <div style="font-weight:600;">${log.sessionName || 'Sessie'}</div>
-                        <div class="text-sm text-muted">${dateStr} • ${log.duration} min • ${log.exercisesCompleted} oefeningen</div>
-                    </div>
-                    <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
-                </div>
-                <div class="hidden history-details">
-                    ${summaryHtml}
-                </div>
-            `;
-            hList.appendChild(el);
+        const groupedLogs = {};
+        store.logs.forEach(log => {
+            const pName = log.planName || 'Overige Sessies';
+            if (!groupedLogs[pName]) groupedLogs[pName] = [];
+            groupedLogs[pName].push(log);
         });
+
+        for (const [planName, logs] of Object.entries(groupedLogs)) {
+            const sortedLogs = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            const planSection = document.createElement('div');
+            planSection.className = 'mt-4';
+            planSection.innerHTML = `<h4 style="color:var(--text-primary); margin-bottom:8px; margin-top:16px;">${planName}</h4>`;
+            
+            const listWrapper = document.createElement('div');
+            listWrapper.className = 'flex-col gap-3';
+
+            sortedLogs.forEach(log => {
+                const dateStr = new Date(log.date).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
+                
+                let summaryHtml = '';
+                if (log.exercises && log.exercises.length > 0) {
+                    log.exercises.forEach(ex => {
+                        let exDetails = [];
+                        if (ex.details) {
+                            ex.details.forEach(d => {
+                                let text = `Set ${d.setNumber}:`;
+                                if (d.weight) text += ` ${d.weight}kg`;
+                                if (d.reps) text += ` x ${d.reps}`;
+                                exDetails.push(text);
+                            });
+                        }
+                        
+                        summaryHtml += `
+                            <div class="mt-2 pt-2" style="border-top: 1px solid rgba(0,0,0,0.05);">
+                                <div style="font-weight:600; font-size:0.9rem;">${ex.name} (${ex.setsCompleted}/${ex.totalSets} sets)</div>
+                                <div class="text-sm text-muted" style="margin-top:2px;">
+                                    ${exDetails.length > 0 ? exDetails.join(', ') : 'Afgevinkt (geen details)'}
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    summaryHtml = '<div class="text-sm text-muted mt-2">Geen details beschikbaar (oude sessie).</div>';
+                }
+
+                const el = document.createElement('div');
+                el.className = 'glass-panel';
+                el.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                        <div>
+                            <div style="font-weight:600;">${log.sessionName || 'Sessie'}</div>
+                            <div class="text-sm text-muted">${dateStr} • ${log.duration} min • ${log.exercisesCompleted} oefeningen</div>
+                        </div>
+                        <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
+                    </div>
+                    <div class="hidden history-details">
+                        ${summaryHtml}
+                    </div>
+                `;
+                listWrapper.appendChild(el);
+            });
+            
+            planSection.appendChild(listWrapper);
+            hList.appendChild(planSection);
+        }
     },
 
     setActivePlan(id) {
@@ -498,7 +517,11 @@ const app = {
             }
         });
 
+        const activePlan = store.getActivePlan();
+
         store.saveWorkoutLog({
+            planId: activePlan ? activePlan.id : null,
+            planName: activePlan ? activePlan.name : 'Overige Sessies',
             sessionId: this.activeWorkout.session.id,
             sessionName: this.activeWorkout.session.name,
             duration: duration,
