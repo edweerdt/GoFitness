@@ -76,6 +76,12 @@ const app = {
         const navBtn = document.querySelector(`.nav-item[data-target="${viewId}"]`);
         if(navBtn) navBtn.classList.add('active');
         
+        if (viewId === 'workout') {
+            document.getElementById('bottom-nav').classList.add('hidden');
+        } else {
+            document.getElementById('bottom-nav').classList.remove('hidden');
+        }
+
         this.currentView = viewId;
         
         if(viewId === 'home') this.renderHome();
