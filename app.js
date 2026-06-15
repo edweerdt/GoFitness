@@ -630,8 +630,47 @@ const app = {
     },
 
     showEditLogModal(logId) {
-        this.logToEdit = JSON.parse(JSON.stringify(store.logs.find(l => l.id === logId))); // clone to avoid saving unsaved edits
-        if (!this.logToEdit) return;
+        const originalLog = store.logs.find(l => l.id === logId);
+        if (!originalLog) return;
+        
+        this.logToEdit = JSON.parse(JSON.stringify(originalLog));
+        
+        const plan = store.plans.find(p => p.id === this.logToEdit.planId);
+        const session = plan ? plan.sessions.find(s => s.id === this.logToEdit.sessionId) : null;
+        
+        if (session) {
+            const fullExercises = session.exercises.map(sessionEx => {
+                const loggedEx = this.logToEdit.exercises.find(e => e.name === sessionEx.name);
+                const details = [];
+                for (let i = 1; i <= sessionEx.sets; i++) {
+                    const loggedSet = loggedEx && loggedEx.details ? loggedEx.details.find(d => d.setNumber === i) : null;
+                    details.push({
+                        setNumber: i,
+                        weight: loggedSet ? loggedSet.weight : '',
+                        reps: loggedSet ? loggedSet.reps : ''
+                    });
+                }
+                return {
+                    name: sessionEx.name,
+                    totalSets: sessionEx.sets,
+                    setsCompleted: loggedEx ? loggedEx.setsCompleted : 0,
+                    details: details
+                };
+            });
+            this.logToEdit.exercises = fullExercises;
+        } else {
+            this.logToEdit.exercises.forEach(ex => {
+                if (ex.totalSets > ex.details.length) {
+                    for (let i = 1; i <= ex.totalSets; i++) {
+                        if (!ex.details.find(d => d.setNumber === i)) {
+                            ex.details.push({ setNumber: i, weight: '', reps: '' });
+                        }
+                    }
+                    ex.details.sort((a,b) => a.setNumber - b.setNumber);
+                }
+            });
+        }
+
         this.renderEditLogModal();
         document.getElementById('modal-edit-log').classList.remove('hidden');
     },
@@ -695,6 +734,18 @@ const app = {
 
     saveEditLog() {
         if (!this.logToEdit) return;
+        
+        let totalExercisesCompleted = 0;
+        this.logToEdit.exercises.forEach(ex => {
+            const completedDetails = ex.details.filter(d => (d.weight && d.weight.toString().trim() !== '') || (d.reps && d.reps.toString().trim() !== ''));
+            ex.setsCompleted = completedDetails.length;
+            ex.details = completedDetails;
+            if (ex.setsCompleted > 0) totalExercisesCompleted++;
+        });
+        
+        this.logToEdit.exercises = this.logToEdit.exercises.filter(ex => ex.setsCompleted > 0);
+        this.logToEdit.exercisesCompleted = totalExercisesCompleted;
+
         const index = store.logs.findIndex(l => l.id === this.logToEdit.id);
         if (index > -1) {
             store.logs[index] = this.logToEdit;
