@@ -336,18 +336,30 @@ const app = {
                     summaryHtml = '<div class="text-sm text-muted mt-2">Geen details beschikbaar (oude sessie).</div>';
                 }
 
+                if (log.exercises && log.exercises.length > 0) {
+                    summaryHtml += `
+                        <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal('${log.id}')">edit_note</span>
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteLogModal('${log.id}')">delete_outline</span>
+                        </div>
+                    `;
+                } else {
+                    summaryHtml += `
+                        <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteLogModal('${log.id}')">delete_outline</span>
+                        </div>
+                    `;
+                }
+
                 const el = document.createElement('div');
                 el.className = 'glass-panel';
                 el.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div style="flex:1; cursor:pointer;" onclick="this.parentElement.nextElementSibling.classList.toggle('hidden')">
+                    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                        <div>
                             <div style="font-weight:600;">${log.sessionName || 'Sessie'}</div>
                             <div class="text-sm text-muted">${dateStr} • ${log.duration} min • ${log.exercisesCompleted} oefeningen</div>
                         </div>
-                        <div style="display:flex; gap:12px; align-items:center;">
-                            <span class="material-icons-round text-muted" style="font-size:1.2rem; cursor:pointer;" onclick="this.parentElement.parentElement.nextElementSibling.classList.toggle('hidden')">expand_more</span>
-                            <span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteLogModal('${log.id}')">delete_outline</span>
-                        </div>
+                        <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
                     </div>
                     <div class="hidden history-details">
                         ${summaryHtml}
@@ -565,6 +577,81 @@ const app = {
         this.hideDeleteLogModal();
         this.renderProgress();
         this.renderHome(); // Update home stats if needed
+    },
+
+    showEditLogModal(logId) {
+        this.logToEdit = JSON.parse(JSON.stringify(store.logs.find(l => l.id === logId))); // clone to avoid saving unsaved edits
+        if (!this.logToEdit) return;
+        this.renderEditLogModal();
+        document.getElementById('modal-edit-log').classList.remove('hidden');
+    },
+
+    hideEditLogModal() {
+        this.logToEdit = null;
+        document.getElementById('modal-edit-log').classList.add('hidden');
+    },
+
+    updateEditLogWeight(exIndex, setIndex, val) {
+        const detail = this.logToEdit.exercises[exIndex].details.find(d => d.setNumber === setIndex + 1);
+        if (detail) detail.weight = val;
+    },
+
+    updateEditLogReps(exIndex, setIndex, val) {
+        const detail = this.logToEdit.exercises[exIndex].details.find(d => d.setNumber === setIndex + 1);
+        if (detail) detail.reps = val;
+    },
+
+    renderEditLogModal() {
+        const container = document.getElementById('edit-log-container');
+        container.innerHTML = '';
+
+        if (!this.logToEdit.exercises || this.logToEdit.exercises.length === 0) {
+            container.innerHTML = '<p class="text-muted">Geen details beschikbaar voor deze oude sessie.</p>';
+            return;
+        }
+
+        this.logToEdit.exercises.forEach((ex, exIndex) => {
+            let setsHtml = '';
+            
+            if (ex.details && ex.details.length > 0) {
+                ex.details.forEach(d => {
+                    const setIndex = d.setNumber - 1;
+                    setsHtml += `
+                        <div class="set-row" style="margin-top: 8px; justify-content: space-between;">
+                            <div class="set-info text-muted">Set ${d.setNumber}</div>
+                            <div style="display:flex; gap:8px;">
+                                <input type="number" class="input-field" placeholder="kg" style="width:70px; text-align:center;" 
+                                    value="${d.weight || ''}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
+                                <input type="number" class="input-field" placeholder="reps" style="width:70px; text-align:center;" 
+                                    value="${d.reps || ''}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                setsHtml = '<div class="text-sm text-muted">Geen details opgeslagen voor deze oefening.</div>';
+            }
+
+            const card = document.createElement('div');
+            card.className = 'glass-panel';
+            card.style.padding = '12px';
+            card.innerHTML = `
+                <div style="font-weight: 600; margin-bottom: 8px;">${ex.name}</div>
+                <div>${setsHtml}</div>
+            `;
+            container.appendChild(card);
+        });
+    },
+
+    saveEditLog() {
+        if (!this.logToEdit) return;
+        const index = store.logs.findIndex(l => l.id === this.logToEdit.id);
+        if (index > -1) {
+            store.logs[index] = this.logToEdit;
+            store.save();
+        }
+        this.hideEditLogModal();
+        this.renderProgress();
     },
 
     // --- IMPORT / EXPORT ---

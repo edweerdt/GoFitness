@@ -184,6 +184,22 @@
                 </div>
             </div>
         </div>
+
+        <!-- Edit Log Modal -->
+        <div id="modal-edit-log" class="modal-overlay hidden">
+            <div class="modal-content glass-panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h3>Sessie Bewerken</h3>
+                    <button class="icon-btn" onclick="app.hideEditLogModal()"><span class="material-icons-round">close</span></button>
+                </div>
+                <div id="edit-log-container" class="flex-col gap-3" style="max-height: 60vh; overflow-y: auto; padding-right: 4px;">
+                    <!-- Injected by JS -->
+                </div>
+                <div class="mt-6">
+                    <button class="btn-primary w-full" onclick="app.saveEditLog()">Wijzigingen Opslaan</button>
+                </div>
+            </div>
+        </div>
     </div>
     
     <script src="app.js"></script>
