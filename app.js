@@ -81,20 +81,23 @@ const app = {
     },
 
     applyTheme() {
-        const btn = document.getElementById('theme-toggle-btn');
-        const icon = btn ? btn.querySelector('.material-icons-round') : null;
+        const btns = document.querySelectorAll('.theme-toggle-btn');
         
         document.documentElement.classList.remove('theme-light', 'theme-dark');
         
+        let iconName = 'brightness_auto';
         if (store.theme === 'light') {
             document.documentElement.classList.add('theme-light');
-            if(icon) icon.textContent = 'light_mode';
+            iconName = 'light_mode';
         } else if (store.theme === 'dark') {
             document.documentElement.classList.add('theme-dark');
-            if(icon) icon.textContent = 'dark_mode';
-        } else {
-            if(icon) icon.textContent = 'brightness_auto';
+            iconName = 'dark_mode';
         }
+
+        btns.forEach(btn => {
+            const icon = btn.querySelector('.material-icons-round');
+            if (icon) icon.textContent = iconName;
+        });
     },
 
     navigate(viewId) {

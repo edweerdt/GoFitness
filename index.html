@@ -30,7 +30,7 @@
                                 <span id="recovery-text">Klaar om te trainen</span>
                             </div>
                         </div>
-                        <button class="icon-btn" onclick="app.toggleTheme()" id="theme-toggle-btn" title="Thema aanpassen">
+                        <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen">
                             <span class="material-icons-round">brightness_auto</span>
                         </button>
                     </div>
@@ -71,7 +71,9 @@
                 <header class="workout-header">
                     <button class="icon-btn" onclick="app.navigate('home')"><span class="material-icons-round">close</span></button>
                     <h2 id="workout-title">Training</h2>
-                    <div style="width:24px"></div> <!-- spacer -->
+                    <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen">
+                        <span class="material-icons-round">brightness_auto</span>
+                    </button>
                 </header>
                 <div class="content-padded pb-32 flex-col gap-3" id="workout-exercise-list">
                     <!-- Exercises injected here -->

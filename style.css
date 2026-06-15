@@ -407,6 +407,7 @@ button:disabled {
 .theme-light #bottom-nav { background: rgba(255, 255, 255, 0.85); border-top: 1px solid rgba(0, 0, 0, 0.05); }
 .theme-light .weight-input, .theme-light .input-field { background: var(--surface-color); border: 1px solid rgba(0,0,0,0.2); color: var(--text-primary); }
 .theme-light .check-btn { background: var(--surface-color); border: 1px solid rgba(0,0,0,0.2); }
+.theme-light .check-btn.checked { background: var(--status-green); color: white; border-color: var(--status-green); }
 .theme-light .set-row { border-bottom: 1px solid rgba(0,0,0,0.05); }
 
 /* System Preference Fallback */
@@ -428,5 +429,6 @@ button:disabled {
     :root:not(.theme-dark) #bottom-nav { background: rgba(255, 255, 255, 0.85); border-top: 1px solid rgba(0, 0, 0, 0.05); }
     :root:not(.theme-dark) .weight-input, :root:not(.theme-dark) .input-field { background: var(--surface-color); border: 1px solid rgba(0,0,0,0.2); color: var(--text-primary); }
     :root:not(.theme-dark) .check-btn { background: var(--surface-color); border: 1px solid rgba(0,0,0,0.2); }
+    :root:not(.theme-dark) .check-btn.checked { background: var(--status-green); color: white; border-color: var(--status-green); }
     :root:not(.theme-dark) .set-row { border-bottom: 1px solid rgba(0,0,0,0.05); }
 }
