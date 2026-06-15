@@ -430,6 +430,8 @@ const app = {
     showImportModal() {
         document.getElementById('import-json-text').value = '';
         document.getElementById('import-file').value = '';
+        const urlInput = document.getElementById('import-url');
+        if (urlInput) urlInput.value = '';
         document.getElementById('import-error').classList.add('hidden');
         document.getElementById('import-preview').classList.add('hidden');
         document.getElementById('btn-confirm-import').textContent = 'Preview';
@@ -440,6 +442,36 @@ const app = {
 
     hideModal() {
         document.getElementById('modal-overlay').classList.add('hidden');
+    },
+
+    async fetchFromUrl() {
+        const urlInput = document.getElementById('import-url');
+        if (!urlInput || !urlInput.value.trim()) return;
+        
+        const rawUrl = urlInput.value.trim();
+        const errEl = document.getElementById('import-error');
+        errEl.classList.add('hidden');
+        
+        let fetchUrl = rawUrl;
+        const driveMatch = rawUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || rawUrl.match(/id=([a-zA-Z0-9_-]+)/);
+        if (rawUrl.includes('drive.google.com') && driveMatch) {
+            fetchUrl = `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+        }
+        
+        try {
+            urlInput.disabled = true;
+            const res = await fetch(fetchUrl);
+            if (!res.ok) throw new Error(`Netwerk fout (${res.status}). Controleer of de link publiek toegankelijk is.`);
+            
+            const text = await res.text();
+            document.getElementById('import-json-text').value = text;
+            this.previewImport();
+        } catch (e) {
+            errEl.textContent = "Fout bij ophalen link: " + e.message + " (Soms blokkeert je browser de verbinding vanwege beveiliging).";
+            errEl.classList.remove('hidden');
+        } finally {
+            urlInput.disabled = false;
+        }
     },
 
     handleFileSelect(e) {

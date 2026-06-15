@@ -135,8 +135,12 @@
         <div id="modal-overlay" class="modal-overlay hidden">
             <div id="import-modal" class="modal-content glass-panel">
                 <h3>Schema Importeren</h3>
-                <p class="text-sm text-muted mt-2">Kies een JSON bestand of plak de tekst hieronder.</p>
-                <textarea id="import-json-text" rows="8" class="mt-2 input-field" placeholder='{"name": "Mijn Schema", ...}'></textarea>
+                <p class="text-sm text-muted mt-2">Kies een bestand, plak de tekst, of plak een (Google Drive) link.</p>
+                <div style="display:flex; gap:8px; margin-top:12px;">
+                    <input type="text" id="import-url" class="input-field" placeholder="https://drive.google.com/..." style="flex:1;">
+                    <button class="btn-secondary" onclick="app.fetchFromUrl()" style="padding: 0 16px;">Haal Op</button>
+                </div>
+                <textarea id="import-json-text" rows="5" class="mt-2 input-field" placeholder='{"name": "Mijn Schema", ...}'></textarea>
                 <input type="file" id="import-file" accept=".json" class="mt-2 file-input">
                 <div id="import-error" class="status-badge mt-2 hidden" style="background: rgba(255, 82, 82, 0.1); color: #ff5252; border: 1px solid rgba(255,82,82,0.2);"></div>
                 <div id="import-preview" class="glass-panel mt-2 hidden"></div>
