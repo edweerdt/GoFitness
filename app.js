@@ -198,7 +198,7 @@ const app = {
             btnStart.onclick = () => {
                 document.getElementById('workout-title').textContent = this.activeWorkout.session.name;
                 this.renderWorkoutExercises();
-                document.getElementById('btn-finish-workout').onclick = () => this.finishWorkout();
+                document.getElementById('btn-finish-workout').onclick = () => this.showFinishModal();
                 document.getElementById('bottom-nav').classList.add('hidden');
                 document.getElementById('view-workout').querySelector('.sticky-footer').style.bottom = '0';
                 this.navigate('workout');
@@ -387,7 +387,7 @@ const app = {
         document.getElementById('workout-title').textContent = session.name;
         this.renderWorkoutExercises();
         
-        document.getElementById('btn-finish-workout').onclick = () => this.finishWorkout();
+        document.getElementById('btn-finish-workout').onclick = () => this.showFinishModal();
         
         document.getElementById('bottom-nav').classList.add('hidden');
         document.getElementById('view-workout').querySelector('.sticky-footer').style.bottom = '0';
@@ -486,7 +486,16 @@ const app = {
         store.saveActiveWorkoutState(this.activeWorkout);
     },
 
+    showFinishModal() {
+        document.getElementById('modal-finish-workout').classList.remove('hidden');
+    },
+
+    hideFinishModal() {
+        document.getElementById('modal-finish-workout').classList.add('hidden');
+    },
+
     finishWorkout() {
+        this.hideFinishModal();
         const duration = Math.round((new Date() - this.activeWorkout.startTime) / 60000);
         let totalExercisesCompleted = 0;
         
