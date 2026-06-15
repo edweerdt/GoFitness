@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Go Fitness</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121212">
+    <!-- Google Fonts for premium look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+</head>
+<body>
+    <!-- App Container -->
+    <div id="app">
+        <!-- Views will be injected or toggled here -->
+        <main id="main-content">
+            <!-- Home View -->
+            <section id="view-home" class="view active">
+                <header class="home-header">
+                    <h1 id="home-date">Vandaag</h1>
+                    <div id="recovery-status" class="status-badge green">
+                        <span class="material-icons-round">battery_charging_full</span>
+                        <span id="recovery-text">Klaar om te trainen</span>
+                    </div>
+                </header>
+                <div class="content-padded">
+                    <div class="recommended-card glass-panel">
+                        <h3>Aanbevolen Sessie</h3>
+                        <h2 id="recommended-session-name">Geen schema actief</h2>
+                        <p id="recommended-reason" class="text-muted">Importeer eerst een trainingsschema.</p>
+                        <button id="btn-start-session" class="btn-primary mt-4" disabled>Start Nu</button>
+                    </div>
+                    
+                    <div class="stats-mini mt-4">
+                        <div class="stat-box glass-panel">
+                            <div class="stat-icon-wrapper text-accent">
+                                <span class="material-icons-round">local_fire_department</span>
+                            </div>
+                            <div class="stat-details">
+                                <span class="stat-value" id="stat-streak">0</span>
+                                <span class="stat-label">Weken Streak</span>
+                            </div>
+                        </div>
+                        <div class="stat-box glass-panel">
+                            <div class="stat-icon-wrapper text-accent">
+                                <span class="material-icons-round">done_all</span>
+                            </div>
+                            <div class="stat-details">
+                                <span class="stat-value" id="stat-completed">0</span>
+                                <span class="stat-label">Sessies</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Workout View -->
+            <section id="view-workout" class="view">
+                <header class="workout-header">
+                    <button class="icon-btn" onclick="app.navigate('home')"><span class="material-icons-round">close</span></button>
+                    <h2 id="workout-title">Training</h2>
+                    <div style="width:24px"></div> <!-- spacer -->
+                </header>
+                <div class="content-padded pb-32 flex-col gap-3" id="workout-exercise-list">
+                    <!-- Exercises injected here -->
+                </div>
+                <div class="sticky-footer glass-panel">
+                    <button id="btn-finish-workout" class="btn-primary w-full">Sessie Afronden</button>
+                </div>
+            </section>
+
+            <!-- Plans View -->
+            <section id="view-plans" class="view">
+                <header class="top-nav">
+                    <h2>Schema's</h2>
+                </header>
+                <div class="content-padded pb-32">
+                    <div class="actions-row">
+                        <button class="btn-secondary flex-1" onclick="app.showImportModal()"><span class="material-icons-round">upload_file</span> Importeer JSON</button>
+                        <button class="btn-secondary flex-1" onclick="app.exportData()"><span class="material-icons-round">download</span> Backup</button>
+                    </div>
+                    <div id="plans-list" class="mt-4 flex-col gap-3">
+                        <!-- Plans injected here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Progress View -->
+            <section id="view-progress" class="view">
+                <header class="top-nav">
+                    <h2>Voortgang</h2>
+                </header>
+                <div class="content-padded pb-32">
+                    <h3>Statistieken</h3>
+                    <div class="stats-grid mt-2" id="full-stats-grid">
+                        <!-- Stats injected here -->
+                    </div>
+                    <h3 class="mt-6">Mijlpalen</h3>
+                    <div id="milestones-list" class="mt-2 flex-col gap-3">
+                        <!-- Milestones injected here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav id="bottom-nav" class="glass-panel">
+            <button class="nav-item active" data-target="home">
+                <span class="material-icons-round">home</span>
+                <span>Home</span>
+            </button>
+            <button class="nav-item" data-target="plans">
+                <span class="material-icons-round">view_list</span>
+                <span>Schema's</span>
+            </button>
+            <button class="nav-item" data-target="progress">
+                <span class="material-icons-round">emoji_events</span>
+                <span>Voortgang</span>
+            </button>
+        </nav>
+
+        <!-- Modal Overlay -->
+        <div id="modal-overlay" class="modal-overlay hidden">
+            <div id="import-modal" class="modal-content glass-panel">
+                <h3>Schema Importeren</h3>
+                <p class="text-sm text-muted mt-2">Kies een JSON bestand of plak de tekst hieronder.</p>
+                <textarea id="import-json-text" rows="8" class="mt-2 input-field" placeholder='{"name": "Mijn Schema", ...}'></textarea>
+                <input type="file" id="import-file" accept=".json" class="mt-2 file-input">
+                <div id="import-error" class="status-badge mt-2 hidden" style="background: rgba(255, 82, 82, 0.1); color: #ff5252; border: 1px solid rgba(255,82,82,0.2);"></div>
+                <div id="import-preview" class="glass-panel mt-2 hidden"></div>
+                <div class="modal-actions mt-4">
+                    <button class="btn-secondary flex-1" onclick="app.hideModal()">Annuleren</button>
+                    <button id="btn-confirm-import" class="btn-primary flex-1" onclick="app.processImport()">Importeer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('SW geregistreerd!'))
+                .catch(err => console.log('SW registratie faalde', err));
+        }
+    </script>
+</body>
+</html>
