@@ -389,9 +389,29 @@ button:disabled {
     color: var(--text-muted);
 }
 
-/* Light Theme Support */
+/* Light Theme Variables & Overrides */
+:root.theme-light {
+    --bg-color: #f3f4f6;
+    --surface-color: #ffffff;
+    --surface-light: #e5e7eb;
+    --text-primary: #111827;
+    --text-muted: #6b7280;
+    --accent-color: #2563eb;
+    --accent-hover: #1d4ed8;
+}
+.theme-light .glass-panel {
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+.theme-light .workout-header, .theme-light .top-nav { background: rgba(243, 244, 246, 0.9); }
+.theme-light #bottom-nav { background: rgba(255, 255, 255, 0.85); border-top: 1px solid rgba(0, 0, 0, 0.05); }
+.theme-light .weight-input, .theme-light .input-field { background: var(--surface-color); border: 1px solid rgba(0,0,0,0.2); color: var(--text-primary); }
+.theme-light .check-btn { background: var(--surface-color); border: 1px solid rgba(0,0,0,0.2); }
+.theme-light .set-row { border-bottom: 1px solid rgba(0,0,0,0.05); }
+
+/* System Preference Fallback */
 @media (prefers-color-scheme: light) {
-    :root {
+    :root:not(.theme-dark) {
         --bg-color: #f3f4f6;
         --surface-color: #ffffff;
         --surface-light: #e5e7eb;
@@ -400,33 +420,13 @@ button:disabled {
         --accent-color: #2563eb;
         --accent-hover: #1d4ed8;
     }
-    
-    .glass-panel {
+    :root:not(.theme-dark) .glass-panel {
         border: 1px solid rgba(0, 0, 0, 0.05);
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
     }
-    
-    .workout-header, .top-nav {
-        background: rgba(243, 244, 246, 0.9);
-    }
-
-    #bottom-nav {
-        background: rgba(255, 255, 255, 0.85);
-        border-top: 1px solid rgba(0, 0, 0, 0.05);
-    }
-    
-    .weight-input, .input-field {
-        background: var(--surface-color);
-        border: 1px solid rgba(0,0,0,0.2);
-        color: var(--text-primary);
-    }
-    
-    .check-btn {
-        background: var(--surface-color);
-        border: 1px solid rgba(0,0,0,0.2);
-    }
-
-    .set-row {
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-    }
+    :root:not(.theme-dark) .workout-header, :root:not(.theme-dark) .top-nav { background: rgba(243, 244, 246, 0.9); }
+    :root:not(.theme-dark) #bottom-nav { background: rgba(255, 255, 255, 0.85); border-top: 1px solid rgba(0, 0, 0, 0.05); }
+    :root:not(.theme-dark) .weight-input, :root:not(.theme-dark) .input-field { background: var(--surface-color); border: 1px solid rgba(0,0,0,0.2); color: var(--text-primary); }
+    :root:not(.theme-dark) .check-btn { background: var(--surface-color); border: 1px solid rgba(0,0,0,0.2); }
+    :root:not(.theme-dark) .set-row { border-bottom: 1px solid rgba(0,0,0,0.05); }
 }

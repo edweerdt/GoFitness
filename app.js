@@ -9,11 +9,13 @@ class DataStore {
         this.activePlanId = localStorage.getItem('activePlanId') || null;
         this.logs = JSON.parse(localStorage.getItem('logs') || '[]');
         this.activeWorkoutState = JSON.parse(localStorage.getItem('activeWorkoutState')) || null;
+        this.theme = localStorage.getItem('theme') || 'auto';
     }
     save() {
         localStorage.setItem('plans', JSON.stringify(this.plans));
         if(this.activePlanId) localStorage.setItem('activePlanId', this.activePlanId);
         localStorage.setItem('logs', JSON.stringify(this.logs));
+        localStorage.setItem('theme', this.theme);
     }
     saveActiveWorkoutState(state) {
         this.activeWorkoutState = state;
@@ -62,10 +64,37 @@ const app = {
             }
         }
 
+        this.applyTheme();
+
         this.setupNavigation();
         this.renderHome();
         this.renderPlans();
         this.renderProgress();
+    },
+
+    toggleTheme() {
+        const themes = ['auto', 'light', 'dark'];
+        const currentIdx = themes.indexOf(store.theme);
+        store.theme = themes[(currentIdx + 1) % themes.length];
+        store.save();
+        this.applyTheme();
+    },
+
+    applyTheme() {
+        const btn = document.getElementById('theme-toggle-btn');
+        const icon = btn ? btn.querySelector('.material-icons-round') : null;
+        
+        document.documentElement.classList.remove('theme-light', 'theme-dark');
+        
+        if (store.theme === 'light') {
+            document.documentElement.classList.add('theme-light');
+            if(icon) icon.textContent = 'light_mode';
+        } else if (store.theme === 'dark') {
+            document.documentElement.classList.add('theme-dark');
+            if(icon) icon.textContent = 'dark_mode';
+        } else {
+            if(icon) icon.textContent = 'brightness_auto';
+        }
     },
 
     navigate(viewId) {

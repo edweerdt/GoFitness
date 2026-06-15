@@ -22,10 +22,17 @@
             <!-- Home View -->
             <section id="view-home" class="view active">
                 <header class="home-header">
-                    <h1 id="home-date">Vandaag</h1>
-                    <div id="recovery-status" class="status-badge green">
-                        <span class="material-icons-round">battery_charging_full</span>
-                        <span id="recovery-text">Klaar om te trainen</span>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <h1 id="home-date">Vandaag</h1>
+                            <div id="recovery-status" class="status-badge green mt-2">
+                                <span class="material-icons-round">battery_charging_full</span>
+                                <span id="recovery-text">Klaar om te trainen</span>
+                            </div>
+                        </div>
+                        <button class="icon-btn" onclick="app.toggleTheme()" id="theme-toggle-btn" title="Thema aanpassen">
+                            <span class="material-icons-round">brightness_auto</span>
+                        </button>
                     </div>
                 </header>
                 <div class="content-padded">
