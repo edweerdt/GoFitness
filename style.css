@@ -388,3 +388,45 @@ button:disabled {
     width: 100%;
     color: var(--text-muted);
 }
+
+/* Light Theme Support */
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg-color: #f3f4f6;
+        --surface-color: #ffffff;
+        --surface-light: #e5e7eb;
+        --text-primary: #111827;
+        --text-muted: #6b7280;
+        --accent-color: #2563eb;
+        --accent-hover: #1d4ed8;
+    }
+    
+    .glass-panel {
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
+    
+    .workout-header, .top-nav {
+        background: rgba(243, 244, 246, 0.9);
+    }
+
+    #bottom-nav {
+        background: rgba(255, 255, 255, 0.85);
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    .weight-input, .input-field {
+        background: var(--surface-color);
+        border: 1px solid rgba(0,0,0,0.2);
+        color: var(--text-primary);
+    }
+    
+    .check-btn {
+        background: var(--surface-color);
+        border: 1px solid rgba(0,0,0,0.2);
+    }
+
+    .set-row {
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+}
