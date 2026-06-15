@@ -256,7 +256,10 @@ const app = {
                         <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2;">${p.name}</h3>
                         ${desc}
                     </div>
-                    ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; margin-left:12px; white-space:nowrap;">Actief</span>' : ''}
+                    <div style="display:flex; align-items:center; gap:8px; margin-left:12px;">
+                        ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
+                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeletePlanModal('${p.id}')">delete_outline</span>
+                    </div>
                 </div>
                 
                 <div style="background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; margin-top: 8px;">
@@ -402,6 +405,28 @@ const app = {
         store.activePlanId = id;
         store.save();
         this.renderPlans();
+    },
+
+    showDeletePlanModal(planId) {
+        this.planToDelete = planId;
+        document.getElementById('modal-delete-plan').classList.remove('hidden');
+    },
+
+    hideDeletePlanModal() {
+        this.planToDelete = null;
+        document.getElementById('modal-delete-plan').classList.add('hidden');
+    },
+
+    confirmDeletePlan() {
+        if (!this.planToDelete) return;
+        store.plans = store.plans.filter(p => p.id !== this.planToDelete);
+        if (store.activePlanId === this.planToDelete) {
+            store.activePlanId = null;
+        }
+        store.save();
+        this.hideDeletePlanModal();
+        this.renderPlans();
+        this.renderHome();
     },
 
     calculateStreak() {
