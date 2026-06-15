@@ -19,11 +19,14 @@ class DataStore {
     }
     importPlan(planData) {
         planData.id = 'plan_' + Date.now();
-        // Give ids to sessions and exercises
+        // Give ids to sessions and exercises if they don't have one
         planData.sessions.forEach(s => {
-            s.id = 'sess_' + Math.random().toString(36).substr(2, 9);
+            if (!s.id && !s.sessionId) s.id = 'sess_' + Math.random().toString(36).substr(2, 9);
+            else if (s.sessionId) s.id = s.sessionId;
+            
             s.exercises.forEach(e => {
-                e.id = 'ex_' + Math.random().toString(36).substr(2, 9);
+                if (!e.id && !e.exerciseId) e.id = 'ex_' + Math.random().toString(36).substr(2, 9);
+                else if (e.exerciseId) e.id = e.exerciseId;
             });
         });
         this.plans.push(planData);
@@ -84,7 +87,7 @@ const app = {
         
         const lastLog = store.logs[store.logs.length - 1];
         const hoursSinceLast = (new Date() - new Date(lastLog.date)) / (1000 * 60 * 60);
-        const minHours = plan.minRecoveryHours || 48;
+        const minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
         
         if(hoursSinceLast < (minHours * 0.5)) return { status: 'red', text: 'Beter rusten' };
         if(hoursSinceLast < minHours) return { status: 'orange', text: 'Rustig aan' };
@@ -163,12 +166,13 @@ const app = {
             const el = document.createElement('div');
             el.className = 'glass-panel flex-col gap-3';
             const isActive = store.activePlanId === p.id;
+            const targetSessions = (p.schedule && p.schedule.targetSessionsPerWeek) ? p.schedule.targetSessionsPerWeek : (p.targetSessionsPerWeek || '?');
             el.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem">${p.name}</h3>
                     ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem">Actief</span>' : ''}
                 </div>
-                <p class="text-sm text-muted">${p.sessions.length} sessies • ${p.targetSessionsPerWeek}x per week</p>
+                <p class="text-sm text-muted">${p.sessions.length} sessies • ${targetSessions}x per week</p>
                 ${!isActive ? `<button class="btn-secondary mt-2 w-full" onclick="app.setActivePlan('${p.id}')">Maak Actief</button>` : ''}
             `;
             list.appendChild(el);
@@ -224,7 +228,8 @@ const app = {
             exercises: session.exercises.map(e => ({
                 ...e,
                 setsCompleted: Array(e.sets).fill(false),
-                weights: Array(e.sets).fill('')
+                weights: Array(e.sets).fill(''),
+                actualReps: Array(e.sets).fill('')
             }))
         };
         
@@ -244,15 +249,50 @@ const app = {
         list.innerHTML = '';
         
         this.activeWorkout.exercises.forEach((ex, exIndex) => {
+            // Build rep/duration string
+            let metaString = `${ex.sets} sets`;
+            if (ex.repsMin && ex.repsMax) metaString += ` • ${ex.repsMin}-${ex.repsMax} reps`;
+            else if (ex.reps) metaString += ` • ${ex.reps}`;
+            else if (ex.durationSecondsMin && ex.durationSecondsMax) metaString += ` • ${ex.durationSecondsMin}-${ex.durationSecondsMax} sec`;
+            else if (ex.duration) metaString += ` • ${ex.duration}`;
+            
+            // Build notes & alternatives
+            let notesHtml = '';
+            if (ex.notes && Array.isArray(ex.notes) && ex.notes.length > 0) {
+                notesHtml += `<ul class="text-sm text-muted mt-2" style="list-style-type: disc; padding-left: 20px;">`;
+                ex.notes.forEach(n => notesHtml += `<li>${n}</li>`);
+                notesHtml += `</ul>`;
+            } else if (ex.notes && typeof ex.notes === 'string') {
+                notesHtml += `<div class="text-sm text-muted mt-2">${ex.notes}</div>`;
+            }
+
+            if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
+                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${ex.optionalAlternatives.join(', ')}</div>`;
+            }
+
             let setsHtml = '';
             for(let i=0; i<ex.sets; i++) {
                 const checked = ex.setsCompleted[i] ? 'checked' : '';
+                
+                // TrackMetrics check for dynamic inputs
+                const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
+                const wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : false;
+                
+                let inputsHtml = '';
+                if (wantsWeight) {
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="kg" 
+                        value="${ex.weights ? ex.weights[i] : ''}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">`;
+                }
+                if (wantsReps) {
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="reps" style="width: 55px;"
+                        value="${ex.actualReps ? ex.actualReps[i] : ''}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+                }
+
                 setsHtml += `
                     <div class="set-row">
                         <div class="set-info text-muted">Set ${i+1}</div>
                         <div class="set-actions">
-                            <input type="number" class="weight-input" placeholder="kg" 
-                                value="${ex.weights[i]}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">
+                            ${inputsHtml}
                             <button class="check-btn ${checked}" onclick="app.toggleSet(${exIndex}, ${i})">
                                 <span class="material-icons-round">check</span>
                             </button>
@@ -267,7 +307,8 @@ const app = {
                 <div class="exercise-header">
                     <div>
                         <div class="exercise-title">${ex.name}</div>
-                        <div class="exercise-meta">${ex.sets} sets • ${ex.reps || ex.duration}</div>
+                        <div class="exercise-meta">${metaString}</div>
+                        ${notesHtml}
                     </div>
                 </div>
                 <div class="exercise-body">
@@ -285,6 +326,10 @@ const app = {
 
     updateWeight(exIndex, setIndex, val) {
         this.activeWorkout.exercises[exIndex].weights[setIndex] = val;
+    },
+
+    updateReps(exIndex, setIndex, val) {
+        this.activeWorkout.exercises[exIndex].actualReps[setIndex] = val;
     },
 
     finishWorkout() {
