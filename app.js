@@ -8,11 +8,20 @@ class DataStore {
         this.plans = JSON.parse(localStorage.getItem('plans') || '[]');
         this.activePlanId = localStorage.getItem('activePlanId') || null;
         this.logs = JSON.parse(localStorage.getItem('logs') || '[]');
+        this.activeWorkoutState = JSON.parse(localStorage.getItem('activeWorkoutState')) || null;
     }
     save() {
         localStorage.setItem('plans', JSON.stringify(this.plans));
         if(this.activePlanId) localStorage.setItem('activePlanId', this.activePlanId);
         localStorage.setItem('logs', JSON.stringify(this.logs));
+    }
+    saveActiveWorkoutState(state) {
+        this.activeWorkoutState = state;
+        if(state) {
+            localStorage.setItem('activeWorkoutState', JSON.stringify(state));
+        } else {
+            localStorage.removeItem('activeWorkoutState');
+        }
     }
     getActivePlan() {
         return this.plans.find(p => p.id === this.activePlanId) || null;
@@ -46,6 +55,13 @@ const app = {
     activeWorkout: null,
 
     init() {
+        if(store.activeWorkoutState) {
+            this.activeWorkout = store.activeWorkoutState;
+            if(this.activeWorkout && this.activeWorkout.startTime) {
+                this.activeWorkout.startTime = new Date(this.activeWorkout.startTime);
+            }
+        }
+
         this.setupNavigation();
         this.renderHome();
         this.renderPlans();
@@ -70,10 +86,6 @@ const app = {
     setupNavigation() {
         document.querySelectorAll('.nav-item').forEach(btn => {
             btn.addEventListener('click', () => {
-                if(this.activeWorkout && btn.dataset.target !== 'workout') {
-                    if(!confirm("Je bent met een training bezig. Weet je zeker dat je wilt weggaan?")) return;
-                    this.activeWorkout = null;
-                }
                 this.navigate(btn.dataset.target);
             });
         });
@@ -137,17 +149,37 @@ const app = {
         if(recStatus.status === 'red') icon = 'battery_alert';
         badge.querySelector('.material-icons-round').textContent = icon;
 
-        const recSession = this.getRecommendedSession();
         const btnStart = document.getElementById('btn-start-session');
-        if(recSession) {
-            document.getElementById('recommended-session-name').textContent = recSession.session.name;
-            document.getElementById('recommended-reason').textContent = recSession.reason;
+        
+        if (this.activeWorkout) {
+            document.getElementById('recommended-card-title').textContent = "Sessie in uitvoering";
+            document.getElementById('recommended-session-name').textContent = this.activeWorkout.session.name;
+            document.getElementById('recommended-reason').textContent = "Je was al bezig met deze sessie. Pak hem weer op!";
+            btnStart.textContent = "Hervat Nu";
             btnStart.disabled = false;
-            btnStart.onclick = () => this.startWorkout(recSession.session);
+            btnStart.onclick = () => {
+                document.getElementById('workout-title').textContent = this.activeWorkout.session.name;
+                this.renderWorkoutExercises();
+                document.getElementById('btn-finish-workout').onclick = () => this.finishWorkout();
+                document.getElementById('bottom-nav').classList.add('hidden');
+                document.getElementById('view-workout').querySelector('.sticky-footer').style.bottom = '0';
+                this.navigate('workout');
+            };
         } else {
-            document.getElementById('recommended-session-name').textContent = "Geen schema actief";
-            document.getElementById('recommended-reason').textContent = "Importeer eerst een trainingsschema via Schema's.";
-            btnStart.disabled = true;
+            document.getElementById('recommended-card-title').textContent = "Aanbevolen Sessie";
+            const recSession = this.getRecommendedSession();
+            if(recSession) {
+                document.getElementById('recommended-session-name').textContent = recSession.session.name;
+                document.getElementById('recommended-reason').textContent = recSession.reason;
+                btnStart.textContent = "Start Nu";
+                btnStart.disabled = false;
+                btnStart.onclick = () => this.startWorkout(recSession.session);
+            } else {
+                document.getElementById('recommended-session-name').textContent = "Geen schema actief";
+                document.getElementById('recommended-reason').textContent = "Importeer eerst een trainingsschema via Schema's.";
+                btnStart.textContent = "Start Nu";
+                btnStart.disabled = true;
+            }
         }
 
         // Stats
@@ -232,6 +264,7 @@ const app = {
                 actualReps: Array(e.sets).fill('')
             }))
         };
+        store.saveActiveWorkoutState(this.activeWorkout);
         
         document.getElementById('workout-title').textContent = session.name;
         this.renderWorkoutExercises();
@@ -321,15 +354,18 @@ const app = {
 
     toggleSet(exIndex, setIndex) {
         this.activeWorkout.exercises[exIndex].setsCompleted[setIndex] = !this.activeWorkout.exercises[exIndex].setsCompleted[setIndex];
+        store.saveActiveWorkoutState(this.activeWorkout);
         this.renderWorkoutExercises();
     },
 
     updateWeight(exIndex, setIndex, val) {
         this.activeWorkout.exercises[exIndex].weights[setIndex] = val;
+        store.saveActiveWorkoutState(this.activeWorkout);
     },
 
     updateReps(exIndex, setIndex, val) {
         this.activeWorkout.exercises[exIndex].actualReps[setIndex] = val;
+        store.saveActiveWorkoutState(this.activeWorkout);
     },
 
     finishWorkout() {
@@ -348,6 +384,8 @@ const app = {
         });
 
         this.activeWorkout = null;
+        store.saveActiveWorkoutState(null);
+        
         document.getElementById('bottom-nav').classList.remove('hidden');
         this.navigate('home');
     },
