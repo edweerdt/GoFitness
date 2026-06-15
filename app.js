@@ -236,14 +236,39 @@ const app = {
             const el = document.createElement('div');
             el.className = 'glass-panel flex-col gap-3';
             const isActive = store.activePlanId === p.id;
-            const targetSessions = (p.schedule && p.schedule.targetSessionsPerWeek) ? p.schedule.targetSessionsPerWeek : (p.targetSessionsPerWeek || '?');
+            
+            const sched = p.schedule || {};
+            const targetSessions = sched.targetSessionsPerWeek || p.targetSessionsPerWeek || '?';
+            const desc = p.description ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${p.description}</p>` : '';
+            const recPattern = sched.recommendedPattern || p.recommendedPattern ? 
+                `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${sched.recommendedPattern || p.recommendedPattern}</div>` : '';
+            const recovery = sched.minRecoveryHours || p.minRecoveryHours ? 
+                `<div class="text-sm text-muted"><strong>Herstel:</strong> Minimaal ${sched.minRecoveryHours || p.minRecoveryHours} uur</div>` : '';
+            const weeklyMins = p.estimatedWeeklyMinutes ? 
+                `<div class="text-sm text-muted"><strong>Geschatte tijd per week:</strong> ${p.estimatedWeeklyMinutes} min</div>` : '';
+            const sessionOrder = p.defaultSessionOrder ? 
+                `<div class="text-sm text-muted mt-1"><strong>Sessie volgorde:</strong> ${p.defaultSessionOrder.join(', ')}</div>` : 
+                (p.sessions ? `<div class="text-sm text-muted mt-1"><strong>Sessies:</strong> ${p.sessions.map(s=>s.name).join(', ')}</div>` : '');
+
             el.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem">${p.name}</h3>
-                    ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem">Actief</span>' : ''}
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div style="flex:1;">
+                        <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2;">${p.name}</h3>
+                        ${desc}
+                    </div>
+                    ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; margin-left:12px; white-space:nowrap;">Actief</span>' : ''}
                 </div>
-                <p class="text-sm text-muted">${p.sessions.length} sessies • ${targetSessions}x per week</p>
-                ${!isActive ? `<button class="btn-secondary mt-2 w-full" onclick="app.setActivePlan('${p.id}')">Maak Actief</button>` : ''}
+                
+                <div style="background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; margin-top: 8px;">
+                    <div style="font-weight:600; font-size:0.85rem; margin-bottom:4px; color:var(--accent-color);">DETAILS</div>
+                    <div class="text-sm text-muted"><strong>Frequentie:</strong> ${targetSessions}x per week (${p.sessions.length} unieke sessies)</div>
+                    ${weeklyMins}
+                    ${recovery}
+                    ${recPattern}
+                    ${sessionOrder}
+                </div>
+                
+                ${!isActive ? `<button class="btn-secondary mt-3 w-full" onclick="app.setActivePlan('${p.id}')">Maak Actief</button>` : ''}
             `;
             list.appendChild(el);
         });
