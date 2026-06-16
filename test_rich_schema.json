@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "1.0",
+  "type": "strength",
+  "planId": "rich-plan-001",
+  "name": "Rijk Beginschema",
+  "description": "Een rijk schema voor beginners.",
+  "goal": "Spieropbouw",
+  "level": "Beginner",
+  "locationType": "Gym",
+  "equipment": ["Dumbbells", "Barbell"],
+  "schedule": {
+    "targetSessionsPerWeek": 3,
+    "defaultSessionOrder": ["sess-1", "sess-2"],
+    "minRecoveryHours": 24
+  },
+  "recoveryRules": {
+    "muscleGroupRecoveryHours": {
+      "Chest": 48,
+      "Back": 48
+    }
+  },
+  "progressionRules": "Verhoog met 2.5kg na 3 succesvolle sessies.",
+  "completionRules": "Voltooi alle sets",
+  "successMilestones": [
+    {
+      "id": "ms-1",
+      "title": "Sterkere Borst",
+      "description": "Doe 5 sessies met borstoefeningen.",
+      "condition": {
+        "type": "muscleGroupSessions",
+        "muscleGroup": "Chest",
+        "count": 5
+      }
+    }
+  ],
+  "homeScreenHints": "Vergeet je eiwitten niet!",
+  "sessions": [
+    {
+      "sessionId": "sess-1",
+      "name": "Full Body A",
+      "description": "De eerste full body sessie.",
+      "estimatedDurationMinutes": 45,
+      "dayOrderHint": 1,
+      "warmup": "5 min wandelen en lichte stretches.",
+      "exerciseOrderLogic": "Compound first",
+      "exercises": [
+        {
+          "exerciseId": "ex-1",
+          "order": 1,
+          "name": "Bench Press",
+          "category": "Compound",
+          "exerciseType": "Strength",
+          "muscleGroups": ["Chest", "Triceps"],
+          "movementPattern": "Push",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 12,
+          "restSeconds": 90,
+          "trackMetrics": ["weight", "reps"],
+          "notes": ["Houd je rug recht"],
+          "alternatives": ["Dumbbell Press"]
+        },
+        {
+          "exerciseId": "ex-2",
+          "order": 2,
+          "name": "Plank",
+          "category": "Core",
+          "exerciseType": "Endurance",
+          "muscleGroups": ["Core"],
+          "sets": 3,
+          "durationSecondsMin": 30,
+          "durationSecondsMax": 60,
+          "restSeconds": 60,
+          "trackMetrics": ["duration_seconds"]
+        }
+      ]
+    }
+  ]
+}

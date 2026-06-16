@@ -30,6 +30,19 @@ class DataStore {
     }
     importPlan(planData) {
         planData.id = 'plan_' + Date.now();
+
+        // Normalize top-level rich schema fields
+        if (!planData.schemaVersion) planData.schemaVersion = "1.0";
+        if (!planData.schedule) planData.schedule = {};
+        if (planData.targetSessionsPerWeek && !planData.schedule.targetSessionsPerWeek) {
+            planData.schedule.targetSessionsPerWeek = planData.targetSessionsPerWeek;
+        }
+        if (planData.minRecoveryHours && !planData.schedule.minRecoveryHours) {
+            planData.schedule.minRecoveryHours = planData.minRecoveryHours;
+        }
+        if (!planData.recoveryRules) planData.recoveryRules = {};
+        if (!planData.successMilestones) planData.successMilestones = [];
+
         // Give ids to sessions and exercises if they don't have one
         planData.sessions.forEach(s => {
             if (!s.id && !s.sessionId) s.id = 'sess_' + Math.random().toString(36).substr(2, 9);
@@ -137,8 +150,26 @@ const app = {
         
         const lastLog = store.logs[store.logs.length - 1];
         const hoursSinceLast = (new Date() - new Date(lastLog.date)) / (1000 * 60 * 60);
-        const minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
+        let minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
         
+        // Check muscle group specific recovery
+        if (plan.recoveryRules && plan.recoveryRules.muscleGroupRecoveryHours && lastLog.exercises) {
+            let maxMuscleGroupRecovery = 0;
+            const recentSession = plan.sessions.find(s => s.id === lastLog.sessionId);
+            if (recentSession) {
+                recentSession.exercises.forEach(ex => {
+                    if (ex.muscleGroups) {
+                        ex.muscleGroups.forEach(mg => {
+                            if (plan.recoveryRules.muscleGroupRecoveryHours[mg]) {
+                                maxMuscleGroupRecovery = Math.max(maxMuscleGroupRecovery, plan.recoveryRules.muscleGroupRecoveryHours[mg]);
+                            }
+                        });
+                    }
+                });
+            }
+            if (maxMuscleGroupRecovery > minHours) minHours = maxMuscleGroupRecovery;
+        }
+
         if(hoursSinceLast < (minHours * 0.5)) return { status: 'red', text: 'Beter rusten' };
         if(hoursSinceLast < minHours) return { status: 'orange', text: 'Rustig aan' };
         return { status: 'green', text: 'Volledig hersteld' };
@@ -148,14 +179,23 @@ const app = {
         const plan = store.getActivePlan();
         if(!plan) return null;
         
-        // Simple logic: find first session that hasn't been done in the last 7 days
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         
         const recentLogs = store.logs.filter(l => new Date(l.date) > sevenDaysAgo);
         const doneSessionIds = recentLogs.map(l => l.sessionId);
         
-        const nextSession = plan.sessions.find(s => !doneSessionIds.includes(s.id));
+        let orderedSessions = [...plan.sessions];
+
+        // Use defaultSessionOrder from rich schema if available
+        if (plan.schedule && plan.schedule.defaultSessionOrder && plan.schedule.defaultSessionOrder.length > 0) {
+            orderedSessions = plan.schedule.defaultSessionOrder.map(id => plan.sessions.find(s => s.id === id || s.sessionId === id)).filter(Boolean);
+        } else {
+            // Sort by dayOrderHint if available
+            orderedSessions.sort((a, b) => (a.dayOrderHint || 99) - (b.dayOrderHint || 99));
+        }
+
+        const nextSession = orderedSessions.find(s => !doneSessionIds.includes(s.id));
         
         if(nextSession) {
             return {
@@ -164,9 +204,8 @@ const app = {
             };
         }
         
-        // If all done, recommend the one done longest ago
         return {
-            session: plan.sessions[0],
+            session: orderedSessions[0],
             reason: `Je hebt alle sessies gehad, we beginnen weer vooraan.`
         };
     },
@@ -223,6 +262,34 @@ const app = {
         // Stats
         document.getElementById('stat-completed').textContent = store.logs.length;
         document.getElementById('stat-streak').textContent = this.calculateStreak();
+
+        // Target sessions per week progress
+        const plan = store.getActivePlan();
+        if (plan) {
+            const targetSessions = (plan.schedule && plan.schedule.targetSessionsPerWeek) ? plan.schedule.targetSessionsPerWeek : plan.targetSessionsPerWeek;
+            if (targetSessions) {
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                const recentLogsCount = store.logs.filter(l => new Date(l.date) > oneWeekAgo && l.planId === plan.id).length;
+
+                let progressText = `${recentLogsCount}/${targetSessions} sessies deze week`;
+                const progressDiv = document.createElement('div');
+                progressDiv.className = 'text-sm text-muted mt-2';
+                progressDiv.style.textAlign = 'center';
+                progressDiv.textContent = progressText;
+
+                // Add or update progress text under the streak stats
+                const statsMini = document.querySelector('.stats-mini');
+                let existingProgress = document.getElementById('home-weekly-progress');
+                if (!existingProgress) {
+                    existingProgress = document.createElement('div');
+                    existingProgress.id = 'home-weekly-progress';
+                    existingProgress.style.gridColumn = '1 / -1';
+                    statsMini.appendChild(existingProgress);
+                }
+                existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${progressText}</div>`;
+            }
+        }
     },
 
     renderPlans() {
@@ -250,10 +317,21 @@ const app = {
                 `<div class="text-sm text-muted mt-1"><strong>Sessie volgorde:</strong> ${p.defaultSessionOrder.join(', ')}</div>` : 
                 (p.sessions ? `<div class="text-sm text-muted mt-1"><strong>Sessies:</strong> ${p.sessions.map(s=>s.name).join(', ')}</div>` : '');
 
+            const level = p.level ? `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${p.level}</span>` : '';
+            const goal = p.goal ? `<div class="text-sm text-muted"><strong>Doel:</strong> ${p.goal}</div>` : '';
+            const equipment = p.equipment && p.equipment.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${p.equipment.join(', ')}</div>` : '';
+            const recoveryRules = p.recoveryRules && Object.keys(p.recoveryRules).length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Herstelregels:</strong> Bevat specifieke herstelregels per spiergroep.</div>` : '';
+            const progressionRules = p.progressionRules ? `<div class="text-sm text-muted mt-1"><strong>Progressieregels:</strong> ${p.progressionRules}</div>` : '';
+            const milestones = p.successMilestones && p.successMilestones.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Mijlpalen:</strong> ${p.successMilestones.length} ingesteld</div>` : '';
+
+
             el.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div style="flex:1;">
-                        <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2;">${p.name}</h3>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0;">${p.name}</h3>
+                            ${level}
+                        </div>
                         ${desc}
                     </div>
                     <div style="display:flex; align-items:center; gap:8px; margin-left:12px;">
@@ -262,11 +340,22 @@ const app = {
                     </div>
                 </div>
                 
-                <div style="background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; margin-top: 8px;">
-                    <div style="font-weight:600; font-size:0.85rem; margin-bottom:4px; color:var(--accent-color);">DETAILS</div>
-                    <div class="text-sm text-muted"><strong>Frequentie:</strong> ${targetSessions}x per week (${p.sessions.length} unieke sessies)</div>
+                <div style="background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; margin-top: 8px; cursor: pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="font-weight:600; font-size:0.85rem; color:var(--accent-color);">DETAILS</div>
+                        <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
+                    </div>
+                    <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${targetSessions}x per week (${p.sessions.length} unieke sessies)</div>
+                    ${goal}
+                </div>
+
+                <div class="hidden" style="background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.05);">
+                    ${equipment}
                     ${weeklyMins}
                     ${recovery}
+                    ${recoveryRules}
+                    ${progressionRules}
+                    ${milestones}
                     ${recPattern}
                     ${sessionOrder}
                 </div>
@@ -293,6 +382,37 @@ const app = {
         if(totalWorkouts >= 1) milestones.push({ title: 'De Eerste Stap', desc: 'Eerste training voltooid!', icon: 'directions_walk' });
         if(totalWorkouts >= 5) milestones.push({ title: 'High Five', desc: '5 trainingen gehaald!', icon: 'front_hand' });
         if(this.calculateStreak() >= 3) milestones.push({ title: 'Gewoontevormer', desc: '3 weken achter elkaar getraind', icon: 'loop' });
+
+        // Add custom success milestones from the active plan
+        const plan = store.getActivePlan();
+        if (plan && plan.successMilestones && plan.successMilestones.length > 0) {
+            plan.successMilestones.forEach(sm => {
+                let achieved = false;
+                if (sm.condition && sm.condition.type === 'muscleGroupSessions') {
+                    const group = sm.condition.muscleGroup;
+                    const requiredCount = sm.condition.count;
+                    let count = 0;
+
+                    store.logs.filter(l => l.planId === plan.id).forEach(log => {
+                        const session = plan.sessions.find(s => s.id === log.sessionId);
+                        if (session) {
+                            let hasGroup = false;
+                            session.exercises.forEach(ex => {
+                                if (ex.muscleGroups && ex.muscleGroups.includes(group)) {
+                                    hasGroup = true;
+                                }
+                            });
+                            if (hasGroup) count++;
+                        }
+                    });
+                    if (count >= requiredCount) achieved = true;
+                }
+
+                if (achieved) {
+                    milestones.push({ title: sm.title, desc: sm.description, icon: 'star' });
+                }
+            });
+        }
 
         const mList = document.getElementById('milestones-list');
         mList.innerHTML = milestones.length ? '' : '<p class="text-muted">Nog geen mijlpalen behaald.</p>';
@@ -464,14 +584,37 @@ const app = {
         const list = document.getElementById('workout-exercise-list');
         list.innerHTML = '';
         
-        this.activeWorkout.exercises.forEach((ex, exIndex) => {
+        if (this.activeWorkout.session.warmup) {
+            const warmupEl = document.createElement('div');
+            warmupEl.className = 'glass-panel';
+            warmupEl.style.padding = '12px 16px';
+            warmupEl.innerHTML = `
+                <div style="font-weight:600; font-size:0.9rem; color:var(--accent-color); margin-bottom:4px;">WARM-UP</div>
+                <div class="text-sm">${this.activeWorkout.session.warmup}</div>
+            `;
+            list.appendChild(warmupEl);
+        }
+
+        const sortedExercises = [...this.activeWorkout.exercises].sort((a, b) => (a.order || 99) - (b.order || 99));
+
+        sortedExercises.forEach((ex) => {
+            const exIndex = this.activeWorkout.exercises.findIndex(e => e.id === ex.id);
+
             // Build rep/duration string
             let metaString = `${ex.sets} sets`;
             if (ex.repsMin && ex.repsMax) metaString += ` • ${ex.repsMin}-${ex.repsMax} reps`;
             else if (ex.reps) metaString += ` • ${ex.reps}`;
             else if (ex.durationSecondsMin && ex.durationSecondsMax) metaString += ` • ${ex.durationSecondsMin}-${ex.durationSecondsMax} sec`;
+            else if (ex.durationSeconds) metaString += ` • ${ex.durationSeconds} sec`;
             else if (ex.duration) metaString += ` • ${ex.duration}`;
             
+            if (ex.restSeconds) metaString += ` • ${ex.restSeconds}s rust`;
+
+            // Build badges
+            let badgesHtml = '';
+            if (ex.category) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted); margin-right:4px;">${ex.category}</span>`;
+            if (ex.exerciseType) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${ex.exerciseType}</span>`;
+
             // Build notes & alternatives
             let notesHtml = '';
             if (ex.notes && Array.isArray(ex.notes) && ex.notes.length > 0) {
@@ -482,7 +625,9 @@ const app = {
                 notesHtml += `<div class="text-sm text-muted mt-2">${ex.notes}</div>`;
             }
 
-            if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
+            if (ex.alternatives && ex.alternatives.length > 0) {
+                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${ex.alternatives.join(', ')}</div>`;
+            } else if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
                 notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${ex.optionalAlternatives.join(', ')}</div>`;
             }
 
@@ -493,6 +638,7 @@ const app = {
                 // TrackMetrics check for dynamic inputs
                 const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
                 const wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : false;
+                const wantsDuration = ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false;
                 
                 let inputsHtml = '';
                 if (wantsWeight) {
@@ -501,6 +647,10 @@ const app = {
                 }
                 if (wantsReps) {
                     inputsHtml += `<input type="number" class="weight-input" placeholder="reps" style="width: 55px;"
+                        value="${ex.actualReps ? ex.actualReps[i] : ''}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+                }
+                if (wantsDuration && !wantsReps) {
+                     inputsHtml += `<input type="number" class="weight-input" placeholder="sec" style="width: 55px;"
                         value="${ex.actualReps ? ex.actualReps[i] : ''}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
                 }
 
@@ -522,7 +672,10 @@ const app = {
             card.innerHTML = `
                 <div class="exercise-header">
                     <div>
-                        <div class="exercise-title">${ex.name}</div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                            <div class="exercise-title" style="margin:0;">${ex.name}</div>
+                        </div>
+                        <div style="margin-bottom:4px;">${badgesHtml}</div>
                         <div class="exercise-meta">${metaString}</div>
                         ${notesHtml}
                     </div>
@@ -829,9 +982,18 @@ const app = {
             const prevEl = document.getElementById('import-preview');
             const totalEx = data.sessions.reduce((sum, s) => sum + (s.exercises ? s.exercises.length : 0), 0);
             
+            let extraInfo = '';
+            if (data.level) extraInfo += `<strong>Niveau:</strong> ${data.level}<br>`;
+            if (data.schedule && data.schedule.targetSessionsPerWeek) {
+                extraInfo += `<strong>Doel:</strong> ${data.schedule.targetSessionsPerWeek}x per week<br>`;
+            } else if (data.targetSessionsPerWeek) {
+                extraInfo += `<strong>Doel:</strong> ${data.targetSessionsPerWeek}x per week<br>`;
+            }
+
             prevEl.innerHTML = `
                 <div class="text-sm">
                     <strong>Schema:</strong> ${data.name}<br>
+                    ${extraInfo}
                     <strong>Sessies:</strong> ${data.sessions.length}<br>
                     <strong>Oefeningen:</strong> ${totalEx}
                 </div>
