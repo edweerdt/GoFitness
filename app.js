@@ -212,6 +212,44 @@ const app = {
 
     // --- RENDERING ---
 
+    formatRichField(value, label = null) {
+        if (value === null || value === undefined) return '';
+
+        let labelHtml = label ? `<strong>${label}:</strong> ` : '';
+        let headerHtml = label ? `<div style="font-weight:600; font-size:0.85rem; color:var(--text-primary); margin-top:8px;">${label}</div>` : '';
+
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+            return `<div class="text-sm text-muted mt-1">${labelHtml}${value}</div>`;
+        }
+
+        if (Array.isArray(value)) {
+            if (value.length === 0) return '';
+            let html = headerHtml + `<ul class="text-sm text-muted mt-1" style="list-style-type: disc; padding-left: 20px; margin-bottom: 8px;">`;
+            value.forEach(item => {
+                let formattedItem = this.formatRichField(item);
+                if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
+                    formattedItem = formattedItem.replace(/^<div[^>]*>/, '').replace(/<\/div>$/, '');
+                }
+                html += `<li>${formattedItem}</li>`;
+            });
+            html += `</ul>`;
+            return html;
+        }
+
+        if (typeof value === 'object') {
+            const keys = Object.keys(value);
+            if (keys.length === 0) return '';
+            let html = headerHtml + `<div class="text-sm text-muted mt-1" style="margin-bottom: 8px; padding-left: 8px; border-left: 2px solid var(--border-color);">`;
+            keys.forEach(key => {
+                html += this.formatRichField(value[key], key);
+            });
+            html += `</div>`;
+            return html;
+        }
+
+        return '';
+    },
+
     renderHome() {
         const dateOpt = { weekday: 'long', day: 'numeric', month: 'long' };
         document.getElementById('home-date').textContent = new Date().toLocaleDateString('nl-NL', dateOpt);
@@ -320,9 +358,12 @@ const app = {
             const level = p.level ? `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${p.level}</span>` : '';
             const goal = p.goal ? `<div class="text-sm text-muted"><strong>Doel:</strong> ${p.goal}</div>` : '';
             const equipment = p.equipment && p.equipment.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${p.equipment.join(', ')}</div>` : '';
-            const recoveryRules = p.recoveryRules && Object.keys(p.recoveryRules).length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Herstelregels:</strong> Bevat specifieke herstelregels per spiergroep.</div>` : '';
-            const progressionRules = p.progressionRules ? `<div class="text-sm text-muted mt-1"><strong>Progressieregels:</strong> ${p.progressionRules}</div>` : '';
-            const milestones = p.successMilestones && p.successMilestones.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Mijlpalen:</strong> ${p.successMilestones.length} ingesteld</div>` : '';
+
+            const scheduleInfo = this.formatRichField(p.schedule, 'Schema Regels');
+            const recoveryRules = this.formatRichField(p.recoveryRules, 'Herstelregels');
+            const progressionRules = this.formatRichField(p.progressionRules, 'Progressieregels');
+            const completionRules = this.formatRichField(p.completionRules, 'Voltooiingsregels');
+            const milestones = this.formatRichField(p.successMilestones, 'Mijlpalen');
 
 
             el.innerHTML = `
@@ -353,8 +394,10 @@ const app = {
                     ${equipment}
                     ${weeklyMins}
                     ${recovery}
+                    ${scheduleInfo}
                     ${recoveryRules}
                     ${progressionRules}
+                    ${completionRules}
                     ${milestones}
                     ${recPattern}
                     ${sessionOrder}
@@ -588,10 +631,7 @@ const app = {
             const warmupEl = document.createElement('div');
             warmupEl.className = 'glass-panel';
             warmupEl.style.padding = '12px 16px';
-            warmupEl.innerHTML = `
-                <div style="font-weight:600; font-size:0.9rem; color:var(--accent-color); margin-bottom:4px;">WARM-UP</div>
-                <div class="text-sm">${this.activeWorkout.session.warmup}</div>
-            `;
+            warmupEl.innerHTML = this.formatRichField(this.activeWorkout.session.warmup, 'WARM-UP');
             list.appendChild(warmupEl);
         }
 
@@ -990,6 +1030,14 @@ const app = {
                 extraInfo += `<strong>Doel:</strong> ${data.targetSessionsPerWeek}x per week<br>`;
             }
 
+            const richFieldsHTML = [
+                this.formatRichField(data.schedule, 'Schema Regels'),
+                this.formatRichField(data.progressionRules, 'Progressieregels'),
+                this.formatRichField(data.recoveryRules, 'Herstelregels'),
+                this.formatRichField(data.completionRules, 'Voltooiingsregels'),
+                this.formatRichField(data.successMilestones, 'Mijlpalen')
+            ].join('');
+
             prevEl.innerHTML = `
                 <div class="text-sm">
                     <strong>Schema:</strong> ${data.name}<br>
@@ -997,6 +1045,7 @@ const app = {
                     <strong>Sessies:</strong> ${data.sessions.length}<br>
                     <strong>Oefeningen:</strong> ${totalEx}
                 </div>
+                ${richFieldsHTML}
             `;
             prevEl.classList.remove('hidden');
             
