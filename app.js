@@ -344,7 +344,11 @@ const app = {
             
             const sched = p.schedule || {};
             const targetSessions = sched.targetSessionsPerWeek || p.targetSessionsPerWeek || '?';
-            const desc = p.description ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${p.description}</p>` : '';
+            let descriptionText = p.description || '';
+            descriptionText = descriptionText.split(/Voltooiingsregels/i)[0];
+            descriptionText = descriptionText.split(/Mijlpalen/i)[0];
+            descriptionText = descriptionText.trim();
+            const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${descriptionText}</p>` : '';
             const recPattern = sched.recommendedPattern || p.recommendedPattern ? 
                 `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${sched.recommendedPattern || p.recommendedPattern}</div>` : '';
             const recovery = sched.minRecoveryHours || p.minRecoveryHours ? 
