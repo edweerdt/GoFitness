@@ -1036,8 +1036,7 @@ const app = {
 
             const richFieldsHTML = [
                 this.formatRichField(data.schedule, 'Schema Regels'),
-                this.formatRichField(data.progressionRules, 'Progressieregels'),
-                this.formatRichField(data.recoveryRules, 'Herstelregels')
+                this.formatRichField(data.progressionRules, 'Progressieregels')
             ].join('');
 
             prevEl.innerHTML = `
