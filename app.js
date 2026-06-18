@@ -2,7 +2,16 @@
 
 class DataStore {
     constructor() {
-        this.load();
+        // Only load if localStorage is defined (useful for testing environments)
+        if (typeof localStorage !== 'undefined') {
+            this.load();
+        } else {
+            this.plans = [];
+            this.activePlanId = null;
+            this.logs = [];
+            this.activeWorkoutState = null;
+            this.theme = 'auto';
+        }
     }
     load() {
         this.plans = JSON.parse(localStorage.getItem('plans') || '[]');
@@ -870,7 +879,15 @@ const app = {
     }
 };
 
-document.getElementById('import-file').addEventListener('change', (e) => app.handleFileSelect(e));
+// Ensure we don't crash when running in a Node/test environment
+if (typeof document !== 'undefined' && document.getElementById('import-file')) {
+    document.getElementById('import-file').addEventListener('change', (e) => app.handleFileSelect(e));
 
-// Start app
-app.init();
+    // Start app
+    app.init();
+}
+
+// Export for testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { DataStore, app, store };
+}
