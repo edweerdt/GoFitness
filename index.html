@@ -179,8 +179,8 @@
                 <h3>Sessie Verwijderen?</h3>
                 <p class="text-sm text-muted mt-2">Weet je zeker dat je deze opgeslagen sessie uit je logboek wilt verwijderen? Dit beïnvloedt je statistieken en kan niet ongedaan worden gemaakt.</p>
                 <div class="modal-actions mt-6">
-                    <button class="btn-secondary flex-1" onclick="app.hideDeleteLogModal()">Annuleren</button>
-                    <button class="btn-primary flex-1" style="background: #ff5252; color: white;" onclick="app.confirmDeleteLog()">Verwijderen</button>
+                    <button class="btn-secondary flex-1" onclick="app.hideDeleteModal('log')">Annuleren</button>
+                    <button class="btn-primary flex-1" style="background: #ff5252; color: white;" onclick="app.confirmDelete('log')">Verwijderen</button>
                 </div>
             </div>
         </div>
@@ -194,8 +194,8 @@
                 <h3>Schema Verwijderen?</h3>
                 <p class="text-sm text-muted mt-2">Weet je zeker dat je dit schema wilt verwijderen? Je gelogde sessies blijven wel bewaard in je logboek.</p>
                 <div class="modal-actions mt-6">
-                    <button class="btn-secondary flex-1" onclick="app.hideDeletePlanModal()">Annuleren</button>
-                    <button class="btn-primary flex-1" style="background: #ff5252; color: white;" onclick="app.confirmDeletePlan()">Verwijderen</button>
+                    <button class="btn-secondary flex-1" onclick="app.hideDeleteModal('plan')">Annuleren</button>
+                    <button class="btn-primary flex-1" style="background: #ff5252; color: white;" onclick="app.confirmDelete('plan')">Verwijderen</button>
                 </div>
             </div>
         </div>
