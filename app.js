@@ -372,6 +372,7 @@ const app = {
             const sched = p.schedule || {};
             const targetSessions = sched.targetSessionsPerWeek || p.targetSessionsPerWeek || '?';
             let descriptionText = p.description || '';
+            descriptionText = descriptionText.split(/Herstelregels/i)[0];
             descriptionText = descriptionText.split(/Voltooiingsregels/i)[0];
             descriptionText = descriptionText.split(/Mijlpalen/i)[0];
             descriptionText = descriptionText.trim();
@@ -445,8 +446,112 @@ const app = {
             <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalMinutes}</span><span class="stat-label">Minuten</span></div></div>
             <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalExercises}</span><span class="stat-label">Oefeningen</span></div></div>
         `;
-
+        this.renderMuscleStats();
         this.renderHistory();
+    },
+
+    renderMuscleStats() {
+        const grid = document.getElementById('muscle-stats-grid');
+        if (!grid) return;
+
+        // Metadata for UI
+        const muscleMeta = {
+            'chest': { name: 'Borst', icon: 'fitness_center', color: '#fca5a5' },
+            'back': { name: 'Rug', icon: 'flight_takeoff', color: '#93c5fd' },
+            'legs': { name: 'Benen', icon: 'directions_run', color: '#86efac' },
+            'glutes': { name: 'Billen', icon: 'sports_gymnastics', color: '#fbcfe8' },
+            'shoulders': { name: 'Schouders', icon: 'accessibility_new', color: '#fde047' },
+            'arms': { name: 'Armen', icon: 'sports_martial_arts', color: '#c4b5fd' },
+            'core': { name: 'Core', icon: 'sports_mma', color: '#fdba74' },
+            'overig': { name: 'Overig', icon: 'more_horiz', color: '#d1d5db' }
+        };
+
+        const stats = {};
+
+        // Build a fallback map from all plans
+        const fallbackMap = {};
+        store.plans.forEach(plan => {
+            if (plan.sessions) {
+                plan.sessions.forEach(session => {
+                    if (session.exercises) {
+                        session.exercises.forEach(ex => {
+                            if (ex.muscleGroups && ex.muscleGroups.length > 0) {
+                                fallbackMap[ex.name] = ex.muscleGroups;
+                            }
+                        });
+                    }
+                });
+            }
+        });
+
+        // Loop over all logs
+        store.logs.forEach(log => {
+            const sessionMuscles = new Set();
+            
+            if (log.exercises) {
+                log.exercises.forEach(ex => {
+                    let muscles = ex.muscleGroups;
+                    if (!muscles || muscles.length === 0) {
+                        muscles = fallbackMap[ex.name] || ['overig'];
+                    }
+
+                    muscles.forEach(m => {
+                        sessionMuscles.add(m);
+                        if (!stats[m]) stats[m] = { sessions: 0, reps: 0, maxWeight: 0, maxReps: 0 };
+                        
+                        if (ex.details) {
+                            ex.details.forEach(detail => {
+                                const reps = parseInt(detail.reps) || 0;
+                                const weight = parseFloat(detail.weight) || 0;
+                                
+                                stats[m].reps += reps;
+                                if (reps > stats[m].maxReps) stats[m].maxReps = reps;
+                                if (weight > stats[m].maxWeight) stats[m].maxWeight = weight;
+                            });
+                        }
+                    });
+                });
+            }
+
+            // Increment session count for each muscle trained in this log
+            sessionMuscles.forEach(m => {
+                if (!stats[m]) stats[m] = { sessions: 0, reps: 0, maxWeight: 0, maxReps: 0 };
+                stats[m].sessions++;
+            });
+        });
+
+        // Generate HTML
+        const muscleKeys = Object.keys(stats).sort((a, b) => stats[b].sessions - stats[a].sessions);
+        
+        if (muscleKeys.length === 0) {
+            grid.innerHTML = '<p class="text-muted text-sm">Nog geen spiergroep-data beschikbaar.</p>';
+            return;
+        }
+
+        let html = '';
+        muscleKeys.forEach(m => {
+            const data = stats[m];
+            const meta = muscleMeta[m] || { name: m, icon: 'fitness_center', color: '#a78bfa' };
+            
+            html += `
+                <div class="glass-panel" style="display:flex; align-items:center; gap:16px;">
+                    <div class="stat-icon-wrapper" style="width:48px; height:48px; background:rgba(255,255,255,0.05); color:${meta.color};">
+                        <span class="material-icons-round">${meta.icon}</span>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="font-weight:600; font-size:1.1rem;">${meta.name}</div>
+                        <div class="text-muted text-sm mt-1" style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
+                            <div><span class="material-icons-round" style="font-size:14px; vertical-align:middle; margin-right:4px; color:var(--text-muted);">event</span>${data.sessions} sessies</div>
+                            <div><span class="material-icons-round" style="font-size:14px; vertical-align:middle; margin-right:4px; color:var(--text-muted);">repeat</span>${data.reps} reps</div>
+                            <div><span class="material-icons-round" style="font-size:14px; vertical-align:middle; margin-right:4px; color:var(--text-muted);">fitness_center</span>Max: ${data.maxWeight} kg</div>
+                            <div><span class="material-icons-round" style="font-size:14px; vertical-align:middle; margin-right:4px; color:var(--text-muted);">emoji_events</span>Max: ${data.maxReps} reps</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        grid.innerHTML = html;
     },
 
     renderAchievements() {
@@ -914,6 +1019,7 @@ const app = {
                 
                 exerciseLogs.push({
                     name: ex.name,
+                    muscleGroups: ex.muscleGroups || [],
                     setsCompleted: completedSetsCount,
                     totalSets: ex.sets,
                     details: setDetails

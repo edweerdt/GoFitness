@@ -1,0 +1,229 @@
+{
+  "schemaVersion": 1,
+  "type": "training_plan",
+  "planId": "beginner-gym-bodyweight-mix-v1",
+  "name": "Beginner Gym + Lichaamsgewicht Mix",
+  "description": "Eenvoudig full-body startplan voor beginners. Drie sessies per week, gericht op consistentie, basiskracht en lage drempel.",
+  "goal": "Basiskracht opbouwen en trainingsroutine starten",
+  "level": "beginner",
+  "locationType": "gym",
+  "equipment": [
+    "leg press of squat rack",
+    "bench press of chest press machine",
+    "lat pulldown or assisted pull-up machine",
+    "seated row machine or cable row",
+    "dumbbells",
+    "mat"
+  ],
+  "schedule": {
+    "targetSessionsPerWeek": 3,
+    "preferredDays": ["monday", "wednesday", "friday"],
+    "minRecoveryHours": 48,
+    "sessionDurationMinutes": 45,
+    "adaptiveScheduling": true
+  },
+  "recoveryRules": {
+    "trafficLightEnabled": true,
+    "green": "48 uur of meer sinds vorige full-body sessie",
+    "orange": "24 tot 48 uur sinds vorige sessie of lichte spiervermoeidheid",
+    "red": "minder dan 24 uur sinds vorige sessie of duidelijke spierpijn/vermoeidheid"
+  },
+  "progressionRules": {
+    "method": "double_progression",
+    "rule": "Als alle sets met goede vorm aan de bovenkant van de herhalingsrange gehaald worden, verhoog dan de volgende keer het gewicht licht.",
+    "weightIncreaseGuidance": {
+      "upperBodyKg": 2.0,
+      "lowerBodyKg": 5.0
+    },
+    "notes": [
+      "Techniek gaat voor gewicht",
+      "Train niet tot complete uitputting",
+      "Laatste 2 herhalingen mogen zwaar voelen maar moeten haalbaar blijven"
+    ]
+  },
+  "sessions": [
+    {
+      "sessionId": "full-body-a",
+      "name": "Full Body A",
+      "repeatPerWeek": 3,
+      "estimatedDurationMinutes": 45,
+      "warmup": {
+        "durationMinutes": 8,
+        "steps": [
+          {
+            "type": "cardio",
+            "name": "Fietsen of wandelen",
+            "durationMinutes": 5,
+            "notes": "Rustig tempo"
+          },
+          {
+            "type": "activation",
+            "name": "Lichte opwarmsets",
+            "durationMinutes": 3,
+            "notes": "Van de eerste 2 oefeningen 1 lichte set"
+          }
+        ]
+      },
+      "exerciseOrderLogic": "compound_first",
+      "exercises": [
+        {
+          "exerciseId": "leg-press-or-squat",
+          "name": "Leg Press of Squat",
+          "category": "compound",
+          "muscleGroups": ["legs", "glutes"],
+          "exerciseType": "strength",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 12,
+          "restSeconds": 90,
+          "weightMode": "working_weight",
+          "optionalAlternatives": ["Leg Press", "Barbell Squat", "Goblet Squat"],
+          "notes": [
+            "Rustig zakken, gecontroleerd omhoog",
+            "Kies een variant die technisch veilig voelt"
+          ],
+          "trackMetrics": ["weight", "reps", "completed"]
+        },
+        {
+          "exerciseId": "bench-press-or-chest-press",
+          "name": "Bench Press of Chest Press Machine",
+          "category": "compound",
+          "muscleGroups": ["chest", "triceps", "shoulders"],
+          "exerciseType": "strength",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 12,
+          "restSeconds": 90,
+          "weightMode": "working_weight",
+          "optionalAlternatives": ["Bench Press", "Chest Press Machine", "Dumbbell Bench Press"],
+          "notes": [
+            "Gecontroleerde beweging",
+            "Schouders stabiel houden"
+          ],
+          "trackMetrics": ["weight", "reps", "completed"]
+        },
+        {
+          "exerciseId": "pushups",
+          "name": "Push-ups",
+          "category": "bodyweight",
+          "muscleGroups": ["chest", "triceps", "shoulders"],
+          "exerciseType": "bodyweight_strength",
+          "sets": 2,
+          "repsMode": "near_failure",
+          "restSeconds": 60,
+          "optionalAlternatives": ["Push-ups", "Knee Push-ups", "Incline Push-ups"],
+          "notes": [
+            "Stop net voor volledige mislukking",
+            "Kwaliteit belangrijker dan aantal"
+          ],
+          "trackMetrics": ["reps", "completed"]
+        },
+        {
+          "exerciseId": "lat-pulldown-or-assisted-pullup",
+          "name": "Lat Pulldown of Assisted Pull-up",
+          "category": "compound",
+          "muscleGroups": ["back", "biceps"],
+          "exerciseType": "strength",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 12,
+          "restSeconds": 90,
+          "weightMode": "working_weight",
+          "optionalAlternatives": ["Lat Pulldown", "Assisted Pull-up"],
+          "notes": [
+            "Niet trekken met momentum",
+            "Volledige controle houden"
+          ],
+          "trackMetrics": ["weight", "reps", "completed"]
+        },
+        {
+          "exerciseId": "seated-row",
+          "name": "Seated Row",
+          "category": "compound",
+          "muscleGroups": ["back", "rear_shoulders", "biceps"],
+          "exerciseType": "strength",
+          "sets": 2,
+          "repsMin": 10,
+          "repsMax": 12,
+          "restSeconds": 75,
+          "weightMode": "working_weight",
+          "optionalAlternatives": ["Seated Row Machine", "Cable Row", "Chest Supported Row"],
+          "notes": [
+            "Schouderbladen actief gebruiken",
+            "Geen gehaaste herhalingen"
+          ],
+          "trackMetrics": ["weight", "reps", "completed"]
+        },
+        {
+          "exerciseId": "dumbbell-shoulder-press",
+          "name": "Dumbbell Shoulder Press",
+          "category": "supporting",
+          "muscleGroups": ["shoulders", "triceps"],
+          "exerciseType": "strength",
+          "sets": 2,
+          "repsMin": 8,
+          "repsMax": 12,
+          "restSeconds": 75,
+          "weightMode": "working_weight",
+          "optionalAlternatives": ["Dumbbell Shoulder Press", "Machine Shoulder Press"],
+          "notes": [
+            "Niet te zwaar starten",
+            "Volledige controle boven het hoofd"
+          ],
+          "trackMetrics": ["weight", "reps", "completed"]
+        },
+        {
+          "exerciseId": "plank",
+          "name": "Plank",
+          "category": "core",
+          "muscleGroups": ["core"],
+          "exerciseType": "isometric",
+          "sets": 3,
+          "durationSecondsMin": 20,
+          "durationSecondsMax": 40,
+          "restSeconds": 45,
+          "notes": [
+            "Lichaam recht houden",
+            "Stop als vorm inzakt"
+          ],
+          "trackMetrics": ["duration_seconds", "completed"]
+        }
+      ],
+      "completionRules": {
+        "exerciseCompletion": "manual_check",
+        "sessionCompletion": "all_exercises_checked_or_manual_override",
+        "sessionStatuses": ["completed", "partial", "skipped"]
+      }
+    }
+  ],
+  "motivationMilestones": [
+    {
+      "id": "first-workout",
+      "name": "Eerste training voltooid",
+      "condition": "completed_sessions >= 1"
+    },
+    {
+      "id": "five-workouts",
+      "name": "Vijf trainingen gehaald",
+      "condition": "completed_sessions >= 5"
+    },
+    {
+      "id": "first-full-session",
+      "name": "Alle oefeningen afgevinkt in één sessie",
+      "condition": "completed_full_sessions >= 1"
+    },
+    {
+      "id": "three-weeks-consistent",
+      "name": "Drie weken consistent",
+      "condition": "weeks_goal_met >= 3"
+    }
+  ],
+  "homeScreenHints": {
+    "primaryAction": "start_now",
+    "showTodayStatus": true,
+    "showRecoveryTrafficLight": true,
+    "showRecommendedSession": true,
+    "showWeeklyProgress": true,
+    "showRecentSuccesses": true
+  }
+}
