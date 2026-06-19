@@ -522,7 +522,7 @@ const app = {
 
             const planSection = document.createElement('div');
             planSection.className = 'mt-4';
-            planSection.innerHTML = `<h4 style="color:var(--text-primary); margin-bottom:8px; margin-top:16px;">${planName}</h4>`;
+            planSection.innerHTML = `<h4 style="color:var(--text-primary); margin-bottom:8px; margin-top:16px;">${app.escapeHTML(planName)}</h4>`;
             
             const listWrapper = document.createElement('div');
             listWrapper.className = 'flex-col gap-3';
@@ -545,7 +545,7 @@ const app = {
                         
                         summaryHtml += `
                             <div class="mt-2 pt-2" style="border-top: 1px solid rgba(0,0,0,0.05);">
-                                <div style="font-weight:600; font-size:0.9rem;">${ex.name} (${ex.setsCompleted}/${ex.totalSets} sets)</div>
+                                <div style="font-weight:600; font-size:0.9rem;">${app.escapeHTML(ex.name)} (${ex.setsCompleted}/${ex.totalSets} sets)</div>
                                 <div class="text-sm text-muted" style="margin-top:2px;">
                                     ${exDetails.length > 0 ? exDetails.join(', ') : 'Afgevinkt (geen details)'}
                                 </div>
@@ -751,7 +751,7 @@ const app = {
                 <div class="exercise-header">
                     <div>
                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                            <div class="exercise-title" style="margin:0;">${ex.name}</div>
+                            <div class="exercise-title" style="margin:0;">${app.escapeHTML(ex.name)}</div>
                         </div>
                         <div style="margin-bottom:4px;">${badgesHtml}</div>
                         <div class="exercise-meta">${metaString}</div>
@@ -938,7 +938,7 @@ const app = {
             card.className = 'glass-panel';
             card.style.padding = '12px';
             card.innerHTML = `
-                <div style="font-weight: 600; margin-bottom: 8px;">${ex.name}</div>
+                <div style="font-weight: 600; margin-bottom: 8px;">${app.escapeHTML(ex.name)}</div>
                 <div>${setsHtml}</div>
             `;
             container.appendChild(card);
