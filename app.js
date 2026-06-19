@@ -219,16 +219,32 @@ const app = {
         };
     },
 
+    // --- UTILS ---
+    escapeHTML(str) {
+        if (typeof str !== 'string') return str;
+        return str.replace(/[&<>'"]/g,
+            tag => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[tag] || tag)
+        );
+    },
+
     // --- RENDERING ---
 
     formatRichField(value, label = null) {
         if (value === null || value === undefined) return '';
 
-        let labelHtml = label ? `<strong>${label}:</strong> ` : '';
-        let headerHtml = label ? `<div style="font-weight:600; font-size:0.85rem; color:var(--text-primary); margin-top:8px;">${label}</div>` : '';
+        const safeLabel = this.escapeHTML(label);
+        let labelHtml = safeLabel ? `<strong>${safeLabel}:</strong> ` : '';
+        let headerHtml = safeLabel ? `<div style="font-weight:600; font-size:0.85rem; color:var(--text-primary); margin-top:8px;">${safeLabel}</div>` : '';
 
         if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-            return `<div class="text-sm text-muted mt-1">${labelHtml}${value}</div>`;
+            const safeValue = this.escapeHTML(String(value));
+            return `<div class="text-sm text-muted mt-1">${labelHtml}${safeValue}</div>`;
         }
 
         if (Array.isArray(value)) {
@@ -1027,11 +1043,11 @@ const app = {
             const totalEx = data.sessions.reduce((sum, s) => sum + (s.exercises ? s.exercises.length : 0), 0);
             
             let extraInfo = '';
-            if (data.level) extraInfo += `<strong>Niveau:</strong> ${data.level}<br>`;
+            if (data.level) extraInfo += `<strong>Niveau:</strong> ${this.escapeHTML(String(data.level))}<br>`;
             if (data.schedule && data.schedule.targetSessionsPerWeek) {
-                extraInfo += `<strong>Doel:</strong> ${data.schedule.targetSessionsPerWeek}x per week<br>`;
+                extraInfo += `<strong>Doel:</strong> ${this.escapeHTML(String(data.schedule.targetSessionsPerWeek))}x per week<br>`;
             } else if (data.targetSessionsPerWeek) {
-                extraInfo += `<strong>Doel:</strong> ${data.targetSessionsPerWeek}x per week<br>`;
+                extraInfo += `<strong>Doel:</strong> ${this.escapeHTML(String(data.targetSessionsPerWeek))}x per week<br>`;
             }
 
             const richFieldsHTML = [
@@ -1041,10 +1057,10 @@ const app = {
 
             prevEl.innerHTML = `
                 <div class="text-sm">
-                    <strong>Schema:</strong> ${data.name}<br>
+                    <strong>Schema:</strong> ${this.escapeHTML(String(data.name))}<br>
                     ${extraInfo}
-                    <strong>Sessies:</strong> ${data.sessions.length}<br>
-                    <strong>Oefeningen:</strong> ${totalEx}
+                    <strong>Sessies:</strong> ${this.escapeHTML(String(data.sessions.length))}<br>
+                    <strong>Oefeningen:</strong> ${this.escapeHTML(String(totalEx))}
                 </div>
                 ${richFieldsHTML}
             `;
