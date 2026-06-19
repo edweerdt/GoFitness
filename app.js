@@ -92,6 +92,7 @@ const app = {
         this.renderHome();
         this.renderPlans();
         this.renderProgress();
+        this.renderAchievements();
     },
 
     toggleTheme() {
@@ -141,6 +142,7 @@ const app = {
         if(viewId === 'home') this.renderHome();
         if(viewId === 'plans') this.renderPlans();
         if(viewId === 'progress') this.renderProgress();
+        if(viewId === 'achievements') this.renderAchievements();
     },
 
     setupNavigation() {
@@ -389,10 +391,7 @@ const app = {
             const equipment = p.equipment && p.equipment.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${p.equipment.join(', ')}</div>` : '';
 
             const scheduleInfo = this.formatRichField(p.schedule, 'Schema Regels');
-            const recoveryRules = this.formatRichField(p.recoveryRules, 'Herstelregels');
             const progressionRules = this.formatRichField(p.progressionRules, 'Progressieregels');
-            const completionRules = this.formatRichField(p.completionRules, 'Voltooiingsregels');
-            const milestones = this.formatRichField(p.successMilestones, 'Mijlpalen');
 
 
             el.innerHTML = `
@@ -424,10 +423,7 @@ const app = {
                     ${weeklyMins}
                     ${recovery}
                     ${scheduleInfo}
-                    ${recoveryRules}
                     ${progressionRules}
-                    ${completionRules}
-                    ${milestones}
                     ${recPattern}
                     ${sessionOrder}
                 </div>
@@ -450,54 +446,149 @@ const app = {
             <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalExercises}</span><span class="stat-label">Oefeningen</span></div></div>
         `;
 
-        const milestones = [];
-        if(totalWorkouts >= 1) milestones.push({ title: 'De Eerste Stap', desc: 'Eerste training voltooid!', icon: 'directions_walk' });
-        if(totalWorkouts >= 5) milestones.push({ title: 'High Five', desc: '5 trainingen gehaald!', icon: 'front_hand' });
-        if(this.calculateStreak() >= 3) milestones.push({ title: 'Gewoontevormer', desc: '3 weken achter elkaar getraind', icon: 'loop' });
+        this.renderHistory();
+    },
 
-        // Add custom success milestones from the active plan
-        const plan = store.getActivePlan();
-        if (plan && plan.successMilestones && plan.successMilestones.length > 0) {
-            plan.successMilestones.forEach(sm => {
-                let achieved = false;
-                if (sm.condition && sm.condition.type === 'muscleGroupSessions') {
-                    const group = sm.condition.muscleGroup;
-                    const requiredCount = sm.condition.count;
-                    let count = 0;
+    renderAchievements() {
+        const grid = document.getElementById('achievements-grid');
+        if (!grid) return;
+        
+        const logs = store.logs;
+        const totalWorkouts = logs.length;
+        
+        // Define all 22 achievements
+        const allAchievements = [
+            { id: 'first_step', title: 'De Eerste Stap', desc: '1e training voltooid!', icon: 'directions_walk', unlocked: false },
+            { id: 'taste_it', title: 'De Smaak te Pakken', desc: '3 trainingen voltooid.', icon: 'local_fire_department', unlocked: false },
+            { id: 'unstoppable', title: 'Niet Te Stoppen', desc: '10 trainingen voltooid.', icon: 'trending_up', unlocked: false },
+            { id: 'century', title: '100 Club', desc: '100 trainingen in het logboek!', icon: 'military_tech', unlocked: false },
+            { id: 'rhythm', title: 'Vast in het Ritme', desc: '4 weken op rij getraind.', icon: 'event_available', unlocked: false },
+            { id: 'exorcist', title: 'Bankhanger Exorcist', desc: 'Getraind na >5 dagen rust.', icon: 'weekend', unlocked: false },
+            { id: 'golden_path', title: 'De Gouden Middenweg', desc: 'Perfecte rust genomen.', icon: 'balance', unlocked: false },
+            { id: 'chest', title: 'Borst Vooruit', desc: 'Focus op borstspieren.', icon: 'fitness_center', unlocked: false },
+            { id: 'back', title: 'Vleugels Kweken', desc: 'Focus op rugspieren.', icon: 'flight_takeoff', unlocked: false },
+            { id: 'shoulders', title: 'Bolder Schouders', desc: 'Focus op schouders.', icon: 'accessibility_new', unlocked: false },
+            { id: 'legs', title: 'T-Rex Mode Geactiveerd', desc: 'Never skip leg day.', icon: 'cruelty_free', unlocked: false },
+            { id: 'glutes', title: 'Perzik Power', desc: 'Bouwen aan bilspieren.', icon: 'sports_gymnastics', unlocked: false },
+            { id: 'core', title: 'Wasbordje in de Maak', desc: 'Focus op core.', icon: 'grid_on', unlocked: false },
+            { id: 'arms', title: 'Mouwenscheurder', desc: 'Focus op armen.', icon: 'sports_martial_arts', unlocked: false },
+            { id: 'calisthenics', title: 'Zwaartekracht Ontkenner', desc: '>80% bodyweight sessie.', icon: 'sports_gymnastics', unlocked: false },
+            { id: 'iron', title: 'Zwaar Metaal', desc: 'Puur krachtwerk sessie.', icon: 'fitness_center', unlocked: false },
+            { id: 'oops', title: 'Oeps, ik deed het weer', desc: 'Twee workouts op 1 dag.', icon: 'looks_two', unlocked: false },
+            { id: 'night', title: 'De Nachtbraker', desc: 'Trainen tussen 00:00 - 04:00.', icon: 'bedtime', unlocked: false },
+            { id: 'bird', title: 'Vroege Vogel', desc: 'Trainen voor 06:00.', icon: 'wb_twilight', unlocked: false },
+            { id: 'weekend', title: 'Weekend Warrior', desc: 'Zware workout in het weekend.', icon: 'celebration', unlocked: false },
+            { id: 'flash', title: 'Flash', desc: 'Workout < 15 minuten.', icon: 'bolt', unlocked: false },
+            { id: 'marathon', title: 'Marathon Strijder', desc: 'Workout > 90 minuten.', icon: 'timer', unlocked: false }
+        ];
 
-                    store.logs.filter(l => l.planId === plan.id).forEach(log => {
-                        const session = plan.sessions.find(s => s.id === log.sessionId);
-                        if (session) {
-                            let hasGroup = false;
-                            session.exercises.forEach(ex => {
-                                if (ex.muscleGroups && ex.muscleGroups.includes(group)) {
-                                    hasGroup = true;
-                                }
-                            });
-                            if (hasGroup) count++;
-                        }
-                    });
-                    if (count >= requiredCount) achieved = true;
-                }
+        // Evaluate logic
+        if (totalWorkouts >= 1) allAchievements.find(a => a.id === 'first_step').unlocked = true;
+        if (totalWorkouts >= 3) allAchievements.find(a => a.id === 'taste_it').unlocked = true;
+        if (totalWorkouts >= 10) allAchievements.find(a => a.id === 'unstoppable').unlocked = true;
+        if (totalWorkouts >= 100) allAchievements.find(a => a.id === 'century').unlocked = true;
+        
+        let lastDate = null;
+        let datesMap = {};
+        let weeksMap = {};
 
-                if (achieved) {
-                    milestones.push({ title: sm.title, desc: sm.description, icon: 'star' });
-                }
-            });
-        }
+        logs.forEach(log => {
+            const d = new Date(log.date);
+            const dateString = d.toDateString();
+            const hour = d.getHours();
+            const dayOfWeek = d.getDay();
+            
+            datesMap[dateString] = (datesMap[dateString] || 0) + 1;
+            if (datesMap[dateString] >= 2) allAchievements.find(a => a.id === 'oops').unlocked = true;
 
-        const mList = document.getElementById('milestones-list');
-        mList.innerHTML = milestones.length ? '' : '<p class="text-muted">Nog geen mijlpalen behaald.</p>';
-        milestones.forEach(m => {
-            mList.innerHTML += `
-                <div class="glass-panel" style="display:flex; align-items:center; gap:16px;">
-                    <div class="stat-icon-wrapper text-accent"><span class="material-icons-round">${m.icon}</span></div>
-                    <div><div style="font-weight:600">${m.title}</div><div class="text-sm text-muted">${m.desc}</div></div>
-                </div>
-            `;
+            if (hour >= 0 && hour < 4) allAchievements.find(a => a.id === 'night').unlocked = true;
+            if (hour >= 4 && hour < 6) allAchievements.find(a => a.id === 'bird').unlocked = true;
+            if (dayOfWeek === 0 || dayOfWeek === 6) allAchievements.find(a => a.id === 'weekend').unlocked = true;
+            if (log.duration < 15) allAchievements.find(a => a.id === 'flash').unlocked = true;
+            if (log.duration > 90) allAchievements.find(a => a.id === 'marathon').unlocked = true;
+
+            if (lastDate) {
+                const diffDays = (d - lastDate) / (1000 * 60 * 60 * 24);
+                if (diffDays > 5) allAchievements.find(a => a.id === 'exorcist').unlocked = true;
+                if (diffDays > 1.5 && diffDays <= 2.5) allAchievements.find(a => a.id === 'golden_path').unlocked = true;
+            }
+
+            const year = d.getFullYear();
+            const week = Math.ceil((d - new Date(year, 0, 1)) / (1000 * 60 * 60 * 24) / 7);
+            const wKey = year + '-' + week;
+            weeksMap[wKey] = (weeksMap[wKey] || 0) + 1;
+
+            lastDate = d;
+
+            if (log.exercises && log.exercises.length > 0) {
+                let chestCount=0, backCount=0, shoulderCount=0, legCount=0, gluteCount=0, coreCount=0, armCount=0, bwCount=0, weightCount=0;
+                
+                log.exercises.forEach(ex => {
+                    const n = ex.name.toLowerCase();
+                    if (n.includes('press') || n.includes('push') || n.includes('fly') || n.includes('dip')) {
+                        if (n.includes('leg')) legCount++;
+                        else if (n.includes('shoulder') || n.includes('overhead') || n.includes('pike')) shoulderCount++;
+                        else chestCount++;
+                    }
+                    if (n.includes('pull') || n.includes('row') || n.includes('chin') || n.includes('deadlift')) backCount++;
+                    if (n.includes('squat') || n.includes('lunge') || n.includes('extension') || n.includes('curl') && n.includes('leg')) legCount++;
+                    if (n.includes('thrust') || n.includes('bridge') || n.includes('kickback')) gluteCount++;
+                    if (n.includes('plank') || n.includes('crunch') || n.includes('raise') && n.includes('leg')) coreCount++;
+                    if (n.includes('curl') || n.includes('extension') || n.includes('skull')) {
+                        if (!n.includes('leg')) armCount++;
+                    }
+                    
+                    if (n.includes('push-up') || n.includes('pull-up') || n.includes('dip') || n.includes('plank') || n.includes('squat') && !n.includes('barbell')) bwCount++;
+                    if (n.includes('barbell') || n.includes('dumbbell') || n.includes('machine') || n.includes('cable')) weightCount++;
+                });
+
+                if (chestCount >= 3) allAchievements.find(a => a.id === 'chest').unlocked = true;
+                if (backCount >= 3) allAchievements.find(a => a.id === 'back').unlocked = true;
+                if (shoulderCount >= 3) allAchievements.find(a => a.id === 'shoulders').unlocked = true;
+                if (legCount >= 3) allAchievements.find(a => a.id === 'legs').unlocked = true;
+                if (gluteCount >= 2) allAchievements.find(a => a.id === 'glutes').unlocked = true;
+                if (coreCount >= 3) allAchievements.find(a => a.id === 'core').unlocked = true;
+                if (armCount >= 3) allAchievements.find(a => a.id === 'arms').unlocked = true;
+
+                if (bwCount > weightCount && bwCount >= 3) allAchievements.find(a => a.id === 'calisthenics').unlocked = true;
+                if (weightCount > bwCount && weightCount >= 3) allAchievements.find(a => a.id === 'iron').unlocked = true;
+            }
         });
 
-        this.renderHistory();
+        let consecutiveWeeks = 0;
+        let weekKeys = Object.keys(weeksMap).sort();
+        for(let i=1; i<weekKeys.length; i++) {
+            const currentW = parseInt(weekKeys[i].split('-')[1]);
+            const prevW = parseInt(weekKeys[i-1].split('-')[1]);
+            if (currentW === prevW + 1) consecutiveWeeks++;
+            else consecutiveWeeks = 0;
+            if (consecutiveWeeks >= 3) allAchievements.find(a => a.id === 'rhythm').unlocked = true;
+        }
+
+        // Render grid
+        grid.innerHTML = '';
+        allAchievements.forEach(ach => {
+            const el = document.createElement('div');
+            el.className = 'glass-panel';
+            el.style.textAlign = 'center';
+            el.style.padding = '16px';
+            el.style.opacity = ach.unlocked ? '1' : '0.4';
+            el.style.filter = ach.unlocked ? 'none' : 'grayscale(100%)';
+            el.style.display = 'flex';
+            el.style.flexDirection = 'column';
+            el.style.alignItems = 'center';
+            el.style.justifyContent = 'center';
+            el.style.gap = '8px';
+
+            el.innerHTML = `
+                <div class="stat-icon-wrapper text-accent" style="width:48px; height:48px; margin: 0 auto; ${ach.unlocked ? 'background:rgba(59, 130, 246, 0.2);' : ''}">
+                    <span class="material-icons-round">${ach.unlocked ? ach.icon : 'lock'}</span>
+                </div>
+                <div style="font-weight:600; font-size:0.85rem; line-height:1.2; margin-top:4px;">${ach.title}</div>
+                <div class="text-sm text-muted" style="font-size:0.7rem; line-height:1.3;">${ach.unlocked ? ach.desc : 'Ontdek door te trainen'}</div>
+            `;
+            grid.appendChild(el);
+        });
     },
 
     renderHistory() {

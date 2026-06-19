@@ -101,23 +101,31 @@
                 </div>
             </section>
 
-            <!-- Progress View -->
+            <!-- Progress View (Statistieken) -->
             <section id="view-progress" class="view">
                 <header class="top-nav">
-                    <h2>Voortgang</h2>
+                    <h2>Statistieken</h2>
                 </header>
                 <div class="content-padded pb-32">
                     <h3>Statistieken</h3>
                     <div class="stats-grid mt-2" id="full-stats-grid">
                         <!-- Stats injected here -->
                     </div>
-                    <h3 class="mt-6">Mijlpalen</h3>
-                    <div id="milestones-list" class="mt-2 flex-col gap-3">
-                        <!-- Milestones injected here -->
-                    </div>
                     <h3 class="mt-6">Logboek</h3>
                     <div id="history-list" class="mt-2 flex-col gap-3">
                         <!-- History injected here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Achievements View -->
+            <section id="view-achievements" class="view">
+                <header class="top-nav">
+                    <h2>Achievements</h2>
+                </header>
+                <div class="content-padded pb-32">
+                    <div id="achievements-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <!-- Achievements injected here -->
                     </div>
                 </div>
             </section>
@@ -134,8 +142,12 @@
                 <span>Schema's</span>
             </button>
             <button class="nav-item" data-target="progress">
+                <span class="material-icons-round">bar_chart</span>
+                <span>Statistieken</span>
+            </button>
+            <button class="nav-item" data-target="achievements">
                 <span class="material-icons-round">emoji_events</span>
-                <span>Voortgang</span>
+                <span>Achievements</span>
             </button>
         </nav>
 
