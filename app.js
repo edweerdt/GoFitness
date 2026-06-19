@@ -381,7 +381,7 @@ const app = {
                     </div>
                     <div style="display:flex; align-items:center; gap:8px; margin-left:12px;">
                         ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
-                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeletePlanModal('${p.id}')">delete_outline</span>
+                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${p.id}')">delete_outline</span>
                     </div>
                 </div>
                 
@@ -535,13 +535,13 @@ const app = {
                     summaryHtml += `
                         <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
                             <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal('${log.id}')">edit_note</span>
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteLogModal('${log.id}')">delete_outline</span>
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${log.id}')">delete_outline</span>
                         </div>
                     `;
                 } else {
                     summaryHtml += `
                         <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteLogModal('${log.id}')">delete_outline</span>
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${log.id}')">delete_outline</span>
                         </div>
                     `;
                 }
@@ -574,26 +574,35 @@ const app = {
         this.renderPlans();
     },
 
-    showDeletePlanModal(planId) {
-        this.planToDelete = planId;
-        document.getElementById('modal-delete-plan').classList.remove('hidden');
+    showDeleteModal(type, id) {
+        this.itemToDelete = { type, id };
+        document.getElementById(`modal-delete-${type}`).classList.remove('hidden');
     },
 
-    hideDeletePlanModal() {
-        this.planToDelete = null;
-        document.getElementById('modal-delete-plan').classList.add('hidden');
+    hideDeleteModal(type) {
+        this.itemToDelete = null;
+        document.getElementById(`modal-delete-${type}`).classList.add('hidden');
     },
 
-    confirmDeletePlan() {
-        if (!this.planToDelete) return;
-        store.plans = store.plans.filter(p => p.id !== this.planToDelete);
-        if (store.activePlanId === this.planToDelete) {
-            store.activePlanId = null;
+    confirmDelete(type) {
+        if (!this.itemToDelete || this.itemToDelete.type !== type) return;
+
+        if (type === 'plan') {
+            store.plans = store.plans.filter(p => p.id !== this.itemToDelete.id);
+            if (store.activePlanId === this.itemToDelete.id) {
+                store.activePlanId = null;
+            }
+            store.save();
+            this.hideDeleteModal('plan');
+            this.renderPlans();
+            this.renderHome();
+        } else if (type === 'log') {
+            store.logs = store.logs.filter(l => l.id !== this.itemToDelete.id);
+            store.save();
+            this.hideDeleteModal('log');
+            this.renderProgress();
+            this.renderHome();
         }
-        store.save();
-        this.hideDeletePlanModal();
-        this.renderPlans();
-        this.renderHome();
     },
 
     calculateStreak() {
@@ -807,24 +816,6 @@ const app = {
         this.navigate('home');
     },
 
-    showDeleteLogModal(logId) {
-        this.logToDelete = logId;
-        document.getElementById('modal-delete-log').classList.remove('hidden');
-    },
-
-    hideDeleteLogModal() {
-        this.logToDelete = null;
-        document.getElementById('modal-delete-log').classList.add('hidden');
-    },
-
-    confirmDeleteLog() {
-        if (!this.logToDelete) return;
-        store.logs = store.logs.filter(l => l.id !== this.logToDelete);
-        store.save();
-        this.hideDeleteLogModal();
-        this.renderProgress();
-        this.renderHome(); // Update home stats if needed
-    },
 
     showEditLogModal(logId) {
         const originalLog = store.logs.find(l => l.id === logId);
