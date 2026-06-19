@@ -1,4 +1,4 @@
-const { DataStore } = require('./app');
+const { DataStore, app } = require('./app');
 
 describe('DataStore', () => {
     let mockLocalStorage;
@@ -77,5 +77,21 @@ describe('DataStore', () => {
         expect(() => {
             new DataStore();
         }).toThrow(SyntaxError);
+    });
+});
+
+describe('app XSS Security', () => {
+    it('should escape HTML characters using escapeHTML to prevent XSS', () => {
+        expect(app.escapeHTML('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
+        expect(app.escapeHTML('Hello & Welcome')).toBe('Hello &amp; Welcome');
+        expect(app.escapeHTML("O'Reilly")).toBe('O&#39;Reilly');
+    });
+
+    it('should format rich fields escaping XSS safely', () => {
+        const result = app.formatRichField('<script>alert("XSS")</script>', '<style>body{display:none}</style>');
+        expect(result).not.toContain('<script>');
+        expect(result).toContain('&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;');
+        expect(result).not.toContain('<style>');
+        expect(result).toContain('&lt;style&gt;body{display:none}&lt;/style&gt;');
     });
 });
