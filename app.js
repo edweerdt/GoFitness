@@ -534,17 +534,29 @@ const app = {
             const meta = muscleMeta[m] || { name: m, icon: 'fitness_center', color: '#a78bfa' };
             
             html += `
-                <div class="glass-panel" style="display:flex; align-items:center; gap:16px;">
-                    <div class="stat-icon-wrapper" style="width:48px; height:48px; background:rgba(255,255,255,0.05); color:${meta.color};">
-                        <span class="material-icons-round">${meta.icon}</span>
+                <div class="glass-panel" style="display:flex; flex-direction:column; gap:12px; padding:16px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div class="stat-icon-wrapper" style="width:36px; height:36px; padding:6px; background:rgba(255,255,255,0.05); color:${meta.color};">
+                            <span class="material-icons-round" style="font-size:18px;">${meta.icon}</span>
+                        </div>
+                        <div style="font-weight:600; font-size:1rem;">${meta.name}</div>
                     </div>
-                    <div style="flex:1;">
-                        <div style="font-weight:600; font-size:1.1rem;">${meta.name}</div>
-                        <div class="text-muted text-sm mt-1" style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-                            <div><span class="material-icons-round" style="font-size:14px; vertical-align:middle; margin-right:4px; color:var(--text-muted);">event</span>${data.sessions} sessies</div>
-                            <div><span class="material-icons-round" style="font-size:14px; vertical-align:middle; margin-right:4px; color:var(--text-muted);">repeat</span>${data.reps} reps</div>
-                            <div><span class="material-icons-round" style="font-size:14px; vertical-align:middle; margin-right:4px; color:var(--text-muted);">fitness_center</span>Max: ${data.maxWeight} kg</div>
-                            <div><span class="material-icons-round" style="font-size:14px; vertical-align:middle; margin-right:4px; color:var(--text-muted);">emoji_events</span>Max: ${data.maxReps} reps</div>
+                    <div class="text-muted text-sm" style="display:flex; flex-direction:column; gap:4px;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>Sessies:</span>
+                            <span style="color:var(--text-primary); font-weight:500;">${data.sessions}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>Reps:</span>
+                            <span style="color:var(--text-primary); font-weight:500;">${data.reps}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>Max gewicht:</span>
+                            <span style="color:var(--text-primary); font-weight:500;">${data.maxWeight} kg</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>Max reps:</span>
+                            <span style="color:var(--text-primary); font-weight:500;">${data.maxReps}</span>
                         </div>
                     </div>
                 </div>
