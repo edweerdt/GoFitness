@@ -542,21 +542,21 @@ const app = {
                         <div style="font-weight:600; font-size:1rem;">${meta.name}</div>
                     </div>
                     <div class="text-muted text-sm" style="display:flex; flex-direction:column; gap:4px;">
-                        <div style="display:flex; justify-content:space-between;">
-                            <span>Sessies:</span>
-                            <span style="color:var(--text-primary); font-weight:500;">${data.sessions}</span>
+                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                            <span style="white-space:nowrap;">Sessies:</span>
+                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${data.sessions}</span>
                         </div>
-                        <div style="display:flex; justify-content:space-between;">
-                            <span>Reps:</span>
-                            <span style="color:var(--text-primary); font-weight:500;">${data.reps}</span>
+                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                            <span style="white-space:nowrap;">Reps:</span>
+                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${data.reps}</span>
                         </div>
-                        <div style="display:flex; justify-content:space-between;">
-                            <span>Max gewicht:</span>
-                            <span style="color:var(--text-primary); font-weight:500;">${data.maxWeight} kg</span>
+                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                            <span style="white-space:nowrap;">Max gewicht:</span>
+                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${data.maxWeight} kg</span>
                         </div>
-                        <div style="display:flex; justify-content:space-between;">
-                            <span>Max reps:</span>
-                            <span style="color:var(--text-primary); font-weight:500;">${data.maxReps}</span>
+                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                            <span style="white-space:nowrap;">Max reps:</span>
+                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${data.maxReps}</span>
                         </div>
                     </div>
                 </div>
