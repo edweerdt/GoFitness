@@ -103,6 +103,33 @@ const app = {
         this.applyTheme();
     },
 
+    showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        const iconName = type === 'success' ? 'check_circle' : 'error_outline';
+        const iconColor = type === 'success' ? 'var(--status-green)' : 'var(--status-red)';
+
+        toast.innerHTML = `
+            <span class="material-icons-round" style="color: ${iconColor};">${iconName}</span>
+            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${message}</div>
+        `;
+
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.animation = 'fadeOut 0.3s ease forwards';
+            setTimeout(() => {
+                if (container.contains(toast)) {
+                    container.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
+    },
+
     applyTheme() {
         const btns = document.querySelectorAll('.theme-toggle-btn');
         
@@ -534,17 +561,29 @@ const app = {
             const meta = muscleMeta[m] || { name: m, icon: 'fitness_center', color: '#a78bfa' };
             
             html += `
-                <div class="glass-panel" style="display:flex; align-items:center; gap:16px;">
-                    <div class="stat-icon-wrapper" style="width:48px; height:48px; background:rgba(255,255,255,0.05); color:${meta.color};">
-                        <span class="material-icons-round">${meta.icon}</span>
+                <div class="glass-panel" style="display:flex; flex-direction:column; gap:12px; padding:16px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div class="stat-icon-wrapper" style="width:36px; height:36px; padding:6px; background:rgba(255,255,255,0.05); color:${meta.color};">
+                            <span class="material-icons-round" style="font-size:18px;">${meta.icon}</span>
+                        </div>
+                        <div style="font-weight:600; font-size:1rem;">${meta.name}</div>
                     </div>
-                    <div style="flex:1;">
-                        <div style="font-weight:600; font-size:1.1rem;">${meta.name}</div>
-                        <div class="text-muted text-sm mt-1" style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-                            <div><span class="material-icons-round" style="font-size:14px; vertical-align:middle; margin-right:4px; color:var(--text-muted);">event</span>${data.sessions} sessies</div>
-                            <div><span class="material-icons-round" style="font-size:14px; vertical-align:middle; margin-right:4px; color:var(--text-muted);">repeat</span>${data.reps} reps</div>
-                            <div><span class="material-icons-round" style="font-size:14px; vertical-align:middle; margin-right:4px; color:var(--text-muted);">fitness_center</span>Max: ${data.maxWeight} kg</div>
-                            <div><span class="material-icons-round" style="font-size:14px; vertical-align:middle; margin-right:4px; color:var(--text-muted);">emoji_events</span>Max: ${data.maxReps} reps</div>
+                    <div class="text-muted text-sm" style="display:flex; flex-direction:column; gap:4px;">
+                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                            <span style="white-space:nowrap;">Sessies:</span>
+                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${data.sessions}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                            <span style="white-space:nowrap;">Reps:</span>
+                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${data.reps}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                            <span style="white-space:nowrap;">Max gewicht:</span>
+                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${data.maxWeight} kg</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                            <span style="white-space:nowrap;">Max reps:</span>
+                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${data.maxReps}</span>
                         </div>
                     </div>
                 </div>
@@ -1286,7 +1325,7 @@ const app = {
         this.hideModal();
         this.renderPlans();
         this.renderHome();
-        alert("Schema succesvol geïmporteerd!");
+        this.showToast("Schema succesvol geïmporteerd!", "success");
     },
 
     exportData() {
