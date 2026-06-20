@@ -103,6 +103,33 @@ const app = {
         this.applyTheme();
     },
 
+    showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        const iconName = type === 'success' ? 'check_circle' : 'error_outline';
+        const iconColor = type === 'success' ? 'var(--status-green)' : 'var(--status-red)';
+
+        toast.innerHTML = `
+            <span class="material-icons-round" style="color: ${iconColor};">${iconName}</span>
+            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${message}</div>
+        `;
+
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.animation = 'fadeOut 0.3s ease forwards';
+            setTimeout(() => {
+                if (container.contains(toast)) {
+                    container.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
+    },
+
     applyTheme() {
         const btns = document.querySelectorAll('.theme-toggle-btn');
         
@@ -1298,7 +1325,7 @@ const app = {
         this.hideModal();
         this.renderPlans();
         this.renderHome();
-        alert("Schema succesvol geïmporteerd!");
+        this.showToast("Schema succesvol geïmporteerd!", "success");
     },
 
     exportData() {
