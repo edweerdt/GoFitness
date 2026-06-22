@@ -765,7 +765,13 @@ const app = {
 
             const planSection = document.createElement('div');
             planSection.className = 'mt-4';
-            planSection.innerHTML = `<h4 style="color:var(--text-primary); margin-bottom:8px; margin-top:16px;">${app.escapeHTML(planName)}</h4>`;
+
+            const titleEl = document.createElement('h4');
+            titleEl.style.color = 'var(--text-primary)';
+            titleEl.style.marginBottom = '8px';
+            titleEl.style.marginTop = '16px';
+            titleEl.textContent = planName;
+            planSection.appendChild(titleEl);
             
             const listWrapper = document.createElement('div');
             listWrapper.className = 'flex-col gap-3';
