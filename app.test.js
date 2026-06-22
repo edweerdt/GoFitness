@@ -1,4 +1,4 @@
-const { DataStore, app } = require('./app');
+const { DataStore, app, store } = require('./app');
 
 describe('DataStore', () => {
     let mockLocalStorage;
@@ -77,6 +77,120 @@ describe('DataStore', () => {
         expect(() => {
             new DataStore();
         }).toThrow(SyntaxError);
+    });
+});
+
+describe('app logic', () => {
+    beforeEach(() => {
+        // Reset store state before each test
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [];
+    });
+
+    describe('getRecoveryStatus', () => {
+        it('should return green when no plan is active', () => {
+            const status = app.getRecoveryStatus();
+            expect(status).toEqual({ status: 'green', text: 'Klaar om te trainen' });
+        });
+
+        it('should return green when there are no logs', () => {
+            store.plans = [{ id: 'plan_1', minRecoveryHours: 48 }];
+            store.activePlanId = 'plan_1';
+            const status = app.getRecoveryStatus();
+            expect(status).toEqual({ status: 'green', text: 'Klaar om te trainen' });
+        });
+
+        it('should return red when hours since last log is less than half min recovery hours', () => {
+            store.plans = [{ id: 'plan_1', minRecoveryHours: 48 }];
+            store.activePlanId = 'plan_1';
+            const logDate = new Date();
+            logDate.setHours(logDate.getHours() - 10); // 10 hours ago (< 24)
+            store.logs = [{ date: logDate.toISOString() }];
+
+            const status = app.getRecoveryStatus();
+            expect(status).toEqual({ status: 'red', text: 'Beter rusten' });
+        });
+
+        it('should return orange when hours since last log is between half and full min recovery hours', () => {
+            store.plans = [{ id: 'plan_1', minRecoveryHours: 48 }];
+            store.activePlanId = 'plan_1';
+            const logDate = new Date();
+            logDate.setHours(logDate.getHours() - 30); // 30 hours ago (> 24, < 48)
+            store.logs = [{ date: logDate.toISOString() }];
+
+            const status = app.getRecoveryStatus();
+            expect(status).toEqual({ status: 'orange', text: 'Rustig aan' });
+        });
+
+        it('should return green when hours since last log is greater than min recovery hours', () => {
+            store.plans = [{ id: 'plan_1', minRecoveryHours: 48 }];
+            store.activePlanId = 'plan_1';
+            const logDate = new Date();
+            logDate.setHours(logDate.getHours() - 50); // 50 hours ago (> 48)
+            store.logs = [{ date: logDate.toISOString() }];
+
+            const status = app.getRecoveryStatus();
+            expect(status).toEqual({ status: 'green', text: 'Volledig hersteld' });
+        });
+    });
+
+    describe('getRecommendedSession', () => {
+        it('should return null when no plan is active', () => {
+            expect(app.getRecommendedSession()).toBeNull();
+        });
+
+        it('should return the first session when no sessions have been done recently', () => {
+            const session1 = { id: 's1', name: 'Session 1' };
+            const session2 = { id: 's2', name: 'Session 2' };
+            store.plans = [{ id: 'plan_1', name: 'Test Plan', sessions: [session1, session2] }];
+            store.activePlanId = 'plan_1';
+
+            const recommended = app.getRecommendedSession();
+            expect(recommended.session).toEqual(session1);
+            expect(recommended.reason).toContain('volgende in je schema');
+        });
+
+        it('should return the next uncompleted session', () => {
+            const session1 = { id: 's1', name: 'Session 1' };
+            const session2 = { id: 's2', name: 'Session 2' };
+            store.plans = [{ id: 'plan_1', name: 'Test Plan', sessions: [session1, session2] }];
+            store.activePlanId = 'plan_1';
+
+            const logDate = new Date();
+            store.logs = [{ sessionId: 's1', date: logDate.toISOString() }];
+
+            const recommended = app.getRecommendedSession();
+            expect(recommended.session).toEqual(session2);
+        });
+
+        it('should loop back to the first session when all have been completed', () => {
+            const session1 = { id: 's1', name: 'Session 1' };
+            const session2 = { id: 's2', name: 'Session 2' };
+            store.plans = [{ id: 'plan_1', name: 'Test Plan', sessions: [session1, session2] }];
+            store.activePlanId = 'plan_1';
+
+            const logDate = new Date();
+            store.logs = [
+                { sessionId: 's1', date: logDate.toISOString() },
+                { sessionId: 's2', date: logDate.toISOString() }
+            ];
+
+            const recommended = app.getRecommendedSession();
+            expect(recommended.session).toEqual(session1);
+            expect(recommended.reason).toContain('we beginnen weer vooraan');
+        });
+    });
+
+    describe('calculateStreak', () => {
+        it('should return 0 when there are no logs', () => {
+            expect(app.calculateStreak()).toBe(0);
+        });
+
+        it('should return 1 when there are logs', () => {
+            store.logs = [{ id: 'log1' }];
+            expect(app.calculateStreak()).toBe(1);
+        });
     });
 });
 
