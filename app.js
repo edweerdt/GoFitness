@@ -464,8 +464,13 @@ const app = {
 
     renderProgress() {
         const totalWorkouts = store.logs.length;
-        let totalMinutes = store.logs.reduce((sum, l) => sum + (l.duration || 45), 0);
-        let totalExercises = store.logs.reduce((sum, l) => sum + (l.exercisesCompleted || 0), 0);
+        let totalMinutes = 0;
+        let totalExercises = 0;
+        for (let i = 0; i < store.logs.length; i++) {
+            const l = store.logs[i];
+            totalMinutes += (l.duration || 45);
+            totalExercises += (l.exercisesCompleted || 0);
+        }
         
         document.getElementById('full-stats-grid').innerHTML = `
             <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalWorkouts}</span><span class="stat-label">Trainingen</span></div></div>
