@@ -426,7 +426,7 @@ const app = {
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div style="flex:1;">
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0;">${p.name}</h3>
+                            <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0;">${this.escapeHTML(p.name)}</h3>
                             ${level}
                         </div>
                         ${desc}
