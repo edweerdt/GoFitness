@@ -219,8 +219,9 @@ const app = {
         
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const sevenDaysAgoStr = sevenDaysAgo.toISOString();
         
-        const recentLogs = store.logs.filter(l => new Date(l.date) > sevenDaysAgo);
+        const recentLogs = store.logs.filter(l => l.date > sevenDaysAgoStr);
         const doneSessionIds = recentLogs.map(l => l.sessionId);
         
         let orderedSessions = [...plan.sessions];
@@ -362,7 +363,8 @@ const app = {
             if (targetSessions) {
                 const oneWeekAgo = new Date();
                 oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                const recentLogsCount = store.logs.filter(l => new Date(l.date) > oneWeekAgo && l.planId === plan.id).length;
+                const oneWeekAgoStr = oneWeekAgo.toISOString();
+                const recentLogsCount = store.logs.filter(l => l.date > oneWeekAgoStr && l.planId === plan.id).length;
 
                 let progressText = `${recentLogsCount}/${targetSessions} sessies deze week`;
                 const progressDiv = document.createElement('div');
