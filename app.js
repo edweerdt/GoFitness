@@ -221,7 +221,7 @@ const app = {
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         
         const recentLogs = store.logs.filter(l => new Date(l.date) > sevenDaysAgo);
-        const doneSessionIds = recentLogs.map(l => l.sessionId);
+        const doneSessionIds = new Set(recentLogs.map(l => l.sessionId));
         
         let orderedSessions = [...plan.sessions];
 
@@ -233,7 +233,7 @@ const app = {
             orderedSessions.sort((a, b) => (a.dayOrderHint || 99) - (b.dayOrderHint || 99));
         }
 
-        const nextSession = orderedSessions.find(s => !doneSessionIds.includes(s.id));
+        const nextSession = orderedSessions.find(s => !doneSessionIds.has(s.id));
         
         if(nextSession) {
             return {
