@@ -766,7 +766,7 @@ const app = {
         });
 
         for (const [planName, logs] of Object.entries(groupedLogs)) {
-            const sortedLogs = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+            const sortedLogs = [...logs].sort((a, b) => (a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)));
 
             const planSection = document.createElement('div');
             planSection.className = 'mt-4';
