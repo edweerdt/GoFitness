@@ -78,6 +78,31 @@ describe('DataStore', () => {
             new DataStore();
         }).toThrow(SyntaxError);
     });
+
+    describe('saveActiveWorkoutState', () => {
+        it('should save active workout state to localStorage when state is provided', () => {
+            const store = new DataStore();
+            const mockState = { exerciseId: 'ex_1', sets: [] };
+
+            store.saveActiveWorkoutState(mockState);
+
+            expect(store.activeWorkoutState).toEqual(mockState);
+            expect(mockLocalStorage.setItem).toHaveBeenCalledWith('activeWorkoutState', JSON.stringify(mockState));
+        });
+
+        it('should remove active workout state from localStorage when state is null', () => {
+            const store = new DataStore();
+
+            // First, set a state
+            store.saveActiveWorkoutState({ exerciseId: 'ex_1' });
+
+            // Then clear it
+            store.saveActiveWorkoutState(null);
+
+            expect(store.activeWorkoutState).toBeNull();
+            expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('activeWorkoutState');
+        });
+    });
 });
 
 describe('app logic', () => {

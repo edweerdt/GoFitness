@@ -219,9 +219,11 @@ const app = {
         
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const sevenDaysAgoStr = sevenDaysAgo.toISOString();
         
-        const recentLogs = store.logs.filter(l => new Date(l.date) > sevenDaysAgo);
+        const recentLogs = store.logs.filter(l => l.date > sevenDaysAgoStr);
         const doneSessionIds = new Set(recentLogs.map(l => l.sessionId));
+
         
         let orderedSessions = [...plan.sessions];
 
@@ -362,7 +364,8 @@ const app = {
             if (targetSessions) {
                 const oneWeekAgo = new Date();
                 oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                const recentLogsCount = store.logs.filter(l => new Date(l.date) > oneWeekAgo && l.planId === plan.id).length;
+                const oneWeekAgoStr = oneWeekAgo.toISOString();
+                const recentLogsCount = store.logs.filter(l => l.date > oneWeekAgoStr && l.planId === plan.id).length;
 
                 let progressText = `${recentLogsCount}/${targetSessions} sessies deze week`;
                 const progressDiv = document.createElement('div');
@@ -766,7 +769,7 @@ const app = {
         });
 
         for (const [planName, logs] of Object.entries(groupedLogs)) {
-            const sortedLogs = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+            const sortedLogs = [...logs].sort((a, b) => (a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)));
 
             const planSection = document.createElement('div');
             planSection.className = 'mt-4';
