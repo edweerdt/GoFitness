@@ -917,6 +917,27 @@ const app = {
         this.navigate('workout');
     },
 
+    getPreviousExerciseStats(exerciseName) {
+        for (let i = store.logs.length - 1; i >= 0; i--) {
+            const log = store.logs[i];
+            if (!log.exercises) continue;
+            
+            const ex = log.exercises.find(e => e.name === exerciseName);
+            if (ex && ex.details && ex.details.length > 0) {
+                let maxWeight = 0;
+                let maxReps = 0;
+                ex.details.forEach(d => {
+                    const w = parseFloat(d.weight) || 0;
+                    const r = parseInt(d.reps) || 0;
+                    if (w > maxWeight) maxWeight = w;
+                    if (r > maxReps) maxReps = r;
+                });
+                return { maxWeight: maxWeight > 0 ? maxWeight : null, maxReps: maxReps > 0 ? maxReps : null };
+            }
+        }
+        return null;
+    },
+
     renderWorkoutExercises() {
         const list = document.getElementById('workout-exercise-list');
         list.innerHTML = '';
@@ -933,6 +954,9 @@ const app = {
 
         sortedExercises.forEach((ex) => {
             const exIndex = this.activeWorkout.exercises.findIndex(e => e.id === ex.id);
+            const prevStats = this.getPreviousExerciseStats(ex.name) || {};
+            const weightPlaceholder = prevStats.maxWeight || 'kg';
+            const repsPlaceholder = prevStats.maxReps || 'reps';
 
             // Build rep/duration string
             let metaString = `${ex.sets} sets`;
@@ -976,11 +1000,11 @@ const app = {
                 
                 let inputsHtml = '';
                 if (wantsWeight) {
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="kg" 
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="${weightPlaceholder}" 
                         value="${ex.weights ? ex.weights[i] : ''}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">`;
                 }
                 if (wantsReps) {
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="reps" style="width: 55px;"
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="${repsPlaceholder}" style="width: 55px;"
                         value="${ex.actualReps ? ex.actualReps[i] : ''}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
                 }
                 if (wantsDuration && !wantsReps) {
