@@ -918,11 +918,13 @@ const app = {
     },
 
     getPreviousExerciseDetails(exerciseName) {
+        if (!exerciseName) return null;
+        const targetName = exerciseName.toLowerCase().trim();
         for (let i = store.logs.length - 1; i >= 0; i--) {
             const log = store.logs[i];
             if (!log.exercises) continue;
             
-            const ex = log.exercises.find(e => e.name === exerciseName);
+            const ex = log.exercises.find(e => e.name && e.name.toLowerCase().trim() === targetName);
             if (ex && ex.details && ex.details.length > 0) {
                 return ex.details;
             }
