@@ -917,22 +917,14 @@ const app = {
         this.navigate('workout');
     },
 
-    getPreviousExerciseStats(exerciseName) {
+    getPreviousExerciseDetails(exerciseName) {
         for (let i = store.logs.length - 1; i >= 0; i--) {
             const log = store.logs[i];
             if (!log.exercises) continue;
             
             const ex = log.exercises.find(e => e.name === exerciseName);
             if (ex && ex.details && ex.details.length > 0) {
-                let maxWeight = 0;
-                let maxReps = 0;
-                ex.details.forEach(d => {
-                    const w = parseFloat(d.weight) || 0;
-                    const r = parseInt(d.reps) || 0;
-                    if (w > maxWeight) maxWeight = w;
-                    if (r > maxReps) maxReps = r;
-                });
-                return { maxWeight: maxWeight > 0 ? maxWeight : null, maxReps: maxReps > 0 ? maxReps : null };
+                return ex.details;
             }
         }
         return null;
@@ -954,9 +946,7 @@ const app = {
 
         sortedExercises.forEach((ex) => {
             const exIndex = this.activeWorkout.exercises.findIndex(e => e.id === ex.id);
-            const prevStats = this.getPreviousExerciseStats(ex.name) || {};
-            const weightPlaceholder = prevStats.maxWeight || 'kg';
-            const repsPlaceholder = prevStats.maxReps || 'reps';
+            const prevDetails = this.getPreviousExerciseDetails(ex.name) || [];
 
             // Build rep/duration string
             let metaString = `${ex.sets} sets`;
@@ -993,6 +983,10 @@ const app = {
             for(let i=0; i<ex.sets; i++) {
                 const checked = ex.setsCompleted[i] ? 'checked' : '';
                 
+                const prevSet = prevDetails[i] || {};
+                const weightPlaceholder = prevSet.weight || 'kg';
+                const repsPlaceholder = prevSet.reps || 'reps';
+
                 // TrackMetrics check for dynamic inputs
                 const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
                 const wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : false;
