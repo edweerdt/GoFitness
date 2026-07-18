@@ -383,6 +383,21 @@ describe('app achievements', () => {
         expect(document.getElementById('achievements-grid').innerHTML).toContain('Vast in het Ritme');
     });
 
+    it('should unlock muscle achievements via muscleGroups metadata for Dutch exercise names', () => {
+        // De oude naam-heuristiek (Engelse termen) zou deze namen missen
+        store.logs = [{
+            date: new Date().toISOString(),
+            duration: 45,
+            exercises: [
+                { name: 'Borstdrukken', muscleGroups: ['Chest'], details: [{ setNumber: 1, weight: '40', reps: '10' }] },
+                { name: 'Vlinderslag Apparaat', muscleGroups: ['chest'], details: [{ setNumber: 1, weight: '30', reps: '12' }] },
+                { name: 'Opdrukken', muscleGroups: ['CHEST'], details: [{ setNumber: 1, weight: '', reps: '15' }] }
+            ]
+        }];
+        app.renderAchievements();
+        expect(document.getElementById('achievements-grid').innerHTML).toContain('Borst Vooruit');
+    });
+
     it('should not unlock the rhythm achievement when a week is skipped', () => {
         store.logs = [
             { date: new Date(2025, 11, 8).toISOString(), duration: 45 },

@@ -274,6 +274,35 @@ const app = {
     },
 
     // --- UTILS ---
+
+    // Normaliseert spiergroep-namen uit schema's (hoofdletters, synoniemen) naar de interne sleutels
+    normalizeMuscleGroup(mg) {
+        const key = String(mg).toLowerCase().trim();
+        const aliases = {
+            biceps: 'arms', triceps: 'arms', forearms: 'arms',
+            quads: 'legs', hamstrings: 'legs', calves: 'legs',
+            abs: 'core', lats: 'back', traps: 'back'
+        };
+        return aliases[key] || key;
+    },
+
+    // Fallback voor oude logs zonder muscleGroups: raad spiergroepen op basis van de oefennaam
+    guessMuscleGroupsFromName(name) {
+        const n = String(name || '').toLowerCase();
+        const groups = [];
+        if (n.includes('press') || n.includes('push') || n.includes('fly') || n.includes('dip')) {
+            if (n.includes('leg')) groups.push('legs');
+            else if (n.includes('shoulder') || n.includes('overhead') || n.includes('pike')) groups.push('shoulders');
+            else groups.push('chest');
+        }
+        if (n.includes('pull') || n.includes('row') || n.includes('chin') || n.includes('deadlift')) groups.push('back');
+        if (n.includes('squat') || n.includes('lunge') || (n.includes('extension') && n.includes('leg')) || (n.includes('curl') && n.includes('leg'))) groups.push('legs');
+        if (n.includes('thrust') || n.includes('bridge') || n.includes('kickback')) groups.push('glutes');
+        if (n.includes('plank') || n.includes('crunch') || (n.includes('raise') && n.includes('leg'))) groups.push('core');
+        if ((n.includes('curl') || n.includes('extension') || n.includes('skull')) && !n.includes('leg')) groups.push('arms');
+        return [...new Set(groups)];
+    },
+
     escapeHTML(str) {
         if (typeof str !== 'string') return str;
         return str.replace(/[&<>'"]/g,
@@ -375,31 +404,28 @@ const app = {
 
         // Target sessions per week progress
         const plan = store.getActivePlan();
-        if (plan) {
-            const targetSessions = (plan.schedule && plan.schedule.targetSessionsPerWeek) ? plan.schedule.targetSessionsPerWeek : plan.targetSessionsPerWeek;
-            if (targetSessions) {
-                const oneWeekAgo = new Date();
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                const oneWeekAgoStr = oneWeekAgo.toISOString();
-                const recentLogsCount = store.logs.filter(l => l.date > oneWeekAgoStr && l.planId === plan.id).length;
+        const targetSessions = plan ? ((plan.schedule && plan.schedule.targetSessionsPerWeek) ? plan.schedule.targetSessionsPerWeek : plan.targetSessionsPerWeek) : null;
+        let existingProgress = document.getElementById('home-weekly-progress');
+        if (plan && targetSessions) {
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            const oneWeekAgoStr = oneWeekAgo.toISOString();
+            const recentLogsCount = store.logs.filter(l => l.date > oneWeekAgoStr && l.planId === plan.id).length;
 
-                let progressText = `${recentLogsCount}/${targetSessions} sessies deze week`;
-                const progressDiv = document.createElement('div');
-                progressDiv.className = 'text-sm text-muted mt-2';
-                progressDiv.style.textAlign = 'center';
-                progressDiv.textContent = progressText;
+            const progressText = `${recentLogsCount}/${targetSessions} sessies deze week`;
 
-                // Add or update progress text under the streak stats
-                const statsMini = document.querySelector('.stats-mini');
-                let existingProgress = document.getElementById('home-weekly-progress');
-                if (!existingProgress) {
-                    existingProgress = document.createElement('div');
-                    existingProgress.id = 'home-weekly-progress';
-                    existingProgress.style.gridColumn = '1 / -1';
-                    statsMini.appendChild(existingProgress);
-                }
-                existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${this.escapeHTML(progressText)}</div>`;
+            // Add or update progress text under the streak stats
+            const statsMini = document.querySelector('.stats-mini');
+            if (!existingProgress) {
+                existingProgress = document.createElement('div');
+                existingProgress.id = 'home-weekly-progress';
+                existingProgress.style.gridColumn = '1 / -1';
+                statsMini.appendChild(existingProgress);
             }
+            existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${this.escapeHTML(progressText)}</div>`;
+        } else if (existingProgress) {
+            // Geen (plan met) weekdoel meer -> oude voortgangsbalk opruimen
+            existingProgress.remove();
         }
     },
 
@@ -545,6 +571,8 @@ const app = {
                     if (!muscles || muscles.length === 0) {
                         muscles = fallbackMap[ex.name] || ['overig'];
                     }
+                    // Normaliseren zodat 'Chest' en 'chest' (en synoniemen) samen tellen
+                    muscles = [...new Set(muscles.map(m => this.normalizeMuscleGroup(m)))];
 
                     muscles.forEach(m => {
                         sessionMuscles.add(m);
@@ -687,34 +715,30 @@ const app = {
             lastDate = d;
 
             if (log.exercises && log.exercises.length > 0) {
-                let chestCount=0, backCount=0, shoulderCount=0, legCount=0, gluteCount=0, coreCount=0, armCount=0, bwCount=0, weightCount=0;
-                
+                // Tel per spiergroep via de schema-metadata; alleen bij oude logs zonder
+                // muscleGroups vallen we terug op naam-herkenning
+                const groupCounts = {};
+                let bwCount = 0, weightCount = 0;
+
                 log.exercises.forEach(ex => {
-                    const n = ex.name.toLowerCase();
-                    if (n.includes('press') || n.includes('push') || n.includes('fly') || n.includes('dip')) {
-                        if (n.includes('leg')) legCount++;
-                        else if (n.includes('shoulder') || n.includes('overhead') || n.includes('pike')) shoulderCount++;
-                        else chestCount++;
-                    }
-                    if (n.includes('pull') || n.includes('row') || n.includes('chin') || n.includes('deadlift')) backCount++;
-                    if (n.includes('squat') || n.includes('lunge') || n.includes('extension') || n.includes('curl') && n.includes('leg')) legCount++;
-                    if (n.includes('thrust') || n.includes('bridge') || n.includes('kickback')) gluteCount++;
-                    if (n.includes('plank') || n.includes('crunch') || n.includes('raise') && n.includes('leg')) coreCount++;
-                    if (n.includes('curl') || n.includes('extension') || n.includes('skull')) {
-                        if (!n.includes('leg')) armCount++;
-                    }
-                    
-                    if (n.includes('push-up') || n.includes('pull-up') || n.includes('dip') || n.includes('plank') || n.includes('squat') && !n.includes('barbell')) bwCount++;
-                    if (n.includes('barbell') || n.includes('dumbbell') || n.includes('machine') || n.includes('cable')) weightCount++;
+                    const groups = (ex.muscleGroups && ex.muscleGroups.length > 0)
+                        ? [...new Set(ex.muscleGroups.map(mg => this.normalizeMuscleGroup(mg)))]
+                        : this.guessMuscleGroupsFromName(ex.name);
+                    groups.forEach(g => groupCounts[g] = (groupCounts[g] || 0) + 1);
+
+                    // Gewicht gelogd? Dan telt de oefening als krachtwerk, anders als bodyweight
+                    const hasWeight = ex.details && ex.details.some(d => parseFloat(d.weight) > 0);
+                    if (hasWeight) weightCount++;
+                    else bwCount++;
                 });
 
-                if (chestCount >= 3) allAchievements.find(a => a.id === 'chest').unlocked = true;
-                if (backCount >= 3) allAchievements.find(a => a.id === 'back').unlocked = true;
-                if (shoulderCount >= 3) allAchievements.find(a => a.id === 'shoulders').unlocked = true;
-                if (legCount >= 3) allAchievements.find(a => a.id === 'legs').unlocked = true;
-                if (gluteCount >= 2) allAchievements.find(a => a.id === 'glutes').unlocked = true;
-                if (coreCount >= 3) allAchievements.find(a => a.id === 'core').unlocked = true;
-                if (armCount >= 3) allAchievements.find(a => a.id === 'arms').unlocked = true;
+                if ((groupCounts['chest'] || 0) >= 3) allAchievements.find(a => a.id === 'chest').unlocked = true;
+                if ((groupCounts['back'] || 0) >= 3) allAchievements.find(a => a.id === 'back').unlocked = true;
+                if ((groupCounts['shoulders'] || 0) >= 3) allAchievements.find(a => a.id === 'shoulders').unlocked = true;
+                if ((groupCounts['legs'] || 0) >= 3) allAchievements.find(a => a.id === 'legs').unlocked = true;
+                if ((groupCounts['glutes'] || 0) >= 2) allAchievements.find(a => a.id === 'glutes').unlocked = true;
+                if ((groupCounts['core'] || 0) >= 3) allAchievements.find(a => a.id === 'core').unlocked = true;
+                if ((groupCounts['arms'] || 0) >= 3) allAchievements.find(a => a.id === 'arms').unlocked = true;
 
                 if (bwCount > weightCount && bwCount >= 3) allAchievements.find(a => a.id === 'calisthenics').unlocked = true;
                 if (weightCount > bwCount && weightCount >= 3) allAchievements.find(a => a.id === 'iron').unlocked = true;
