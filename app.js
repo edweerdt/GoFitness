@@ -351,14 +351,7 @@ const app = {
             document.getElementById('recommended-reason').textContent = "Je was al bezig met deze sessie. Pak hem weer op!";
             btnStart.textContent = "Hervat Nu";
             btnStart.disabled = false;
-            btnStart.onclick = () => {
-                document.getElementById('workout-title').textContent = this.activeWorkout.session.name;
-                this.renderWorkoutExercises();
-                document.getElementById('btn-finish-workout').onclick = () => this.showFinishModal();
-                document.getElementById('bottom-nav').classList.add('hidden');
-                document.getElementById('view-workout').querySelector('.sticky-footer').style.bottom = '0';
-                this.navigate('workout');
-            };
+            btnStart.onclick = () => this.openWorkoutView();
         } else {
             document.getElementById('recommended-card-title').textContent = "Aanbevolen Sessie";
             const recSession = this.getRecommendedSession();
@@ -955,15 +948,19 @@ const app = {
             }))
         };
         store.saveActiveWorkoutState(this.activeWorkout);
-        
-        document.getElementById('workout-title').textContent = session.name;
+        this.openWorkoutView();
+    },
+
+    // Opent de workout-view voor de actieve workout (zowel starten als hervatten)
+    openWorkoutView() {
+        document.getElementById('workout-title').textContent = this.activeWorkout.session.name;
         this.renderWorkoutExercises();
-        
+
         document.getElementById('btn-finish-workout').onclick = () => this.showFinishModal();
-        
+
         document.getElementById('bottom-nav').classList.add('hidden');
         document.getElementById('view-workout').querySelector('.sticky-footer').style.bottom = '0';
-        
+
         this.navigate('workout');
     },
 
