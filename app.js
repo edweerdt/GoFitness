@@ -554,8 +554,93 @@ const app = {
             <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalMinutes}</span><span class="stat-label">Minuten</span></div></div>
             <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalExercises}</span><span class="stat-label">Oefeningen</span></div></div>
         `;
+        this.renderExerciseProgress();
         this.renderMuscleStats();
         this.renderHistory();
+    },
+
+    // Bouwt per oefening een reeks (datum, max gewicht) uit de logs
+    getExerciseProgressSeries() {
+        const series = {};
+        store.logs.forEach(log => {
+            if (!log.exercises || !log.date) return;
+            log.exercises.forEach(ex => {
+                let maxWeight = 0;
+                let bestSet = null;
+                (ex.details || []).forEach(d => {
+                    const w = parseFloat(d.weight);
+                    if (!isNaN(w) && w > maxWeight) {
+                        maxWeight = w;
+                        bestSet = d;
+                    }
+                });
+                if (maxWeight <= 0) return;
+
+                const key = String(ex.name).toLowerCase().trim();
+                if (!series[key]) series[key] = { name: ex.name, points: [] };
+                series[key].points.push({ date: log.date, weight: maxWeight, reps: parseInt(bestSet.reps) || 0 });
+            });
+        });
+
+        // Alleen oefeningen met minstens 2 metingen, punten op datumvolgorde
+        return Object.values(series)
+            .map(s => ({ ...s, points: [...s.points].sort((a, b) => (a.date < b.date ? -1 : 1)) }))
+            .filter(s => s.points.length >= 2);
+    },
+
+    buildSparklineSVG(points) {
+        const w = 100, h = 32, pad = 2;
+        const weights = points.map(p => p.weight);
+        const min = Math.min(...weights);
+        const max = Math.max(...weights);
+        const range = (max - min) || 1;
+        const step = (w - pad * 2) / (points.length - 1);
+        const coords = points.map((p, i) => {
+            const x = pad + i * step;
+            const y = h - pad - ((p.weight - min) / range) * (h - pad * 2);
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+        });
+        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%; height:48px; display:block;">
+            <polyline points="${coords.join(' ')}" fill="none" stroke="var(--accent-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+        </svg>`;
+    },
+
+    renderExerciseProgress() {
+        const container = document.getElementById('exercise-progress-list');
+        if (!container) return;
+
+        const series = this.getExerciseProgressSeries();
+        if (series.length === 0) {
+            container.innerHTML = '<p class="text-muted text-sm">Log minimaal twee sessies met gewichten om je progressie te zien.</p>';
+            return;
+        }
+
+        // Meest gelogde oefeningen bovenaan, maximaal 8 grafieken
+        series.sort((a, b) => b.points.length - a.points.length);
+
+        let html = '';
+        series.slice(0, 8).forEach(s => {
+            const first = s.points[0].weight;
+            const last = s.points[s.points.length - 1].weight;
+            const diff = Math.round((last - first) * 10) / 10;
+            const diffText = diff === 0 ? 'gelijk' : (diff > 0 ? `+${diff} kg` : `${diff} kg`);
+            const diffColor = diff > 0 ? 'var(--status-green)' : (diff < 0 ? 'var(--status-red)' : 'var(--text-muted)');
+
+            html += `
+                <div class="glass-panel" style="padding: 12px 16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+                        <div style="font-weight:600; font-size:0.9rem;">${this.escapeHTML(String(s.name))}</div>
+                        <div class="text-sm" style="color:${diffColor}; white-space:nowrap;">${diffText}</div>
+                    </div>
+                    <div class="mt-2">${this.buildSparklineSVG(s.points)}</div>
+                    <div class="text-sm text-muted" style="display:flex; justify-content:space-between;">
+                        <span>${s.points.length} sessies</span>
+                        <span>Laatst: ${last} kg</span>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
     },
 
     renderMuscleStats() {

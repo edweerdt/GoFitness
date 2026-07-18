@@ -455,6 +455,36 @@ describe('renderHistory', () => {
     });
 });
 
+describe('exercise progress', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [];
+        document.body.innerHTML = '<div id="exercise-progress-list"></div>';
+    });
+
+    it('should render a sparkline per exercise with at least two weighted sessions', () => {
+        store.logs = [
+            { date: '2026-07-01T10:00:00.000Z', exercises: [{ name: 'Bench Press', details: [{ setNumber: 1, weight: '40', reps: '10' }] }] },
+            { date: '2026-07-08T10:00:00.000Z', exercises: [{ name: 'Bench Press', details: [{ setNumber: 1, weight: '45', reps: '8' }] }] },
+            { date: '2026-07-08T10:00:00.000Z', exercises: [{ name: 'Plank', details: [{ setNumber: 1, weight: '', reps: '' }] }] }
+        ];
+        app.renderExerciseProgress();
+
+        const html = document.getElementById('exercise-progress-list').innerHTML;
+        expect(html).toContain('Bench Press');
+        expect(html).toContain('<svg');
+        expect(html).toContain('+5 kg');
+        // Oefeningen zonder gewichtsdata krijgen geen grafiek
+        expect(html).not.toContain('Plank');
+    });
+
+    it('should show a hint when there is not enough data', () => {
+        app.renderExerciseProgress();
+        expect(document.getElementById('exercise-progress-list').innerHTML).toContain('minimaal twee sessies');
+    });
+});
+
 describe('rest timer', () => {
     beforeEach(() => {
         jest.useFakeTimers();
