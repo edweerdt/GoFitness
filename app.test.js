@@ -230,8 +230,41 @@ describe('app logic', () => {
             expect(app.calculateStreak()).toBe(0);
         });
 
-        it('should return 1 when there are logs', () => {
-            store.logs = [{ id: 'log1' }];
+        it('should return 1 when there is only a workout in the current week', () => {
+            store.logs = [{ id: 'log1', date: new Date().toISOString() }];
+            expect(app.calculateStreak()).toBe(1);
+        });
+
+        it('should count consecutive training weeks', () => {
+            const now = new Date();
+            const lastWeek = new Date(now); lastWeek.setDate(now.getDate() - 7);
+            const twoWeeksAgo = new Date(now); twoWeeksAgo.setDate(now.getDate() - 14);
+            store.logs = [
+                { date: twoWeeksAgo.toISOString() },
+                { date: lastWeek.toISOString() },
+                { date: now.toISOString() }
+            ];
+            expect(app.calculateStreak()).toBe(3);
+        });
+
+        it('should keep the streak alive when this week has no workout yet', () => {
+            const now = new Date();
+            const lastWeek = new Date(now); lastWeek.setDate(now.getDate() - 7);
+            const twoWeeksAgo = new Date(now); twoWeeksAgo.setDate(now.getDate() - 14);
+            store.logs = [
+                { date: twoWeeksAgo.toISOString() },
+                { date: lastWeek.toISOString() }
+            ];
+            expect(app.calculateStreak()).toBe(2);
+        });
+
+        it('should break the streak when a week is skipped', () => {
+            const now = new Date();
+            const threeWeeksAgo = new Date(now); threeWeeksAgo.setDate(now.getDate() - 21);
+            store.logs = [
+                { date: threeWeeksAgo.toISOString() },
+                { date: now.toISOString() }
+            ];
             expect(app.calculateStreak()).toBe(1);
         });
     });

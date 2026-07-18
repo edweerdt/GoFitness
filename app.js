@@ -901,9 +901,36 @@ const app = {
         }
     },
 
+    // Geeft de timestamp van maandag 00:00 van de week waarin `date` valt
+    getWeekStart(date) {
+        const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const day = (d.getDay() + 6) % 7; // maandag = 0, zondag = 6
+        d.setDate(d.getDate() - day);
+        return d.getTime();
+    },
+
     calculateStreak() {
         if(store.logs.length === 0) return 0;
-        return 1; // Simplified for MVP
+
+        const trainedWeeks = new Set();
+        store.logs.forEach(log => {
+            if (log.date) trainedWeeks.add(this.getWeekStart(new Date(log.date)));
+        });
+        if (trainedWeeks.size === 0) return 0;
+
+        // Start in de huidige week; nog niet getraind deze week? Dan telt een
+        // streak t/m vorige week nog gewoon door.
+        const cursor = new Date(this.getWeekStart(new Date()));
+        if (!trainedWeeks.has(cursor.getTime())) {
+            cursor.setDate(cursor.getDate() - 7);
+        }
+
+        let streak = 0;
+        while (trainedWeeks.has(cursor.getTime())) {
+            streak++;
+            cursor.setDate(cursor.getDate() - 7);
+        }
+        return streak;
     },
 
     // --- WORKOUT FLOW ---
