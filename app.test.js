@@ -207,6 +207,38 @@ describe('app logic', () => {
             const status = app.getRecoveryStatus();
             expect(status).toEqual({ status: 'green', text: 'Volledig hersteld' });
         });
+
+        it('should be green when the next session trains recovered muscle groups', () => {
+            const twentyHoursAgo = new Date();
+            twentyHoursAgo.setHours(twentyHoursAgo.getHours() - 20);
+            store.plans = [{
+                id: 'plan_1', minRecoveryHours: 48,
+                sessions: [
+                    { id: 'legs', name: 'Benen', dayOrderHint: 1, exercises: [{ id: 'e1', name: 'Squat', muscleGroups: ['legs'], sets: 3 }] },
+                    { id: 'push', name: 'Push', dayOrderHint: 2, exercises: [{ id: 'e2', name: 'Bench Press', muscleGroups: ['chest'], sets: 3 }] }
+                ]
+            }];
+            store.activePlanId = 'plan_1';
+            store.logs = [{ sessionId: 'legs', date: twentyHoursAgo.toISOString(), exercises: [{ name: 'Squat', muscleGroups: ['legs'] }] }];
+
+            // Benen gisteren getraind, maar de aanbevolen sessie is push (borst nooit getraind) -> groen
+            expect(app.getRecoveryStatus().status).toBe('green');
+        });
+
+        it('should be red when the next session trains a muscle group that was just trained', () => {
+            const tenHoursAgo = new Date();
+            tenHoursAgo.setHours(tenHoursAgo.getHours() - 10);
+            store.plans = [{
+                id: 'plan_1', minRecoveryHours: 48,
+                sessions: [
+                    { id: 'push', name: 'Push', exercises: [{ id: 'e2', name: 'Bench Press', muscleGroups: ['chest'], sets: 3 }] }
+                ]
+            }];
+            store.activePlanId = 'plan_1';
+            store.logs = [{ sessionId: 'push', date: tenHoursAgo.toISOString(), exercises: [{ name: 'Bench Press', muscleGroups: ['chest'] }] }];
+
+            expect(app.getRecoveryStatus().status).toBe('red');
+        });
     });
 
     describe('getRecommendedSession', () => {

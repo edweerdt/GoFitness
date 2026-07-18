@@ -209,28 +209,59 @@ const app = {
     getRecoveryStatus() {
         const plan = store.getActivePlan();
         if(!plan || store.logs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
-        
-        const lastLog = store.logs[store.logs.length - 1];
-        const hoursSinceLast = (new Date() - new Date(lastLog.date)) / (1000 * 60 * 60);
-        let minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
-        
-        // Check muscle group specific recovery
-        if (plan.recoveryRules && plan.recoveryRules.muscleGroupRecoveryHours && lastLog.exercises) {
-            let maxMuscleGroupRecovery = 0;
-            const recentSession = plan.sessions.find(s => s.id === lastLog.sessionId);
-            if (recentSession) {
-                recentSession.exercises.forEach(ex => {
-                    if (ex.muscleGroups) {
-                        ex.muscleGroups.forEach(mg => {
-                            if (plan.recoveryRules.muscleGroupRecoveryHours[mg]) {
-                                maxMuscleGroupRecovery = Math.max(maxMuscleGroupRecovery, plan.recoveryRules.muscleGroupRecoveryHours[mg]);
-                            }
-                        });
-                    }
-                });
-            }
-            if (maxMuscleGroupRecovery > minHours) minHours = maxMuscleGroupRecovery;
+
+        const minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
+        const now = new Date();
+
+        // Herstelregels per spiergroep, genormaliseerd op sleutel
+        const mgRules = {};
+        if (plan.recoveryRules && plan.recoveryRules.muscleGroupRecoveryHours) {
+            Object.entries(plan.recoveryRules.muscleGroupRecoveryHours).forEach(([k, v]) => {
+                mgRules[this.normalizeMuscleGroup(k)] = v;
+            });
         }
+
+        // Per spiergroep: wanneer voor het laatst getraind?
+        const lastTrained = {};
+        store.logs.forEach(log => {
+            if (!log.date || !log.exercises) return;
+            const t = new Date(log.date).getTime();
+            log.exercises.forEach(ex => {
+                (ex.muscleGroups || []).forEach(mg => {
+                    const g = this.normalizeMuscleGroup(mg);
+                    if (!lastTrained[g] || t > lastTrained[g]) lastTrained[g] = t;
+                });
+            });
+        });
+
+        // Spiergroepen die de eerstvolgende (aanbevolen) sessie traint
+        const rec = (plan.sessions && plan.sessions.length > 0) ? this.getRecommendedSession() : null;
+        const nextGroups = [];
+        if (rec && rec.session && rec.session.exercises) {
+            rec.session.exercises.forEach(ex => (ex.muscleGroups || []).forEach(mg => {
+                const g = this.normalizeMuscleGroup(mg);
+                if (!nextGroups.includes(g)) nextGroups.push(g);
+            }));
+        }
+
+        // Spiergroep-specifiek stoplicht: alleen de spiergroepen die de volgende sessie
+        // traint tellen mee. "Benen gisteren, push vandaag" mag dus gewoon groen zijn.
+        if (nextGroups.length > 0 && Object.keys(lastTrained).length > 0) {
+            let worstRatio = Infinity;
+            nextGroups.forEach(g => {
+                if (!lastTrained[g]) return; // nooit getraind -> hersteld
+                const hoursSince = (now - lastTrained[g]) / (1000 * 60 * 60);
+                const required = mgRules[g] || minHours;
+                worstRatio = Math.min(worstRatio, hoursSince / required);
+            });
+            if (worstRatio === Infinity || worstRatio >= 1) return { status: 'green', text: 'Klaar om te trainen' };
+            if (worstRatio < 0.5) return { status: 'red', text: 'Beter rusten' };
+            return { status: 'orange', text: 'Rustig aan' };
+        }
+
+        // Fallback zonder spiergroep-data: algemene rusttijd sinds de laatste sessie
+        const lastLog = store.logs[store.logs.length - 1];
+        const hoursSinceLast = (now - new Date(lastLog.date)) / (1000 * 60 * 60);
 
         if(hoursSinceLast < (minHours * 0.5)) return { status: 'red', text: 'Beter rusten' };
         if(hoursSinceLast < minHours) return { status: 'orange', text: 'Rustig aan' };
