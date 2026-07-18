@@ -381,7 +381,7 @@ const app = {
                     existingProgress.style.gridColumn = '1 / -1';
                     statsMini.appendChild(existingProgress);
                 }
-                existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${progressText}</div>`;
+                existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${this.escapeHTML(progressText)}</div>`;
             }
         }
     },
@@ -405,20 +405,20 @@ const app = {
             descriptionText = descriptionText.split(/Voltooiingsregels/i)[0];
             descriptionText = descriptionText.split(/Mijlpalen/i)[0];
             descriptionText = descriptionText.trim();
-            const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${descriptionText}</p>` : '';
-            const recPattern = sched.recommendedPattern || p.recommendedPattern ? 
-                `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${sched.recommendedPattern || p.recommendedPattern}</div>` : '';
-            const recovery = sched.minRecoveryHours || p.minRecoveryHours ? 
-                `<div class="text-sm text-muted"><strong>Herstel:</strong> Minimaal ${sched.minRecoveryHours || p.minRecoveryHours} uur</div>` : '';
-            const weeklyMins = p.estimatedWeeklyMinutes ? 
-                `<div class="text-sm text-muted"><strong>Geschatte tijd per week:</strong> ${p.estimatedWeeklyMinutes} min</div>` : '';
-            const sessionOrder = p.defaultSessionOrder ? 
-                `<div class="text-sm text-muted mt-1"><strong>Sessie volgorde:</strong> ${p.defaultSessionOrder.join(', ')}</div>` : 
-                (p.sessions ? `<div class="text-sm text-muted mt-1"><strong>Sessies:</strong> ${p.sessions.map(s=>s.name).join(', ')}</div>` : '');
+            const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${this.escapeHTML(descriptionText)}</p>` : '';
+            const recPattern = sched.recommendedPattern || p.recommendedPattern ?
+                `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${this.escapeHTML(String(sched.recommendedPattern || p.recommendedPattern))}</div>` : '';
+            const recovery = sched.minRecoveryHours || p.minRecoveryHours ?
+                `<div class="text-sm text-muted"><strong>Herstel:</strong> Minimaal ${this.escapeHTML(String(sched.minRecoveryHours || p.minRecoveryHours))} uur</div>` : '';
+            const weeklyMins = p.estimatedWeeklyMinutes ?
+                `<div class="text-sm text-muted"><strong>Geschatte tijd per week:</strong> ${this.escapeHTML(String(p.estimatedWeeklyMinutes))} min</div>` : '';
+            const sessionOrder = p.defaultSessionOrder ?
+                `<div class="text-sm text-muted mt-1"><strong>Sessie volgorde:</strong> ${this.escapeHTML(p.defaultSessionOrder.join(', '))}</div>` :
+                (p.sessions ? `<div class="text-sm text-muted mt-1"><strong>Sessies:</strong> ${this.escapeHTML(p.sessions.map(s=>s.name).join(', '))}</div>` : '');
 
-            const level = p.level ? `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${p.level}</span>` : '';
-            const goal = p.goal ? `<div class="text-sm text-muted"><strong>Doel:</strong> ${p.goal}</div>` : '';
-            const equipment = p.equipment && p.equipment.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${p.equipment.join(', ')}</div>` : '';
+            const level = p.level ? `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${this.escapeHTML(String(p.level))}</span>` : '';
+            const goal = p.goal ? `<div class="text-sm text-muted"><strong>Doel:</strong> ${this.escapeHTML(String(p.goal))}</div>` : '';
+            const equipment = p.equipment && p.equipment.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${this.escapeHTML(p.equipment.join(', '))}</div>` : '';
 
             const scheduleInfo = this.formatRichField(p.schedule, 'Schema Regels');
             const progressionRules = this.formatRichField(p.progressionRules, 'Progressieregels');
@@ -444,7 +444,7 @@ const app = {
                         <div style="font-weight:600; font-size:0.85rem; color:var(--accent-color);">DETAILS</div>
                         <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
                     </div>
-                    <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${targetSessions}x per week (${p.sessions.length} unieke sessies)</div>
+                    <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${this.escapeHTML(String(targetSessions))}x per week (${p.sessions.length} unieke sessies)</div>
                     ${goal}
                 </div>
 
@@ -573,7 +573,7 @@ const app = {
                         <div class="stat-icon-wrapper" style="width:36px; height:36px; padding:6px; background:rgba(255,255,255,0.05); color:${meta.color};">
                             <span class="material-icons-round" style="font-size:18px;">${meta.icon}</span>
                         </div>
-                        <div style="font-weight:600; font-size:1rem;">${meta.name}</div>
+                        <div style="font-weight:600; font-size:1rem;">${this.escapeHTML(meta.name)}</div>
                     </div>
                     <div class="text-muted text-sm" style="display:flex; flex-direction:column; gap:4px;">
                         <div style="display:flex; justify-content:space-between; gap:8px;">
@@ -795,7 +795,7 @@ const app = {
                                 let text = `Set ${d.setNumber}:`;
                                 if (d.weight) text += ` ${d.weight}kg`;
                                 if (d.reps) text += ` x ${d.reps}`;
-                                exDetails.push(text);
+                                exDetails.push(app.escapeHTML(text));
                             });
                         }
                         
@@ -832,7 +832,7 @@ const app = {
                 el.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
                         <div>
-                            <div style="font-weight:600;">${log.sessionName || 'Sessie'}</div>
+                            <div style="font-weight:600;">${app.escapeHTML(log.sessionName || 'Sessie')}</div>
                             <div class="text-sm text-muted">${dateStr} • ${log.duration} min • ${log.exercisesCompleted} oefeningen</div>
                         </div>
                         <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
@@ -962,23 +962,23 @@ const app = {
 
             // Build badges
             let badgesHtml = '';
-            if (ex.category) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted); margin-right:4px;">${ex.category}</span>`;
-            if (ex.exerciseType) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${ex.exerciseType}</span>`;
+            if (ex.category) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted); margin-right:4px;">${app.escapeHTML(String(ex.category))}</span>`;
+            if (ex.exerciseType) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${app.escapeHTML(String(ex.exerciseType))}</span>`;
 
             // Build notes & alternatives
             let notesHtml = '';
             if (ex.notes && Array.isArray(ex.notes) && ex.notes.length > 0) {
                 notesHtml += `<ul class="text-sm text-muted mt-2" style="list-style-type: disc; padding-left: 20px;">`;
-                ex.notes.forEach(n => notesHtml += `<li>${n}</li>`);
+                ex.notes.forEach(n => notesHtml += `<li>${app.escapeHTML(String(n))}</li>`);
                 notesHtml += `</ul>`;
             } else if (ex.notes && typeof ex.notes === 'string') {
-                notesHtml += `<div class="text-sm text-muted mt-2">${ex.notes}</div>`;
+                notesHtml += `<div class="text-sm text-muted mt-2">${app.escapeHTML(ex.notes)}</div>`;
             }
 
             if (ex.alternatives && ex.alternatives.length > 0) {
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${ex.alternatives.join(', ')}</div>`;
+                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.alternatives.join(', '))}</div>`;
             } else if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${ex.optionalAlternatives.join(', ')}</div>`;
+                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.optionalAlternatives.join(', '))}</div>`;
             }
 
             let setsHtml = '';
@@ -996,16 +996,16 @@ const app = {
                 
                 let inputsHtml = '';
                 if (wantsWeight) {
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="${weightPlaceholder}" 
-                        value="${ex.weights ? ex.weights[i] : ''}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">`;
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(weightPlaceholder))}"
+                        value="${app.escapeHTML(String(ex.weights ? ex.weights[i] : ''))}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">`;
                 }
                 if (wantsReps) {
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="${repsPlaceholder}" style="width: 55px;"
-                        value="${ex.actualReps ? ex.actualReps[i] : ''}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(repsPlaceholder))}" style="width: 55px;"
+                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
                 }
                 if (wantsDuration && !wantsReps) {
                      inputsHtml += `<input type="number" class="weight-input" placeholder="sec" style="width: 55px;"
-                        value="${ex.actualReps ? ex.actualReps[i] : ''}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
                 }
 
                 setsHtml += `
@@ -1030,7 +1030,7 @@ const app = {
                             <div class="exercise-title" style="margin:0;">${app.escapeHTML(ex.name)}</div>
                         </div>
                         <div style="margin-bottom:4px;">${badgesHtml}</div>
-                        <div class="exercise-meta">${metaString}</div>
+                        <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
                         ${notesHtml}
                     </div>
                 </div>
@@ -1199,10 +1199,10 @@ const app = {
                         <div class="set-row" style="margin-top: 8px; justify-content: space-between;">
                             <div class="set-info text-muted">Set ${d.setNumber}</div>
                             <div style="display:flex; gap:8px;">
-                                <input type="number" class="input-field" placeholder="kg" style="width:70px; text-align:center;" 
-                                    value="${d.weight || ''}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
-                                <input type="number" class="input-field" placeholder="reps" style="width:70px; text-align:center;" 
-                                    value="${d.reps || ''}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
+                                <input type="number" class="input-field" placeholder="kg" style="width:70px; text-align:center;"
+                                    value="${app.escapeHTML(String(d.weight || ''))}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
+                                <input type="number" class="input-field" placeholder="reps" style="width:70px; text-align:center;"
+                                    value="${app.escapeHTML(String(d.reps || ''))}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
                             </div>
                         </div>
                     `;

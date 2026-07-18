@@ -233,4 +233,27 @@ describe('app XSS Security', () => {
         expect(result).not.toContain('<style>');
         expect(result).toContain('&lt;style&gt;body{display:none}&lt;/style&gt;');
     });
+
+    it('should escape malicious imported plan fields when rendering plans', () => {
+        document.body.innerHTML = '<div id="plans-list"></div>';
+        store.plans = [{
+            id: 'p1',
+            name: 'Kwaadaardig Plan',
+            description: '<img src=x onerror="alert(1)">',
+            goal: '<script>alert(2)</script>',
+            level: '<b onmouseover=alert(3)>pro</b>',
+            equipment: ['<iframe src=x>'],
+            sessions: [{ id: 's1', name: '<svg onload=alert(4)>', exercises: [] }]
+        }];
+        store.activePlanId = 'p1';
+
+        app.renderPlans();
+
+        const html = document.getElementById('plans-list').innerHTML;
+        expect(html).not.toContain('<img');
+        expect(html).not.toContain('<script>');
+        expect(html).not.toContain('<iframe');
+        expect(html).not.toContain('<svg');
+        expect(html).toContain('&lt;script&gt;alert(2)&lt;/script&gt;');
+    });
 });
