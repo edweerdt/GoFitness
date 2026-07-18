@@ -301,6 +301,54 @@ describe('app logic', () => {
     });
 });
 
+describe('rest timer', () => {
+    beforeEach(() => {
+        jest.useFakeTimers();
+        document.body.innerHTML = `
+            <div id="rest-timer" class="hidden"><span id="rest-timer-label"></span></div>
+            <div id="toast-container"></div>
+        `;
+    });
+
+    afterEach(() => {
+        app.stopRestTimer();
+        jest.useRealTimers();
+    });
+
+    it('should show a countdown and hide itself when the rest is over', () => {
+        app.startRestTimer(90);
+        const el = document.getElementById('rest-timer');
+        const label = document.getElementById('rest-timer-label');
+
+        expect(el.classList.contains('hidden')).toBe(false);
+        expect(label.textContent).toBe('Rust: 1:30');
+
+        jest.advanceTimersByTime(1000);
+        expect(label.textContent).toBe('Rust: 1:29');
+
+        jest.advanceTimersByTime(89000);
+        expect(el.classList.contains('hidden')).toBe(true);
+        expect(app.restTimer).toBeNull();
+    });
+
+    it('should be cancellable via stopRestTimer', () => {
+        app.startRestTimer(60);
+        app.stopRestTimer();
+
+        expect(document.getElementById('rest-timer').classList.contains('hidden')).toBe(true);
+        expect(app.restTimer).toBeNull();
+    });
+
+    it('should restart the countdown when a new set is completed', () => {
+        app.startRestTimer(60);
+        jest.advanceTimersByTime(30000);
+        expect(document.getElementById('rest-timer-label').textContent).toBe('Rust: 0:30');
+
+        app.startRestTimer(60);
+        expect(document.getElementById('rest-timer-label').textContent).toBe('Rust: 1:00');
+    });
+});
+
 describe('validateBackup', () => {
     it('should accept a valid backup with plans and logs', () => {
         const result = app.validateBackup({ plans: [{ id: 'p1' }], logs: [], exportDate: '2026-01-01' });

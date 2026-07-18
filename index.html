@@ -80,6 +80,11 @@
                 <div class="content-padded pb-32 flex-col gap-3" id="workout-exercise-list">
                     <!-- Exercises injected here -->
                 </div>
+                <div id="rest-timer" class="rest-timer glass-panel hidden" onclick="app.stopRestTimer()" title="Tik om over te slaan">
+                    <span class="material-icons-round">timer</span>
+                    <span id="rest-timer-label">Rust: 0:00</span>
+                    <span class="text-sm text-muted">tik om over te slaan</span>
+                </div>
                 <div class="sticky-footer glass-panel">
                     <button id="btn-finish-workout" class="btn-primary w-full">Sessie Afronden</button>
                 </div>

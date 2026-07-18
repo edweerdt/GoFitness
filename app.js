@@ -1093,9 +1093,54 @@ const app = {
     },
 
     toggleSet(exIndex, setIndex) {
-        this.activeWorkout.exercises[exIndex].setsCompleted[setIndex] = !this.activeWorkout.exercises[exIndex].setsCompleted[setIndex];
+        const ex = this.activeWorkout.exercises[exIndex];
+        ex.setsCompleted[setIndex] = !ex.setsCompleted[setIndex];
         store.saveActiveWorkoutState(this.activeWorkout);
+
+        // Set afgevinkt en de oefening heeft een rusttijd? Start de rusttimer.
+        if (ex.setsCompleted[setIndex] && ex.restSeconds) {
+            this.startRestTimer(ex.restSeconds);
+        }
+
         this.renderWorkoutExercises();
+    },
+
+    // --- RUSTTIMER ---
+
+    restTimer: null,
+
+    startRestTimer(seconds) {
+        this.stopRestTimer();
+        const el = document.getElementById('rest-timer');
+        const label = document.getElementById('rest-timer-label');
+        if (!el || !label) return;
+
+        let remaining = Math.round(seconds);
+        const update = () => {
+            label.textContent = `Rust: ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
+        };
+        update();
+        el.classList.remove('hidden');
+
+        this.restTimer = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                this.stopRestTimer();
+                if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                this.showToast('Rust voorbij, tijd voor je volgende set!', 'success');
+            } else {
+                update();
+            }
+        }, 1000);
+    },
+
+    stopRestTimer() {
+        if (this.restTimer) {
+            clearInterval(this.restTimer);
+            this.restTimer = null;
+        }
+        const el = document.getElementById('rest-timer');
+        if (el) el.classList.add('hidden');
     },
 
     updateWeight(exIndex, setIndex, val) {
@@ -1118,6 +1163,7 @@ const app = {
 
     finishWorkout() {
         this.hideFinishModal();
+        this.stopRestTimer();
         const duration = Math.round((new Date() - this.activeWorkout.startTime) / 60000);
         let totalExercisesCompleted = 0;
         

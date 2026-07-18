@@ -477,3 +477,29 @@ button:disabled {
     :root:not(.theme-dark) .check-btn.checked { background: var(--status-green); color: white; border-color: var(--status-green); }
     :root:not(.theme-dark) .set-row { border-bottom: 1px solid rgba(0,0,0,0.05); }
 }
+
+/* Rusttimer tussen sets */
+.rest-timer {
+    position: fixed;
+    bottom: 96px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    max-width: 400px;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+}
+
+.rest-timer .material-icons-round {
+    color: var(--accent-color);
+}
+
+#rest-timer-label {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
