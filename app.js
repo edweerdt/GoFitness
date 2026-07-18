@@ -69,11 +69,11 @@ class DataStore {
 
         // Give ids to sessions and exercises if they don't have one
         planData.sessions.forEach(s => {
-            if (!s.id && !s.sessionId) s.id = 'sess_' + Math.random().toString(36).substr(2, 9);
+            if (!s.id && !s.sessionId) s.id = 'sess_' + Math.random().toString(36).slice(2, 11);
             else if (s.sessionId) s.id = s.sessionId;
             
             s.exercises.forEach(e => {
-                if (!e.id && !e.exerciseId) e.id = 'ex_' + Math.random().toString(36).substr(2, 9);
+                if (!e.id && !e.exerciseId) e.id = 'ex_' + Math.random().toString(36).slice(2, 11);
                 else if (e.exerciseId) e.id = e.exerciseId;
             });
         });
