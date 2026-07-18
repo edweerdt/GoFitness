@@ -376,6 +376,52 @@ describe('workout flow', () => {
         expect(app.activeWorkout).toBeNull();
         expect(store.activeWorkoutState).toBeNull();
     });
+
+});
+
+describe('editing session duration', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [{
+            id: 'log1', planId: null, planName: 'Overige Sessies', sessionName: 'Push',
+            duration: 4098, exercisesCompleted: 1,
+            exercises: [{ name: 'Bench Press', totalSets: 1, setsCompleted: 1, details: [{ setNumber: 1, weight: '40', reps: '10' }] }]
+        }];
+        document.body.innerHTML = `
+            <div id="edit-log-container"></div>
+            <div id="modal-edit-log" class="hidden"></div>
+        `;
+        jest.spyOn(app, 'renderProgress').mockImplementation(() => {});
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it('should render an editable duration field in the edit modal', () => {
+        app.showEditLogModal('log1');
+        const html = document.getElementById('edit-log-container').innerHTML;
+        expect(html).toContain('Duur (minuten)');
+        expect(html).toContain('updateEditLogDuration');
+        expect(html).toContain('value="4098"');
+    });
+
+    it('should persist an adjusted duration when saving the log', () => {
+        app.showEditLogModal('log1');
+        app.updateEditLogDuration('55');
+        app.saveEditLog();
+
+        expect(store.logs[0].duration).toBe(55);
+        // Overige gegevens blijven behouden
+        expect(store.logs[0].exercises[0].details[0].weight).toBe('40');
+    });
+
+    it('should ignore invalid or negative duration input', () => {
+        app.logToEdit = JSON.parse(JSON.stringify(store.logs[0]));
+        app.updateEditLogDuration('abc');
+        expect(app.logToEdit.duration).toBe(4098);
+        app.updateEditLogDuration('-5');
+        expect(app.logToEdit.duration).toBe(4098);
+    });
 });
 
 describe('import flow', () => {

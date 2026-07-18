@@ -1507,6 +1507,14 @@ const app = {
         document.getElementById('modal-edit-log').classList.add('hidden');
     },
 
+    updateEditLogDuration(val) {
+        const parsed = parseInt(val, 10);
+        // Alleen een geldige, niet-negatieve waarde overnemen; anders de vorige behouden
+        if (!isNaN(parsed) && parsed >= 0) {
+            this.logToEdit.duration = parsed;
+        }
+    },
+
     updateEditLogWeight(exIndex, setIndex, val) {
         const detail = this.logToEdit.exercises[exIndex].details.find(d => d.setNumber === setIndex + 1);
         if (detail) detail.weight = val;
@@ -1521,8 +1529,25 @@ const app = {
         const container = document.getElementById('edit-log-container');
         container.innerHTML = '';
 
+        // Duur-veld: altijd bewerkbaar, ook bij oude sessies zonder oefening-details
+        const durationCard = document.createElement('div');
+        durationCard.className = 'glass-panel';
+        durationCard.style.padding = '12px';
+        durationCard.innerHTML = `
+            <div class="set-row" style="justify-content: space-between; align-items:center;">
+                <div style="font-weight:600;">Duur (minuten)</div>
+                <input type="number" min="0" class="input-field" style="width:90px; text-align:center;"
+                    value="${app.escapeHTML(String(this.logToEdit.duration != null ? this.logToEdit.duration : ''))}"
+                    onchange="app.updateEditLogDuration(this.value)">
+            </div>
+        `;
+        container.appendChild(durationCard);
+
         if (!this.logToEdit.exercises || this.logToEdit.exercises.length === 0) {
-            container.innerHTML = '<p class="text-muted">Geen details beschikbaar voor deze oude sessie.</p>';
+            const note = document.createElement('p');
+            note.className = 'text-muted';
+            note.textContent = 'Geen oefening-details beschikbaar voor deze oude sessie.';
+            container.appendChild(note);
             return;
         }
 
