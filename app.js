@@ -69,11 +69,11 @@ class DataStore {
 
         // Give ids to sessions and exercises if they don't have one
         planData.sessions.forEach(s => {
-            if (!s.id && !s.sessionId) s.id = 'sess_' + Math.random().toString(36).substr(2, 9);
+            if (!s.id && !s.sessionId) s.id = 'sess_' + Math.random().toString(36).slice(2, 11);
             else if (s.sessionId) s.id = s.sessionId;
             
             s.exercises.forEach(e => {
-                if (!e.id && !e.exerciseId) e.id = 'ex_' + Math.random().toString(36).substr(2, 9);
+                if (!e.id && !e.exerciseId) e.id = 'ex_' + Math.random().toString(36).slice(2, 11);
                 else if (e.exerciseId) e.id = e.exerciseId;
             });
         });
@@ -111,6 +111,13 @@ const app = {
         }
 
         this.applyTheme();
+
+        // Wake lock vervalt zodra de app naar de achtergrond gaat; vraag opnieuw aan
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && this.activeWorkout && this.currentView === 'workout') {
+                this.requestWakeLock();
+            }
+        });
 
         this.setupNavigation();
         this.renderHome();
@@ -209,28 +216,59 @@ const app = {
     getRecoveryStatus() {
         const plan = store.getActivePlan();
         if(!plan || store.logs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
-        
-        const lastLog = store.logs[store.logs.length - 1];
-        const hoursSinceLast = (new Date() - new Date(lastLog.date)) / (1000 * 60 * 60);
-        let minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
-        
-        // Check muscle group specific recovery
-        if (plan.recoveryRules && plan.recoveryRules.muscleGroupRecoveryHours && lastLog.exercises) {
-            let maxMuscleGroupRecovery = 0;
-            const recentSession = plan.sessions.find(s => s.id === lastLog.sessionId);
-            if (recentSession) {
-                recentSession.exercises.forEach(ex => {
-                    if (ex.muscleGroups) {
-                        ex.muscleGroups.forEach(mg => {
-                            if (plan.recoveryRules.muscleGroupRecoveryHours[mg]) {
-                                maxMuscleGroupRecovery = Math.max(maxMuscleGroupRecovery, plan.recoveryRules.muscleGroupRecoveryHours[mg]);
-                            }
-                        });
-                    }
-                });
-            }
-            if (maxMuscleGroupRecovery > minHours) minHours = maxMuscleGroupRecovery;
+
+        const minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
+        const now = new Date();
+
+        // Herstelregels per spiergroep, genormaliseerd op sleutel
+        const mgRules = {};
+        if (plan.recoveryRules && plan.recoveryRules.muscleGroupRecoveryHours) {
+            Object.entries(plan.recoveryRules.muscleGroupRecoveryHours).forEach(([k, v]) => {
+                mgRules[this.normalizeMuscleGroup(k)] = v;
+            });
         }
+
+        // Per spiergroep: wanneer voor het laatst getraind?
+        const lastTrained = {};
+        store.logs.forEach(log => {
+            if (!log.date || !log.exercises) return;
+            const t = new Date(log.date).getTime();
+            log.exercises.forEach(ex => {
+                (ex.muscleGroups || []).forEach(mg => {
+                    const g = this.normalizeMuscleGroup(mg);
+                    if (!lastTrained[g] || t > lastTrained[g]) lastTrained[g] = t;
+                });
+            });
+        });
+
+        // Spiergroepen die de eerstvolgende (aanbevolen) sessie traint
+        const rec = (plan.sessions && plan.sessions.length > 0) ? this.getRecommendedSession() : null;
+        const nextGroups = [];
+        if (rec && rec.session && rec.session.exercises) {
+            rec.session.exercises.forEach(ex => (ex.muscleGroups || []).forEach(mg => {
+                const g = this.normalizeMuscleGroup(mg);
+                if (!nextGroups.includes(g)) nextGroups.push(g);
+            }));
+        }
+
+        // Spiergroep-specifiek stoplicht: alleen de spiergroepen die de volgende sessie
+        // traint tellen mee. "Benen gisteren, push vandaag" mag dus gewoon groen zijn.
+        if (nextGroups.length > 0 && Object.keys(lastTrained).length > 0) {
+            let worstRatio = Infinity;
+            nextGroups.forEach(g => {
+                if (!lastTrained[g]) return; // nooit getraind -> hersteld
+                const hoursSince = (now - lastTrained[g]) / (1000 * 60 * 60);
+                const required = mgRules[g] || minHours;
+                worstRatio = Math.min(worstRatio, hoursSince / required);
+            });
+            if (worstRatio === Infinity || worstRatio >= 1) return { status: 'green', text: 'Klaar om te trainen' };
+            if (worstRatio < 0.5) return { status: 'red', text: 'Beter rusten' };
+            return { status: 'orange', text: 'Rustig aan' };
+        }
+
+        // Fallback zonder spiergroep-data: algemene rusttijd sinds de laatste sessie
+        const lastLog = store.logs[store.logs.length - 1];
+        const hoursSinceLast = (now - new Date(lastLog.date)) / (1000 * 60 * 60);
 
         if(hoursSinceLast < (minHours * 0.5)) return { status: 'red', text: 'Beter rusten' };
         if(hoursSinceLast < minHours) return { status: 'orange', text: 'Rustig aan' };
@@ -274,6 +312,35 @@ const app = {
     },
 
     // --- UTILS ---
+
+    // Normaliseert spiergroep-namen uit schema's (hoofdletters, synoniemen) naar de interne sleutels
+    normalizeMuscleGroup(mg) {
+        const key = String(mg).toLowerCase().trim();
+        const aliases = {
+            biceps: 'arms', triceps: 'arms', forearms: 'arms',
+            quads: 'legs', hamstrings: 'legs', calves: 'legs',
+            abs: 'core', lats: 'back', traps: 'back'
+        };
+        return aliases[key] || key;
+    },
+
+    // Fallback voor oude logs zonder muscleGroups: raad spiergroepen op basis van de oefennaam
+    guessMuscleGroupsFromName(name) {
+        const n = String(name || '').toLowerCase();
+        const groups = [];
+        if (n.includes('press') || n.includes('push') || n.includes('fly') || n.includes('dip')) {
+            if (n.includes('leg')) groups.push('legs');
+            else if (n.includes('shoulder') || n.includes('overhead') || n.includes('pike')) groups.push('shoulders');
+            else groups.push('chest');
+        }
+        if (n.includes('pull') || n.includes('row') || n.includes('chin') || n.includes('deadlift')) groups.push('back');
+        if (n.includes('squat') || n.includes('lunge') || (n.includes('extension') && n.includes('leg')) || (n.includes('curl') && n.includes('leg'))) groups.push('legs');
+        if (n.includes('thrust') || n.includes('bridge') || n.includes('kickback')) groups.push('glutes');
+        if (n.includes('plank') || n.includes('crunch') || (n.includes('raise') && n.includes('leg'))) groups.push('core');
+        if ((n.includes('curl') || n.includes('extension') || n.includes('skull')) && !n.includes('leg')) groups.push('arms');
+        return [...new Set(groups)];
+    },
+
     escapeHTML(str) {
         if (typeof str !== 'string') return str;
         return str.replace(/[&<>'"]/g,
@@ -351,14 +418,7 @@ const app = {
             document.getElementById('recommended-reason').textContent = "Je was al bezig met deze sessie. Pak hem weer op!";
             btnStart.textContent = "Hervat Nu";
             btnStart.disabled = false;
-            btnStart.onclick = () => {
-                document.getElementById('workout-title').textContent = this.activeWorkout.session.name;
-                this.renderWorkoutExercises();
-                document.getElementById('btn-finish-workout').onclick = () => this.showFinishModal();
-                document.getElementById('bottom-nav').classList.add('hidden');
-                document.getElementById('view-workout').querySelector('.sticky-footer').style.bottom = '0';
-                this.navigate('workout');
-            };
+            btnStart.onclick = () => this.openWorkoutView();
         } else {
             document.getElementById('recommended-card-title').textContent = "Aanbevolen Sessie";
             const recSession = this.getRecommendedSession();
@@ -382,31 +442,28 @@ const app = {
 
         // Target sessions per week progress
         const plan = store.getActivePlan();
-        if (plan) {
-            const targetSessions = (plan.schedule && plan.schedule.targetSessionsPerWeek) ? plan.schedule.targetSessionsPerWeek : plan.targetSessionsPerWeek;
-            if (targetSessions) {
-                const oneWeekAgo = new Date();
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                const oneWeekAgoStr = oneWeekAgo.toISOString();
-                const recentLogsCount = store.logs.filter(l => l.date > oneWeekAgoStr && l.planId === plan.id).length;
+        const targetSessions = plan ? ((plan.schedule && plan.schedule.targetSessionsPerWeek) ? plan.schedule.targetSessionsPerWeek : plan.targetSessionsPerWeek) : null;
+        let existingProgress = document.getElementById('home-weekly-progress');
+        if (plan && targetSessions) {
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            const oneWeekAgoStr = oneWeekAgo.toISOString();
+            const recentLogsCount = store.logs.filter(l => l.date > oneWeekAgoStr && l.planId === plan.id).length;
 
-                let progressText = `${recentLogsCount}/${targetSessions} sessies deze week`;
-                const progressDiv = document.createElement('div');
-                progressDiv.className = 'text-sm text-muted mt-2';
-                progressDiv.style.textAlign = 'center';
-                progressDiv.textContent = progressText;
+            const progressText = `${recentLogsCount}/${targetSessions} sessies deze week`;
 
-                // Add or update progress text under the streak stats
-                const statsMini = document.querySelector('.stats-mini');
-                let existingProgress = document.getElementById('home-weekly-progress');
-                if (!existingProgress) {
-                    existingProgress = document.createElement('div');
-                    existingProgress.id = 'home-weekly-progress';
-                    existingProgress.style.gridColumn = '1 / -1';
-                    statsMini.appendChild(existingProgress);
-                }
-                existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${this.escapeHTML(progressText)}</div>`;
+            // Add or update progress text under the streak stats
+            const statsMini = document.querySelector('.stats-mini');
+            if (!existingProgress) {
+                existingProgress = document.createElement('div');
+                existingProgress.id = 'home-weekly-progress';
+                existingProgress.style.gridColumn = '1 / -1';
+                statsMini.appendChild(existingProgress);
             }
+            existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${this.escapeHTML(progressText)}</div>`;
+        } else if (existingProgress) {
+            // Geen (plan met) weekdoel meer -> oude voortgangsbalk opruimen
+            existingProgress.remove();
         }
     },
 
@@ -459,6 +516,7 @@ const app = {
                     </div>
                     <div style="display:flex; align-items:center; gap:8px; margin-left:12px;">
                         ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
+                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${p.id}')" title="Schema delen">ios_share</span>
                         <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${p.id}')">delete_outline</span>
                     </div>
                 </div>
@@ -504,8 +562,109 @@ const app = {
             <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalMinutes}</span><span class="stat-label">Minuten</span></div></div>
             <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalExercises}</span><span class="stat-label">Oefeningen</span></div></div>
         `;
+        this.renderExerciseProgress();
         this.renderMuscleStats();
         this.renderHistory();
+    },
+
+    // Bouwt per oefening een reeks (datum, max gewicht) uit de logs
+    getExerciseProgressSeries() {
+        const series = {};
+        store.logs.forEach(log => {
+            if (!log.exercises || !log.date) return;
+            log.exercises.forEach(ex => {
+                let maxWeight = 0;
+                let bestSet = null;
+                (ex.details || []).forEach(d => {
+                    const w = parseFloat(d.weight);
+                    if (!isNaN(w) && w > maxWeight) {
+                        maxWeight = w;
+                        bestSet = d;
+                    }
+                });
+                if (maxWeight <= 0) return;
+
+                const key = String(ex.name).toLowerCase().trim();
+                if (!series[key]) series[key] = { name: ex.name, points: [] };
+                series[key].points.push({ date: log.date, weight: maxWeight, reps: parseInt(bestSet.reps) || 0 });
+            });
+        });
+
+        // Alleen oefeningen met minstens 2 metingen, punten op datumvolgorde
+        return Object.values(series)
+            .map(s => ({ ...s, points: [...s.points].sort((a, b) => (a.date < b.date ? -1 : 1)) }))
+            .filter(s => s.points.length >= 2);
+    },
+
+    // Epley-formule: geschat 1-rep-max op basis van gewicht en herhalingen
+    estimate1RM(weight, reps) {
+        if (!(weight > 0) || !(reps > 0)) return null;
+        if (reps === 1) return weight;
+        return weight * (1 + reps / 30);
+    },
+
+    buildSparklineSVG(points) {
+        const w = 100, h = 32, pad = 2;
+        const weights = points.map(p => p.weight);
+        const min = Math.min(...weights);
+        const max = Math.max(...weights);
+        const range = (max - min) || 1;
+        const step = (w - pad * 2) / (points.length - 1);
+        const coords = points.map((p, i) => {
+            const x = pad + i * step;
+            const y = h - pad - ((p.weight - min) / range) * (h - pad * 2);
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+        });
+        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%; height:48px; display:block;">
+            <polyline points="${coords.join(' ')}" fill="none" stroke="var(--accent-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+        </svg>`;
+    },
+
+    renderExerciseProgress() {
+        const container = document.getElementById('exercise-progress-list');
+        if (!container) return;
+
+        const series = this.getExerciseProgressSeries();
+        if (series.length === 0) {
+            container.innerHTML = '<p class="text-muted text-sm">Log minimaal twee sessies met gewichten om je progressie te zien.</p>';
+            return;
+        }
+
+        // Meest gelogde oefeningen bovenaan, maximaal 8 grafieken
+        series.sort((a, b) => b.points.length - a.points.length);
+
+        let html = '';
+        series.slice(0, 8).forEach(s => {
+            const first = s.points[0].weight;
+            const last = s.points[s.points.length - 1].weight;
+            const diff = Math.round((last - first) * 10) / 10;
+            const diffText = diff === 0 ? 'gelijk' : (diff > 0 ? `+${diff} kg` : `${diff} kg`);
+            const diffColor = diff > 0 ? 'var(--status-green)' : (diff < 0 ? 'var(--status-red)' : 'var(--text-muted)');
+
+            // Beste geschatte 1RM over alle sessies van deze oefening
+            let best1RM = 0;
+            s.points.forEach(p => {
+                const est = this.estimate1RM(p.weight, p.reps);
+                if (est && est > best1RM) best1RM = est;
+            });
+            const rmHtml = best1RM > 0 ? `<span>Geschat 1RM: ${Math.round(best1RM)} kg</span>` : '';
+
+            html += `
+                <div class="glass-panel" style="padding: 12px 16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+                        <div style="font-weight:600; font-size:0.9rem;">${this.escapeHTML(String(s.name))}</div>
+                        <div class="text-sm" style="color:${diffColor}; white-space:nowrap;">${diffText}</div>
+                    </div>
+                    <div class="mt-2">${this.buildSparklineSVG(s.points)}</div>
+                    <div class="text-sm text-muted" style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+                        <span>${s.points.length} sessies</span>
+                        ${rmHtml}
+                        <span>Laatst: ${last} kg</span>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
     },
 
     renderMuscleStats() {
@@ -552,6 +711,8 @@ const app = {
                     if (!muscles || muscles.length === 0) {
                         muscles = fallbackMap[ex.name] || ['overig'];
                     }
+                    // Normaliseren zodat 'Chest' en 'chest' (en synoniemen) samen tellen
+                    muscles = [...new Set(muscles.map(m => this.normalizeMuscleGroup(m)))];
 
                     muscles.forEach(m => {
                         sessionMuscles.add(m);
@@ -694,34 +855,30 @@ const app = {
             lastDate = d;
 
             if (log.exercises && log.exercises.length > 0) {
-                let chestCount=0, backCount=0, shoulderCount=0, legCount=0, gluteCount=0, coreCount=0, armCount=0, bwCount=0, weightCount=0;
-                
+                // Tel per spiergroep via de schema-metadata; alleen bij oude logs zonder
+                // muscleGroups vallen we terug op naam-herkenning
+                const groupCounts = {};
+                let bwCount = 0, weightCount = 0;
+
                 log.exercises.forEach(ex => {
-                    const n = ex.name.toLowerCase();
-                    if (n.includes('press') || n.includes('push') || n.includes('fly') || n.includes('dip')) {
-                        if (n.includes('leg')) legCount++;
-                        else if (n.includes('shoulder') || n.includes('overhead') || n.includes('pike')) shoulderCount++;
-                        else chestCount++;
-                    }
-                    if (n.includes('pull') || n.includes('row') || n.includes('chin') || n.includes('deadlift')) backCount++;
-                    if (n.includes('squat') || n.includes('lunge') || n.includes('extension') || n.includes('curl') && n.includes('leg')) legCount++;
-                    if (n.includes('thrust') || n.includes('bridge') || n.includes('kickback')) gluteCount++;
-                    if (n.includes('plank') || n.includes('crunch') || n.includes('raise') && n.includes('leg')) coreCount++;
-                    if (n.includes('curl') || n.includes('extension') || n.includes('skull')) {
-                        if (!n.includes('leg')) armCount++;
-                    }
-                    
-                    if (n.includes('push-up') || n.includes('pull-up') || n.includes('dip') || n.includes('plank') || n.includes('squat') && !n.includes('barbell')) bwCount++;
-                    if (n.includes('barbell') || n.includes('dumbbell') || n.includes('machine') || n.includes('cable')) weightCount++;
+                    const groups = (ex.muscleGroups && ex.muscleGroups.length > 0)
+                        ? [...new Set(ex.muscleGroups.map(mg => this.normalizeMuscleGroup(mg)))]
+                        : this.guessMuscleGroupsFromName(ex.name);
+                    groups.forEach(g => groupCounts[g] = (groupCounts[g] || 0) + 1);
+
+                    // Gewicht gelogd? Dan telt de oefening als krachtwerk, anders als bodyweight
+                    const hasWeight = ex.details && ex.details.some(d => parseFloat(d.weight) > 0);
+                    if (hasWeight) weightCount++;
+                    else bwCount++;
                 });
 
-                if (chestCount >= 3) allAchievements.find(a => a.id === 'chest').unlocked = true;
-                if (backCount >= 3) allAchievements.find(a => a.id === 'back').unlocked = true;
-                if (shoulderCount >= 3) allAchievements.find(a => a.id === 'shoulders').unlocked = true;
-                if (legCount >= 3) allAchievements.find(a => a.id === 'legs').unlocked = true;
-                if (gluteCount >= 2) allAchievements.find(a => a.id === 'glutes').unlocked = true;
-                if (coreCount >= 3) allAchievements.find(a => a.id === 'core').unlocked = true;
-                if (armCount >= 3) allAchievements.find(a => a.id === 'arms').unlocked = true;
+                if ((groupCounts['chest'] || 0) >= 3) allAchievements.find(a => a.id === 'chest').unlocked = true;
+                if ((groupCounts['back'] || 0) >= 3) allAchievements.find(a => a.id === 'back').unlocked = true;
+                if ((groupCounts['shoulders'] || 0) >= 3) allAchievements.find(a => a.id === 'shoulders').unlocked = true;
+                if ((groupCounts['legs'] || 0) >= 3) allAchievements.find(a => a.id === 'legs').unlocked = true;
+                if ((groupCounts['glutes'] || 0) >= 2) allAchievements.find(a => a.id === 'glutes').unlocked = true;
+                if ((groupCounts['core'] || 0) >= 3) allAchievements.find(a => a.id === 'core').unlocked = true;
+                if ((groupCounts['arms'] || 0) >= 3) allAchievements.find(a => a.id === 'arms').unlocked = true;
 
                 if (bwCount > weightCount && bwCount >= 3) allAchievements.find(a => a.id === 'calisthenics').unlocked = true;
                 if (weightCount > bwCount && weightCount >= 3) allAchievements.find(a => a.id === 'iron').unlocked = true;
@@ -739,21 +896,16 @@ const app = {
             if (consecutiveWeeks >= 4) allAchievements.find(a => a.id === 'rhythm').unlocked = true;
         }
 
-        // Render grid
+        // Render grid: behaalde badges eerst, daarna de nog te verdienen (vergrijsd)
         grid.innerHTML = '';
-        
-        const unlockedAchievements = allAchievements.filter(ach => ach.unlocked);
-        
-        if (unlockedAchievements.length === 0) {
-            grid.style.display = 'block';
-            grid.innerHTML = '<div class="glass-panel text-center text-muted" style="padding: 32px 16px;">Nog geen achievements behaald.<br>Voltooi een training om je eerste badge vrij te spelen!</div>';
-            return;
-        }
-        
         grid.style.display = 'grid';
-        unlockedAchievements.forEach(ach => {
+
+        const sortedAchievements = [...allAchievements].sort((a, b) => (b.unlocked ? 1 : 0) - (a.unlocked ? 1 : 0));
+
+        sortedAchievements.forEach(ach => {
             const el = document.createElement('div');
-            el.className = 'glass-panel';
+            el.className = `glass-panel achievement ${ach.unlocked ? 'unlocked' : 'locked'}`;
+            el.dataset.achievementId = ach.id;
             el.style.textAlign = 'center';
             el.style.padding = '16px';
             el.style.display = 'flex';
@@ -764,7 +916,7 @@ const app = {
 
             el.innerHTML = `
                 <div class="stat-icon-wrapper text-accent" style="width:48px; height:48px; margin: 0 auto; background:rgba(59, 130, 246, 0.2);">
-                    <span class="material-icons-round">${ach.icon}</span>
+                    <span class="material-icons-round">${ach.unlocked ? ach.icon : 'lock'}</span>
                 </div>
                 <div style="font-weight:600; font-size:0.85rem; line-height:1.2; margin-top:4px;">${ach.title}</div>
                 <div class="text-sm text-muted" style="font-size:0.7rem; line-height:1.3;">${ach.desc}</div>
@@ -955,15 +1107,20 @@ const app = {
             }))
         };
         store.saveActiveWorkoutState(this.activeWorkout);
-        
-        document.getElementById('workout-title').textContent = session.name;
+        this.openWorkoutView();
+    },
+
+    // Opent de workout-view voor de actieve workout (zowel starten als hervatten)
+    openWorkoutView() {
+        document.getElementById('workout-title').textContent = this.activeWorkout.session.name;
         this.renderWorkoutExercises();
-        
+
         document.getElementById('btn-finish-workout').onclick = () => this.showFinishModal();
-        
+
         document.getElementById('bottom-nav').classList.add('hidden');
         document.getElementById('view-workout').querySelector('.sticky-footer').style.bottom = '0';
-        
+
+        this.requestWakeLock();
         this.navigate('workout');
     },
 
@@ -980,6 +1137,32 @@ const app = {
             }
         }
         return null;
+    },
+
+    // Advies voor progressive overload: vorige sessie alle sets (met gewicht) aan de
+    // bovenkant van de herhalingsrange gehaald? Stel dan een licht hoger gewicht voor.
+    getOverloadSuggestion(ex, prevDetails, plan) {
+        if (!prevDetails || prevDetails.length === 0 || !ex.repsMax) return null;
+
+        let maxWeight = 0;
+        for (const d of prevDetails) {
+            const reps = parseInt(d.reps);
+            const weight = parseFloat(d.weight);
+            if (!(weight > 0) || !(reps >= ex.repsMax)) return null;
+            if (weight > maxWeight) maxWeight = weight;
+        }
+
+        // Increment uit de progressieregels van het plan (onder-/bovenlichaam), anders 2.5 kg
+        let increment = 2.5;
+        const guidance = plan && plan.progressionRules && plan.progressionRules.weightIncreaseGuidance;
+        if (guidance) {
+            const groups = (ex.muscleGroups || []).map(mg => this.normalizeMuscleGroup(mg));
+            const lowerBody = groups.includes('legs') || groups.includes('glutes');
+            const g = lowerBody ? guidance.lowerBodyKg : guidance.upperBodyKg;
+            if (g > 0) increment = g;
+        }
+
+        return { prevWeight: maxWeight, newWeight: Math.round((maxWeight + increment) * 10) / 10 };
     },
 
     renderWorkoutExercises() {
@@ -1029,6 +1212,12 @@ const app = {
                 notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.alternatives.join(', '))}</div>`;
             } else if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
                 notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.optionalAlternatives.join(', '))}</div>`;
+            }
+
+            // Progressive-overload-advies op basis van de vorige sessie
+            const overload = app.getOverloadSuggestion(ex, prevDetails, store.getActivePlan());
+            if (overload) {
+                notesHtml += `<div class="text-sm mt-2 progression-hint"><span class="material-icons-round" style="font-size:1rem; vertical-align:-3px;">trending_up</span> Vorige keer alle sets op ${app.escapeHTML(String(ex.repsMax))} reps met ${app.escapeHTML(String(overload.prevWeight))} kg. Probeer nu ${app.escapeHTML(String(overload.newWeight))} kg.</div>`;
             }
 
             let setsHtml = '';
@@ -1105,6 +1294,28 @@ const app = {
         this.renderWorkoutExercises();
     },
 
+    // --- WAKE LOCK ---
+
+    wakeLock: null,
+
+    // Houdt het scherm aan tijdens een workout (waar ondersteund)
+    async requestWakeLock() {
+        try {
+            if (typeof navigator !== 'undefined' && navigator.wakeLock) {
+                this.wakeLock = await navigator.wakeLock.request('screen');
+            }
+        } catch (e) {
+            // Geen ramp: het scherm valt dan gewoon in slaap volgens de systeeminstelling
+        }
+    },
+
+    releaseWakeLock() {
+        if (this.wakeLock) {
+            this.wakeLock.release();
+            this.wakeLock = null;
+        }
+    },
+
     // --- RUSTTIMER ---
 
     restTimer: null,
@@ -1164,6 +1375,7 @@ const app = {
     finishWorkout() {
         this.hideFinishModal();
         this.stopRestTimer();
+        this.releaseWakeLock();
         const duration = Math.round((new Date() - this.activeWorkout.startTime) / 60000);
         let totalExercisesCompleted = 0;
         
@@ -1468,6 +1680,39 @@ const app = {
         dlAnchorElem.setAttribute("href", dataStr);
         dlAnchorElem.setAttribute("download", "go_fitness_backup.json");
         dlAnchorElem.click();
+    },
+
+    // Deelt een schema als JSON via de Web Share API, met klembord als fallback
+    async sharePlan(planId) {
+        const plan = store.plans.find(p => p.id === planId);
+        if (!plan) return;
+
+        // Interne id niet meegeven; de ontvanger krijgt bij import een eigen id
+        const shareable = { ...plan };
+        delete shareable.id;
+        const json = JSON.stringify(shareable, null, 2);
+        const fileName = `${String(plan.name || 'schema').toLowerCase().replace(/[^a-z0-9]+/g, '_')}.json`;
+
+        try {
+            if (typeof navigator !== 'undefined' && navigator.share) {
+                const file = new File([json], fileName, { type: 'application/json' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file], title: plan.name });
+                } else {
+                    await navigator.share({ title: plan.name, text: json });
+                }
+                return;
+            }
+            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                await navigator.clipboard.writeText(json);
+                this.showToast('Schema-JSON gekopieerd naar het klembord!', 'success');
+                return;
+            }
+            this.showToast('Delen wordt niet ondersteund in deze browser.', 'error');
+        } catch (e) {
+            if (e && e.name === 'AbortError') return; // gebruiker annuleerde het delen
+            this.showToast('Delen mislukt: ' + (e.message || e), 'error');
+        }
     },
 
     validateBackup(data) {
