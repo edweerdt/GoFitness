@@ -545,6 +545,34 @@ describe('exercise progress', () => {
     });
 });
 
+describe('wake lock', () => {
+    afterEach(() => {
+        app.wakeLock = null;
+        delete global.navigator.wakeLock;
+    });
+
+    it('should request and release a screen wake lock when supported', async () => {
+        const release = jest.fn();
+        Object.defineProperty(global.navigator, 'wakeLock', {
+            value: { request: jest.fn().mockResolvedValue({ release }) },
+            configurable: true
+        });
+
+        await app.requestWakeLock();
+        expect(navigator.wakeLock.request).toHaveBeenCalledWith('screen');
+        expect(app.wakeLock).not.toBeNull();
+
+        app.releaseWakeLock();
+        expect(release).toHaveBeenCalled();
+        expect(app.wakeLock).toBeNull();
+    });
+
+    it('should not crash when wake lock is unsupported', async () => {
+        await app.requestWakeLock();
+        expect(app.wakeLock).toBeNull();
+    });
+});
+
 describe('rest timer', () => {
     beforeEach(() => {
         jest.useFakeTimers();

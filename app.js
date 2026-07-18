@@ -112,6 +112,13 @@ const app = {
 
         this.applyTheme();
 
+        // Wake lock vervalt zodra de app naar de achtergrond gaat; vraag opnieuw aan
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && this.activeWorkout && this.currentView === 'workout') {
+                this.requestWakeLock();
+            }
+        });
+
         this.setupNavigation();
         this.renderHome();
         this.renderPlans();
@@ -1112,6 +1119,7 @@ const app = {
         document.getElementById('bottom-nav').classList.add('hidden');
         document.getElementById('view-workout').querySelector('.sticky-footer').style.bottom = '0';
 
+        this.requestWakeLock();
         this.navigate('workout');
     },
 
@@ -1285,6 +1293,28 @@ const app = {
         this.renderWorkoutExercises();
     },
 
+    // --- WAKE LOCK ---
+
+    wakeLock: null,
+
+    // Houdt het scherm aan tijdens een workout (waar ondersteund)
+    async requestWakeLock() {
+        try {
+            if (typeof navigator !== 'undefined' && navigator.wakeLock) {
+                this.wakeLock = await navigator.wakeLock.request('screen');
+            }
+        } catch (e) {
+            // Geen ramp: het scherm valt dan gewoon in slaap volgens de systeeminstelling
+        }
+    },
+
+    releaseWakeLock() {
+        if (this.wakeLock) {
+            this.wakeLock.release();
+            this.wakeLock = null;
+        }
+    },
+
     // --- RUSTTIMER ---
 
     restTimer: null,
@@ -1344,6 +1374,7 @@ const app = {
     finishWorkout() {
         this.hideFinishModal();
         this.stopRestTimer();
+        this.releaseWakeLock();
         const duration = Math.round((new Date() - this.activeWorkout.startTime) / 60000);
         let totalExercisesCompleted = 0;
         
