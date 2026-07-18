@@ -376,6 +376,66 @@ describe('workout flow', () => {
         expect(app.activeWorkout).toBeNull();
         expect(store.activeWorkoutState).toBeNull();
     });
+
+    it('should cap an unrealistically long session duration on finish', () => {
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Push' },
+            startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 dagen geleden open blijven staan
+            exercises: [
+                { name: 'Bench Press', muscleGroups: ['chest'], sets: 1, setsCompleted: [true], weights: ['40'], actualReps: ['10'] }
+            ]
+        };
+
+        app.finishWorkout();
+
+        expect(store.logs).toHaveLength(1);
+        expect(store.logs[0].duration).toBe(240);
+    });
+});
+
+describe('editing session duration', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [{
+            id: 'log1', planId: null, planName: 'Overige Sessies', sessionName: 'Push',
+            duration: 4098, exercisesCompleted: 1,
+            exercises: [{ name: 'Bench Press', totalSets: 1, setsCompleted: 1, details: [{ setNumber: 1, weight: '40', reps: '10' }] }]
+        }];
+        document.body.innerHTML = `
+            <div id="edit-log-container"></div>
+            <div id="modal-edit-log" class="hidden"></div>
+        `;
+        jest.spyOn(app, 'renderProgress').mockImplementation(() => {});
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it('should render an editable duration field in the edit modal', () => {
+        app.showEditLogModal('log1');
+        const html = document.getElementById('edit-log-container').innerHTML;
+        expect(html).toContain('Duur (minuten)');
+        expect(html).toContain('updateEditLogDuration');
+        expect(html).toContain('value="4098"');
+    });
+
+    it('should persist an adjusted duration when saving the log', () => {
+        app.showEditLogModal('log1');
+        app.updateEditLogDuration('55');
+        app.saveEditLog();
+
+        expect(store.logs[0].duration).toBe(55);
+        // Overige gegevens blijven behouden
+        expect(store.logs[0].exercises[0].details[0].weight).toBe('40');
+    });
+
+    it('should ignore invalid or negative duration input', () => {
+        app.logToEdit = JSON.parse(JSON.stringify(store.logs[0]));
+        app.updateEditLogDuration('abc');
+        expect(app.logToEdit.duration).toBe(4098);
+        app.updateEditLogDuration('-5');
+        expect(app.logToEdit.duration).toBe(4098);
+    });
 });
 
 describe('import flow', () => {
@@ -517,8 +577,29 @@ describe('exercise progress', () => {
         expect(html).toContain('Bench Press');
         expect(html).toContain('<svg');
         expect(html).toContain('+5 kg');
+        // De gewichtswaardes staan als labels in de grafiek
+        expect(html).toContain('<text');
+        expect(html).toContain('>40</text>');
+        expect(html).toContain('>45</text>');
         // Oefeningen zonder gewichtsdata krijgen geen grafiek
         expect(html).not.toContain('Plank');
+    });
+
+    it('should limit value labels to first, peak and last when there are many sessions', () => {
+        const weights = [40, 42, 44, 46, 48, 50, 52];
+        store.logs = weights.map((wt, i) => ({
+            date: `2026-07-0${i + 1}T10:00:00.000Z`,
+            exercises: [{ name: 'Squat', details: [{ setNumber: 1, weight: String(wt), reps: '5' }] }]
+        }));
+        app.renderExerciseProgress();
+
+        const html = document.getElementById('exercise-progress-list').innerHTML;
+        // 7 metingen -> alleen eerste (40), piek (52) en laatste (52) gelabeld, niet alle
+        const labelCount = (html.match(/<text/g) || []).length;
+        expect(labelCount).toBeLessThan(weights.length);
+        expect(html).toContain('>40</text>');
+        expect(html).toContain('>52</text>');
+        expect(html).not.toContain('>44</text>');
     });
 
     it('should show a hint when there is not enough data', () => {

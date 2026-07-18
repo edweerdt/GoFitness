@@ -604,19 +604,48 @@ const app = {
     },
 
     buildSparklineSVG(points) {
-        const w = 100, h = 32, pad = 2;
+        // Vaste viewBox met behoud van verhouding, zodat de gewichtslabels niet vervormen
+        const w = 320, h = 96;
+        const padX = 26, padTop = 20, padBottom = 14;
         const weights = points.map(p => p.weight);
         const min = Math.min(...weights);
         const max = Math.max(...weights);
         const range = (max - min) || 1;
-        const step = (w - pad * 2) / (points.length - 1);
+        const step = points.length > 1 ? (w - padX * 2) / (points.length - 1) : 0;
+
         const coords = points.map((p, i) => {
-            const x = pad + i * step;
-            const y = h - pad - ((p.weight - min) / range) * (h - pad * 2);
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
+            const x = padX + i * step;
+            const y = h - padBottom - ((p.weight - min) / range) * (h - padTop - padBottom);
+            return { x, y, weight: p.weight };
         });
-        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%; height:48px; display:block;">
-            <polyline points="${coords.join(' ')}" fill="none" stroke="var(--accent-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+
+        // Bij veel metingen alle labels tonen wordt te druk: dan alleen eerste, laatste en de piek
+        const showAll = points.length <= 6;
+        const maxIdx = weights.indexOf(max);
+        const labelIdx = showAll
+            ? points.map((_, i) => i)
+            : [...new Set([0, maxIdx, points.length - 1])];
+
+        const line = `<polyline points="${coords.map(c => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ')}" fill="none" stroke="var(--accent-color)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+        const dots = coords.map(c =>
+            `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="3" fill="var(--accent-color)"/>`
+        ).join('');
+
+        const labels = labelIdx.map(i => {
+            const c = coords[i];
+            // Labels aan de randen naar binnen uitlijnen zodat ze binnen de viewBox blijven
+            let anchor = 'middle';
+            if (i === 0 && points.length > 1) anchor = 'start';
+            else if (i === points.length - 1) anchor = 'end';
+            // Piek onderin het bereik? Label dan onder de punt tekenen i.p.v. erboven
+            const above = c.y > padTop + 6;
+            const ly = above ? c.y - 7 : c.y + 13;
+            return `<text x="${c.x.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anchor}" font-size="12" font-weight="600" fill="var(--text-primary)">${this.escapeHTML(String(c.weight))}</text>`;
+        }).join('');
+
+        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:auto; display:block; overflow:visible;">
+            ${line}${dots}${labels}
         </svg>`;
     },
 
@@ -1376,7 +1405,18 @@ const app = {
         this.hideFinishModal();
         this.stopRestTimer();
         this.releaseWakeLock();
-        const duration = Math.round((new Date() - this.activeWorkout.startTime) / 60000);
+
+        // Een sessie die per ongeluk uren of dagen open bleef staan levert een
+        // onrealistische duur op; begrens die zodat statistieken kloppen. De gebruiker
+        // kan de duur naderhand alsnog aanpassen in het logboek.
+        const MAX_SESSION_MINUTES = 240;
+        let duration = Math.round((new Date() - this.activeWorkout.startTime) / 60000);
+        if (!(duration >= 0)) duration = 0;
+        if (duration > MAX_SESSION_MINUTES) {
+            duration = MAX_SESSION_MINUTES;
+            this.showToast('Sessieduur leek onrealistisch lang en is begrensd. Pas hem eventueel aan in het logboek.', 'error');
+        }
+
         let totalExercisesCompleted = 0;
         
         const exerciseLogs = [];
@@ -1478,6 +1518,14 @@ const app = {
         document.getElementById('modal-edit-log').classList.add('hidden');
     },
 
+    updateEditLogDuration(val) {
+        const parsed = parseInt(val, 10);
+        // Alleen een geldige, niet-negatieve waarde overnemen; anders de vorige behouden
+        if (!isNaN(parsed) && parsed >= 0) {
+            this.logToEdit.duration = parsed;
+        }
+    },
+
     updateEditLogWeight(exIndex, setIndex, val) {
         const detail = this.logToEdit.exercises[exIndex].details.find(d => d.setNumber === setIndex + 1);
         if (detail) detail.weight = val;
@@ -1492,8 +1540,25 @@ const app = {
         const container = document.getElementById('edit-log-container');
         container.innerHTML = '';
 
+        // Duur-veld: altijd bewerkbaar, ook bij oude sessies zonder oefening-details
+        const durationCard = document.createElement('div');
+        durationCard.className = 'glass-panel';
+        durationCard.style.padding = '12px';
+        durationCard.innerHTML = `
+            <div class="set-row" style="justify-content: space-between; align-items:center;">
+                <div style="font-weight:600;">Duur (minuten)</div>
+                <input type="number" min="0" class="input-field" style="width:90px; text-align:center;"
+                    value="${app.escapeHTML(String(this.logToEdit.duration != null ? this.logToEdit.duration : ''))}"
+                    onchange="app.updateEditLogDuration(this.value)">
+            </div>
+        `;
+        container.appendChild(durationCard);
+
         if (!this.logToEdit.exercises || this.logToEdit.exercises.length === 0) {
-            container.innerHTML = '<p class="text-muted">Geen details beschikbaar voor deze oude sessie.</p>';
+            const note = document.createElement('p');
+            note.className = 'text-muted';
+            note.textContent = 'Geen oefening-details beschikbaar voor deze oude sessie.';
+            container.appendChild(note);
             return;
         }
 
