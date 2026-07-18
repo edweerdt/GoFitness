@@ -1405,7 +1405,18 @@ const app = {
         this.hideFinishModal();
         this.stopRestTimer();
         this.releaseWakeLock();
-        const duration = Math.round((new Date() - this.activeWorkout.startTime) / 60000);
+
+        // Een sessie die per ongeluk uren of dagen open bleef staan levert een
+        // onrealistische duur op; begrens die zodat statistieken kloppen. De gebruiker
+        // kan de duur naderhand alsnog aanpassen in het logboek.
+        const MAX_SESSION_MINUTES = 240;
+        let duration = Math.round((new Date() - this.activeWorkout.startTime) / 60000);
+        if (!(duration >= 0)) duration = 0;
+        if (duration > MAX_SESSION_MINUTES) {
+            duration = MAX_SESSION_MINUTES;
+            this.showToast('Sessieduur leek onrealistisch lang en is begrensd. Pas hem eventueel aan in het logboek.', 'error');
+        }
+
         let totalExercisesCompleted = 0;
         
         const exerciseLogs = [];

@@ -377,6 +377,20 @@ describe('workout flow', () => {
         expect(store.activeWorkoutState).toBeNull();
     });
 
+    it('should cap an unrealistically long session duration on finish', () => {
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Push' },
+            startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 dagen geleden open blijven staan
+            exercises: [
+                { name: 'Bench Press', muscleGroups: ['chest'], sets: 1, setsCompleted: [true], weights: ['40'], actualReps: ['10'] }
+            ]
+        };
+
+        app.finishWorkout();
+
+        expect(store.logs).toHaveLength(1);
+        expect(store.logs[0].duration).toBe(240);
+    });
 });
 
 describe('editing session duration', () => {
