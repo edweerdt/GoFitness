@@ -72,11 +72,17 @@ describe('DataStore', () => {
     it('should handle malformed JSON in localStorage gracefully without crashing', () => {
         // Put invalid JSON in localStorage
         mockLocalStorage.setItem('plans', 'invalid json data');
+        mockLocalStorage.setItem('logs', '{not valid');
 
-        // Ensure parsing invalid json throws as normal
+        let store;
         expect(() => {
-            new DataStore();
-        }).toThrow(SyntaxError);
+            store = new DataStore();
+        }).not.toThrow();
+
+        // Corrupte keys vallen terug op de standaardwaarde
+        expect(store.plans).toEqual([]);
+        expect(store.logs).toEqual([]);
+        expect(store.theme).toBe('auto');
     });
 
     describe('saveActiveWorkoutState', () => {

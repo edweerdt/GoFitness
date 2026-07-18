@@ -14,11 +14,21 @@ class DataStore {
         }
     }
     load() {
-        this.plans = JSON.parse(localStorage.getItem('plans') || '[]');
+        this.plans = this.safeParse('plans', []);
         this.activePlanId = localStorage.getItem('activePlanId') || null;
-        this.logs = JSON.parse(localStorage.getItem('logs') || '[]');
-        this.activeWorkoutState = JSON.parse(localStorage.getItem('activeWorkoutState')) || null;
+        this.logs = this.safeParse('logs', []);
+        this.activeWorkoutState = this.safeParse('activeWorkoutState', null);
         this.theme = localStorage.getItem('theme') || 'auto';
+    }
+    safeParse(key, fallback) {
+        // Corrupte data in localStorage mag de app niet laten crashen bij het opstarten
+        try {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : fallback;
+        } catch (e) {
+            console.warn(`Kon '${key}' niet lezen uit localStorage, standaardwaarde gebruikt.`, e);
+            return fallback;
+        }
     }
     save() {
         localStorage.setItem('plans', JSON.stringify(this.plans));
