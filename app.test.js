@@ -545,6 +545,44 @@ describe('exercise progress', () => {
     });
 });
 
+describe('sharePlan', () => {
+    beforeEach(() => {
+        store.plans = [{ id: 'p1', name: 'Mijn Schema', sessions: [] }];
+        store.activePlanId = 'p1';
+        store.logs = [];
+        document.body.innerHTML = '<div id="toast-container"></div>';
+    });
+
+    afterEach(() => {
+        delete global.navigator.share;
+        delete global.navigator.canShare;
+        delete global.navigator.clipboard;
+    });
+
+    it('should share the plan JSON without the internal id via the Web Share API', async () => {
+        const share = jest.fn().mockResolvedValue();
+        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true });
+
+        await app.sharePlan('p1');
+
+        expect(share).toHaveBeenCalledTimes(1);
+        const arg = share.mock.calls[0][0];
+        expect(arg.title).toBe('Mijn Schema');
+        expect(arg.text).toContain('"name": "Mijn Schema"');
+        expect(arg.text).not.toContain('"id"');
+    });
+
+    it('should copy the JSON to the clipboard when Web Share is unavailable', async () => {
+        const writeText = jest.fn().mockResolvedValue();
+        Object.defineProperty(global.navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+        await app.sharePlan('p1');
+
+        expect(writeText).toHaveBeenCalledTimes(1);
+        expect(writeText.mock.calls[0][0]).toContain('Mijn Schema');
+    });
+});
+
 describe('wake lock', () => {
     afterEach(() => {
         app.wakeLock = null;

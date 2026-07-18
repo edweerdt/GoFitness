@@ -516,6 +516,7 @@ const app = {
                     </div>
                     <div style="display:flex; align-items:center; gap:8px; margin-left:12px;">
                         ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
+                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${p.id}')" title="Schema delen">ios_share</span>
                         <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${p.id}')">delete_outline</span>
                     </div>
                 </div>
@@ -1679,6 +1680,39 @@ const app = {
         dlAnchorElem.setAttribute("href", dataStr);
         dlAnchorElem.setAttribute("download", "go_fitness_backup.json");
         dlAnchorElem.click();
+    },
+
+    // Deelt een schema als JSON via de Web Share API, met klembord als fallback
+    async sharePlan(planId) {
+        const plan = store.plans.find(p => p.id === planId);
+        if (!plan) return;
+
+        // Interne id niet meegeven; de ontvanger krijgt bij import een eigen id
+        const shareable = { ...plan };
+        delete shareable.id;
+        const json = JSON.stringify(shareable, null, 2);
+        const fileName = `${String(plan.name || 'schema').toLowerCase().replace(/[^a-z0-9]+/g, '_')}.json`;
+
+        try {
+            if (typeof navigator !== 'undefined' && navigator.share) {
+                const file = new File([json], fileName, { type: 'application/json' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file], title: plan.name });
+                } else {
+                    await navigator.share({ title: plan.name, text: json });
+                }
+                return;
+            }
+            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                await navigator.clipboard.writeText(json);
+                this.showToast('Schema-JSON gekopieerd naar het klembord!', 'success');
+                return;
+            }
+            this.showToast('Delen wordt niet ondersteund in deze browser.', 'error');
+        } catch (e) {
+            if (e && e.name === 'AbortError') return; // gebruiker annuleerde het delen
+            this.showToast('Delen mislukt: ' + (e.message || e), 'error');
+        }
     },
 
     validateBackup(data) {
