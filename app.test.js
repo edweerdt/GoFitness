@@ -483,6 +483,24 @@ describe('exercise progress', () => {
         app.renderExerciseProgress();
         expect(document.getElementById('exercise-progress-list').innerHTML).toContain('minimaal twee sessies');
     });
+
+    it('should show the estimated 1RM based on the best set (Epley)', () => {
+        store.logs = [
+            { date: '2026-07-01T10:00:00.000Z', exercises: [{ name: 'Squat', details: [{ setNumber: 1, weight: '100', reps: '5' }] }] },
+            { date: '2026-07-08T10:00:00.000Z', exercises: [{ name: 'Squat', details: [{ setNumber: 1, weight: '90', reps: '1' }] }] }
+        ];
+        app.renderExerciseProgress();
+
+        // 100 kg x 5 -> 100 * (1 + 5/30) = 116.7 -> 117 kg
+        expect(document.getElementById('exercise-progress-list').innerHTML).toContain('Geschat 1RM: 117 kg');
+    });
+
+    it('should estimate 1RM with the Epley formula', () => {
+        expect(app.estimate1RM(100, 1)).toBe(100);
+        expect(app.estimate1RM(40, 10)).toBeCloseTo(53.33, 1);
+        expect(app.estimate1RM(0, 10)).toBeNull();
+        expect(app.estimate1RM(40, 0)).toBeNull();
+    });
 });
 
 describe('rest timer', () => {

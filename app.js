@@ -588,6 +588,13 @@ const app = {
             .filter(s => s.points.length >= 2);
     },
 
+    // Epley-formule: geschat 1-rep-max op basis van gewicht en herhalingen
+    estimate1RM(weight, reps) {
+        if (!(weight > 0) || !(reps > 0)) return null;
+        if (reps === 1) return weight;
+        return weight * (1 + reps / 30);
+    },
+
     buildSparklineSVG(points) {
         const w = 100, h = 32, pad = 2;
         const weights = points.map(p => p.weight);
@@ -626,6 +633,14 @@ const app = {
             const diffText = diff === 0 ? 'gelijk' : (diff > 0 ? `+${diff} kg` : `${diff} kg`);
             const diffColor = diff > 0 ? 'var(--status-green)' : (diff < 0 ? 'var(--status-red)' : 'var(--text-muted)');
 
+            // Beste geschatte 1RM over alle sessies van deze oefening
+            let best1RM = 0;
+            s.points.forEach(p => {
+                const est = this.estimate1RM(p.weight, p.reps);
+                if (est && est > best1RM) best1RM = est;
+            });
+            const rmHtml = best1RM > 0 ? `<span>Geschat 1RM: ${Math.round(best1RM)} kg</span>` : '';
+
             html += `
                 <div class="glass-panel" style="padding: 12px 16px;">
                     <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
@@ -633,8 +648,9 @@ const app = {
                         <div class="text-sm" style="color:${diffColor}; white-space:nowrap;">${diffText}</div>
                     </div>
                     <div class="mt-2">${this.buildSparklineSVG(s.points)}</div>
-                    <div class="text-sm text-muted" style="display:flex; justify-content:space-between;">
+                    <div class="text-sm text-muted" style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
                         <span>${s.points.length} sessies</span>
+                        ${rmHtml}
                         <span>Laatst: ${last} kg</span>
                     </div>
                 </div>
