@@ -32,7 +32,12 @@ class DataStore {
     }
     save() {
         localStorage.setItem('plans', JSON.stringify(this.plans));
-        if(this.activePlanId) localStorage.setItem('activePlanId', this.activePlanId);
+        if(this.activePlanId) {
+            localStorage.setItem('activePlanId', this.activePlanId);
+        } else {
+            // Anders blijft een verwijderd actief plan na een reload terugkomen
+            localStorage.removeItem('activePlanId');
+        }
         localStorage.setItem('logs', JSON.stringify(this.logs));
         localStorage.setItem('theme', this.theme);
     }

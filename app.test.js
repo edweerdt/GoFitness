@@ -85,6 +85,18 @@ describe('DataStore', () => {
         expect(store.theme).toBe('auto');
     });
 
+    it('should remove activePlanId from localStorage when it is cleared', () => {
+        const store = new DataStore();
+        store.activePlanId = 'plan_1';
+        store.save();
+        expect(mockLocalStorage.store['activePlanId']).toBe('plan_1');
+
+        // Actief plan verwijderd -> id moet ook uit localStorage verdwijnen
+        store.activePlanId = null;
+        store.save();
+        expect(mockLocalStorage.getItem('activePlanId')).toBeNull();
+    });
+
     describe('saveActiveWorkoutState', () => {
         it('should save active workout state to localStorage when state is provided', () => {
             const store = new DataStore();
