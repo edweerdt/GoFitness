@@ -85,6 +85,15 @@ class DataStore {
         this.logs.push({ ...log, id: 'log_' + Date.now(), date: new Date().toISOString() });
         this.save();
     }
+    restoreBackup(backup) {
+        this.plans = backup.plans;
+        this.logs = backup.logs;
+        // De backup bevat geen activePlanId; kies een geldig plan als het huidige niet (meer) bestaat
+        if (!this.plans.find(p => p.id === this.activePlanId)) {
+            this.activePlanId = this.plans.length > 0 ? this.plans[0].id : null;
+        }
+        this.save();
+    }
 }
 
 const store = new DataStore();
@@ -1413,12 +1422,56 @@ const app = {
         dlAnchorElem.setAttribute("href", dataStr);
         dlAnchorElem.setAttribute("download", "go_fitness_backup.json");
         dlAnchorElem.click();
+    },
+
+    validateBackup(data) {
+        if (!data || !Array.isArray(data.plans) || !Array.isArray(data.logs)) {
+            throw new Error("Ongeldig backup-bestand. Verwacht 'plans' en 'logs'.");
+        }
+        return { plans: data.plans, logs: data.logs };
+    },
+
+    handleRestoreFileSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                this.backupToRestore = this.validateBackup(JSON.parse(evt.target.result));
+                const summary = `Backup bevat ${this.backupToRestore.plans.length} schema('s) en ${this.backupToRestore.logs.length} gelogde sessie(s).`;
+                document.getElementById('restore-summary').textContent = summary;
+                document.getElementById('modal-restore').classList.remove('hidden');
+            } catch (err) {
+                this.showToast('Herstellen mislukt: ' + (err.message || 'ongeldige JSON.'), 'error');
+            }
+            // Reset zodat hetzelfde bestand later opnieuw gekozen kan worden
+            e.target.value = '';
+        };
+        reader.readAsText(file);
+    },
+
+    hideRestoreModal() {
+        this.backupToRestore = null;
+        document.getElementById('modal-restore').classList.add('hidden');
+    },
+
+    confirmRestore() {
+        if (!this.backupToRestore) return;
+        store.restoreBackup(this.backupToRestore);
+        this.hideRestoreModal();
+        this.renderPlans();
+        this.renderHome();
+        this.renderProgress();
+        this.renderAchievements();
+        this.showToast('Backup succesvol hersteld!', 'success');
     }
 };
 
 // Ensure we don't crash when running in a Node/test environment
 if (typeof document !== 'undefined' && document.getElementById('import-file')) {
     document.getElementById('import-file').addEventListener('change', (e) => app.handleFileSelect(e));
+    const restoreInput = document.getElementById('restore-file');
+    if (restoreInput) restoreInput.addEventListener('change', (e) => app.handleRestoreFileSelect(e));
 
     // Start app
     app.init();

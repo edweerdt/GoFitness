@@ -97,6 +97,37 @@ describe('DataStore', () => {
         expect(mockLocalStorage.getItem('activePlanId')).toBeNull();
     });
 
+    describe('restoreBackup', () => {
+        it('should replace plans and logs and pick a valid active plan', () => {
+            const store = new DataStore();
+            store.plans = [{ id: 'plan_old', name: 'Oud' }];
+            store.activePlanId = 'plan_old';
+            store.logs = [{ id: 'log_old' }];
+
+            store.restoreBackup({
+                plans: [{ id: 'plan_new', name: 'Nieuw' }],
+                logs: [{ id: 'log_new' }, { id: 'log_new2' }]
+            });
+
+            expect(store.plans).toEqual([{ id: 'plan_new', name: 'Nieuw' }]);
+            expect(store.logs).toHaveLength(2);
+            // Oude activePlanId bestaat niet meer -> eerste plan uit de backup wordt actief
+            expect(store.activePlanId).toBe('plan_new');
+            expect(mockLocalStorage.store['plans']).toContain('plan_new');
+        });
+
+        it('should clear the active plan when the backup contains no plans', () => {
+            const store = new DataStore();
+            store.plans = [{ id: 'plan_old' }];
+            store.activePlanId = 'plan_old';
+
+            store.restoreBackup({ plans: [], logs: [] });
+
+            expect(store.activePlanId).toBeNull();
+            expect(mockLocalStorage.getItem('activePlanId')).toBeNull();
+        });
+    });
+
     describe('saveActiveWorkoutState', () => {
         it('should save active workout state to localStorage when state is provided', () => {
             const store = new DataStore();
@@ -267,6 +298,20 @@ describe('app logic', () => {
             ];
             expect(app.calculateStreak()).toBe(1);
         });
+    });
+});
+
+describe('validateBackup', () => {
+    it('should accept a valid backup with plans and logs', () => {
+        const result = app.validateBackup({ plans: [{ id: 'p1' }], logs: [], exportDate: '2026-01-01' });
+        expect(result).toEqual({ plans: [{ id: 'p1' }], logs: [] });
+    });
+
+    it('should reject data without plans or logs arrays', () => {
+        expect(() => app.validateBackup(null)).toThrow();
+        expect(() => app.validateBackup({})).toThrow();
+        expect(() => app.validateBackup({ plans: 'geen array', logs: [] })).toThrow();
+        expect(() => app.validateBackup({ plans: [], logs: 'geen array' })).toThrow();
     });
 });
 
