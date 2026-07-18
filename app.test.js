@@ -333,6 +333,128 @@ describe('app logic', () => {
     });
 });
 
+describe('workout flow', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [];
+        document.body.innerHTML = `
+            <div id="modal-finish-workout" class="modal-overlay"></div>
+            <div id="bottom-nav" class="hidden"></div>
+            <div id="toast-container"></div>
+        `;
+        jest.spyOn(app, 'navigate').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
+    it('should log only exercises with completed sets, including their set details', () => {
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Push' },
+            startTime: new Date(Date.now() - 30 * 60000),
+            exercises: [
+                { name: 'Bench Press', muscleGroups: ['chest'], sets: 3, setsCompleted: [true, true, false], weights: ['40', '42.5', ''], actualReps: ['10', '8', ''] },
+                { name: 'Overhead Press', muscleGroups: ['shoulders'], sets: 3, setsCompleted: [false, false, false], weights: ['', '', ''], actualReps: ['', '', ''] }
+            ]
+        };
+
+        app.finishWorkout();
+
+        expect(store.logs).toHaveLength(1);
+        const log = store.logs[0];
+        expect(log.sessionName).toBe('Push');
+        expect(log.exercisesCompleted).toBe(1);
+        expect(log.exercises).toHaveLength(1);
+        expect(log.exercises[0].name).toBe('Bench Press');
+        expect(log.exercises[0].details).toEqual([
+            { setNumber: 1, weight: '40', reps: '10' },
+            { setNumber: 2, weight: '42.5', reps: '8' }
+        ]);
+        expect(log.duration).toBeGreaterThanOrEqual(29);
+        expect(app.activeWorkout).toBeNull();
+        expect(store.activeWorkoutState).toBeNull();
+    });
+});
+
+describe('import flow', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [];
+    });
+
+    it('should normalize a rich schema on import and activate the first plan', () => {
+        const richSchema = JSON.parse(JSON.stringify(require('./examples/test_rich_schema.json')));
+        store.importPlan(richSchema);
+
+        expect(store.plans).toHaveLength(1);
+        const plan = store.plans[0];
+        expect(plan.id).toMatch(/^plan_/);
+        expect(store.activePlanId).toBe(plan.id);
+        // sessionId/exerciseId uit het rijke schema worden overgenomen als interne id
+        expect(plan.sessions[0].id).toBe(plan.sessions[0].sessionId);
+        expect(plan.sessions[0].exercises[0].id).toBe(plan.sessions[0].exercises[0].exerciseId);
+        expect(plan.schemaVersion).toBeDefined();
+        expect(plan.schedule).toBeDefined();
+    });
+
+    it('should keep the existing active plan when importing another plan', () => {
+        store.importPlan({ name: 'Plan A', sessions: [] });
+        const firstId = store.activePlanId;
+        store.importPlan({ name: 'Plan B', sessions: [] });
+
+        expect(store.plans).toHaveLength(2);
+        expect(store.activePlanId).toBe(firstId);
+    });
+
+    it('should reject JSON without name or sessions in the import preview', () => {
+        document.body.innerHTML = `
+            <textarea id="import-json-text">{"foo": 1}</textarea>
+            <div id="import-error" class="hidden"></div>
+            <div id="import-preview" class="hidden"></div>
+            <button id="btn-confirm-import"></button>
+        `;
+        app.previewImport();
+
+        const err = document.getElementById('import-error');
+        expect(err.classList.contains('hidden')).toBe(false);
+        expect(err.textContent).toContain('Ongeldig formaat');
+    });
+});
+
+describe('renderHistory', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [];
+        document.body.innerHTML = '<div id="history-list"></div>';
+    });
+
+    it('should group logs by plan and show the newest session first with set details', () => {
+        store.logs = [
+            { id: 'l1', planName: 'Plan X', sessionName: 'Push', date: '2026-07-01T10:00:00.000Z', duration: 40, exercisesCompleted: 1,
+              exercises: [{ name: 'Bench Press', setsCompleted: 2, totalSets: 3, details: [{ setNumber: 1, weight: '40', reps: '10' }] }] },
+            { id: 'l2', planName: 'Plan X', sessionName: 'Pull', date: '2026-07-10T10:00:00.000Z', duration: 35, exercisesCompleted: 1,
+              exercises: [{ name: 'Row', setsCompleted: 3, totalSets: 3, details: [] }] }
+        ];
+        app.renderHistory();
+
+        const html = document.getElementById('history-list').innerHTML;
+        expect(html).toContain('Plan X');
+        expect(html).toContain('Bench Press');
+        expect(html).toContain('Set 1: 40kg x 10');
+        // Nieuwste sessie staat bovenaan binnen de plan-groep
+        expect(html.indexOf('Pull')).toBeLessThan(html.indexOf('Push'));
+    });
+
+    it('should show an empty state when there are no logs', () => {
+        app.renderHistory();
+        expect(document.getElementById('history-list').innerHTML).toContain('Nog geen sessies');
+    });
+});
+
 describe('rest timer', () => {
     beforeEach(() => {
         jest.useFakeTimers();
