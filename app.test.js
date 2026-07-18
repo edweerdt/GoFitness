@@ -270,6 +270,38 @@ describe('app logic', () => {
     });
 });
 
+describe('app achievements', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [];
+        document.body.innerHTML = '<div id="achievements-grid"></div>';
+    });
+
+    it('should unlock the rhythm achievement for 4 consecutive weeks across a year boundary', () => {
+        // 4 opeenvolgende maandagen over de jaargrens 2025 -> 2026
+        store.logs = [
+            { date: new Date(2025, 11, 15).toISOString(), duration: 45 },
+            { date: new Date(2025, 11, 22).toISOString(), duration: 45 },
+            { date: new Date(2025, 11, 29).toISOString(), duration: 45 },
+            { date: new Date(2026, 0, 5).toISOString(), duration: 45 }
+        ];
+        app.renderAchievements();
+        expect(document.getElementById('achievements-grid').innerHTML).toContain('Vast in het Ritme');
+    });
+
+    it('should not unlock the rhythm achievement when a week is skipped', () => {
+        store.logs = [
+            { date: new Date(2025, 11, 8).toISOString(), duration: 45 },
+            { date: new Date(2025, 11, 15).toISOString(), duration: 45 },
+            { date: new Date(2025, 11, 29).toISOString(), duration: 45 },
+            { date: new Date(2026, 0, 5).toISOString(), duration: 45 }
+        ];
+        app.renderAchievements();
+        expect(document.getElementById('achievements-grid').innerHTML).not.toContain('Vast in het Ritme');
+    });
+});
+
 describe('app XSS Security', () => {
     it('should escape HTML characters using escapeHTML to prevent XSS', () => {
         expect(app.escapeHTML('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');

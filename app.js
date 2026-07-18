@@ -679,10 +679,8 @@ const app = {
                 if (diffDays > 1.5 && diffDays <= 2.5) allAchievements.find(a => a.id === 'golden_path').unlocked = true;
             }
 
-            const year = d.getFullYear();
-            const week = Math.ceil((d - new Date(year, 0, 1)) / (1000 * 60 * 60 * 24) / 7);
-            const wKey = year + '-' + week;
-            weeksMap[wKey] = (weeksMap[wKey] || 0) + 1;
+            // Weekstart (maandag) als sleutel, zodat de jaargrens geen rol speelt
+            weeksMap[this.getWeekStart(d)] = true;
 
             lastDate = d;
 
@@ -721,14 +719,15 @@ const app = {
             }
         });
 
-        let consecutiveWeeks = 0;
-        let weekKeys = Object.keys(weeksMap).sort();
-        for(let i=1; i<weekKeys.length; i++) {
-            const currentW = parseInt(weekKeys[i].split('-')[1]);
-            const prevW = parseInt(weekKeys[i-1].split('-')[1]);
-            if (currentW === prevW + 1) consecutiveWeeks++;
-            else consecutiveWeeks = 0;
-            if (consecutiveWeeks >= 3) allAchievements.find(a => a.id === 'rhythm').unlocked = true;
+        // 4 weken op rij getraind: opeenvolgende weekstarts liggen exact 1 week uit elkaar
+        const weekStarts = Object.keys(weeksMap).map(Number).sort((a, b) => a - b);
+        let consecutiveWeeks = 1;
+        for(let i=1; i<weekStarts.length; i++) {
+            const expectedNext = new Date(weekStarts[i-1]);
+            expectedNext.setDate(expectedNext.getDate() + 7);
+            if (expectedNext.getTime() === weekStarts[i]) consecutiveWeeks++;
+            else consecutiveWeeks = 1;
+            if (consecutiveWeeks >= 4) allAchievements.find(a => a.id === 'rhythm').unlocked = true;
         }
 
         // Render grid
