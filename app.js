@@ -604,19 +604,48 @@ const app = {
     },
 
     buildSparklineSVG(points) {
-        const w = 100, h = 32, pad = 2;
+        // Vaste viewBox met behoud van verhouding, zodat de gewichtslabels niet vervormen
+        const w = 320, h = 96;
+        const padX = 26, padTop = 20, padBottom = 14;
         const weights = points.map(p => p.weight);
         const min = Math.min(...weights);
         const max = Math.max(...weights);
         const range = (max - min) || 1;
-        const step = (w - pad * 2) / (points.length - 1);
+        const step = points.length > 1 ? (w - padX * 2) / (points.length - 1) : 0;
+
         const coords = points.map((p, i) => {
-            const x = pad + i * step;
-            const y = h - pad - ((p.weight - min) / range) * (h - pad * 2);
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
+            const x = padX + i * step;
+            const y = h - padBottom - ((p.weight - min) / range) * (h - padTop - padBottom);
+            return { x, y, weight: p.weight };
         });
-        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%; height:48px; display:block;">
-            <polyline points="${coords.join(' ')}" fill="none" stroke="var(--accent-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+
+        // Bij veel metingen alle labels tonen wordt te druk: dan alleen eerste, laatste en de piek
+        const showAll = points.length <= 6;
+        const maxIdx = weights.indexOf(max);
+        const labelIdx = showAll
+            ? points.map((_, i) => i)
+            : [...new Set([0, maxIdx, points.length - 1])];
+
+        const line = `<polyline points="${coords.map(c => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ')}" fill="none" stroke="var(--accent-color)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+        const dots = coords.map(c =>
+            `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="3" fill="var(--accent-color)"/>`
+        ).join('');
+
+        const labels = labelIdx.map(i => {
+            const c = coords[i];
+            // Labels aan de randen naar binnen uitlijnen zodat ze binnen de viewBox blijven
+            let anchor = 'middle';
+            if (i === 0 && points.length > 1) anchor = 'start';
+            else if (i === points.length - 1) anchor = 'end';
+            // Piek onderin het bereik? Label dan onder de punt tekenen i.p.v. erboven
+            const above = c.y > padTop + 6;
+            const ly = above ? c.y - 7 : c.y + 13;
+            return `<text x="${c.x.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anchor}" font-size="12" font-weight="600" fill="var(--text-primary)">${this.escapeHTML(String(c.weight))}</text>`;
+        }).join('');
+
+        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:auto; display:block; overflow:visible;">
+            ${line}${dots}${labels}
         </svg>`;
     },
 

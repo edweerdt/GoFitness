@@ -517,8 +517,29 @@ describe('exercise progress', () => {
         expect(html).toContain('Bench Press');
         expect(html).toContain('<svg');
         expect(html).toContain('+5 kg');
+        // De gewichtswaardes staan als labels in de grafiek
+        expect(html).toContain('<text');
+        expect(html).toContain('>40</text>');
+        expect(html).toContain('>45</text>');
         // Oefeningen zonder gewichtsdata krijgen geen grafiek
         expect(html).not.toContain('Plank');
+    });
+
+    it('should limit value labels to first, peak and last when there are many sessions', () => {
+        const weights = [40, 42, 44, 46, 48, 50, 52];
+        store.logs = weights.map((wt, i) => ({
+            date: `2026-07-0${i + 1}T10:00:00.000Z`,
+            exercises: [{ name: 'Squat', details: [{ setNumber: 1, weight: String(wt), reps: '5' }] }]
+        }));
+        app.renderExerciseProgress();
+
+        const html = document.getElementById('exercise-progress-list').innerHTML;
+        // 7 metingen -> alleen eerste (40), piek (52) en laatste (52) gelabeld, niet alle
+        const labelCount = (html.match(/<text/g) || []).length;
+        expect(labelCount).toBeLessThan(weights.length);
+        expect(html).toContain('>40</text>');
+        expect(html).toContain('>52</text>');
+        expect(html).not.toContain('>44</text>');
     });
 
     it('should show a hint when there is not enough data', () => {
