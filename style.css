@@ -503,3 +503,9 @@ button:disabled {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
+
+/* Nog niet behaalde achievements: vergrijsd als motivatie */
+.achievement.locked {
+    opacity: 0.45;
+    filter: grayscale(1);
+}

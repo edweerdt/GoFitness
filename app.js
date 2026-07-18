@@ -787,21 +787,16 @@ const app = {
             if (consecutiveWeeks >= 4) allAchievements.find(a => a.id === 'rhythm').unlocked = true;
         }
 
-        // Render grid
+        // Render grid: behaalde badges eerst, daarna de nog te verdienen (vergrijsd)
         grid.innerHTML = '';
-        
-        const unlockedAchievements = allAchievements.filter(ach => ach.unlocked);
-        
-        if (unlockedAchievements.length === 0) {
-            grid.style.display = 'block';
-            grid.innerHTML = '<div class="glass-panel text-center text-muted" style="padding: 32px 16px;">Nog geen achievements behaald.<br>Voltooi een training om je eerste badge vrij te spelen!</div>';
-            return;
-        }
-        
         grid.style.display = 'grid';
-        unlockedAchievements.forEach(ach => {
+
+        const sortedAchievements = [...allAchievements].sort((a, b) => (b.unlocked ? 1 : 0) - (a.unlocked ? 1 : 0));
+
+        sortedAchievements.forEach(ach => {
             const el = document.createElement('div');
-            el.className = 'glass-panel';
+            el.className = `glass-panel achievement ${ach.unlocked ? 'unlocked' : 'locked'}`;
+            el.dataset.achievementId = ach.id;
             el.style.textAlign = 'center';
             el.style.padding = '16px';
             el.style.display = 'flex';
@@ -812,7 +807,7 @@ const app = {
 
             el.innerHTML = `
                 <div class="stat-icon-wrapper text-accent" style="width:48px; height:48px; margin: 0 auto; background:rgba(59, 130, 246, 0.2);">
-                    <span class="material-icons-round">${ach.icon}</span>
+                    <span class="material-icons-round">${ach.unlocked ? ach.icon : 'lock'}</span>
                 </div>
                 <div style="font-weight:600; font-size:0.85rem; line-height:1.2; margin-top:4px;">${ach.title}</div>
                 <div class="text-sm text-muted" style="font-size:0.7rem; line-height:1.3;">${ach.desc}</div>

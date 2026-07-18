@@ -534,7 +534,8 @@ describe('app achievements', () => {
             { date: new Date(2026, 0, 5).toISOString(), duration: 45 }
         ];
         app.renderAchievements();
-        expect(document.getElementById('achievements-grid').innerHTML).toContain('Vast in het Ritme');
+        const card = document.querySelector('[data-achievement-id="rhythm"]');
+        expect(card.classList.contains('unlocked')).toBe(true);
     });
 
     it('should unlock muscle achievements via muscleGroups metadata for Dutch exercise names', () => {
@@ -549,7 +550,19 @@ describe('app achievements', () => {
             ]
         }];
         app.renderAchievements();
-        expect(document.getElementById('achievements-grid').innerHTML).toContain('Borst Vooruit');
+        const card = document.querySelector('[data-achievement-id="chest"]');
+        expect(card.classList.contains('unlocked')).toBe(true);
+    });
+
+    it('should render locked achievements greyed out with a lock icon', () => {
+        store.logs = [];
+        app.renderAchievements();
+
+        const cards = document.querySelectorAll('.achievement');
+        expect(cards.length).toBe(22);
+        const rhythmCard = document.querySelector('[data-achievement-id="rhythm"]');
+        expect(rhythmCard.classList.contains('locked')).toBe(true);
+        expect(rhythmCard.innerHTML).toContain('lock');
     });
 
     it('should not unlock the rhythm achievement when a week is skipped', () => {
@@ -560,7 +573,8 @@ describe('app achievements', () => {
             { date: new Date(2026, 0, 5).toISOString(), duration: 45 }
         ];
         app.renderAchievements();
-        expect(document.getElementById('achievements-grid').innerHTML).not.toContain('Vast in het Ritme');
+        const card = document.querySelector('[data-achievement-id="rhythm"]');
+        expect(card.classList.contains('unlocked')).toBe(false);
     });
 });
 
