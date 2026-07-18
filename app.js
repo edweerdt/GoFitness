@@ -1130,6 +1130,32 @@ const app = {
         return null;
     },
 
+    // Advies voor progressive overload: vorige sessie alle sets (met gewicht) aan de
+    // bovenkant van de herhalingsrange gehaald? Stel dan een licht hoger gewicht voor.
+    getOverloadSuggestion(ex, prevDetails, plan) {
+        if (!prevDetails || prevDetails.length === 0 || !ex.repsMax) return null;
+
+        let maxWeight = 0;
+        for (const d of prevDetails) {
+            const reps = parseInt(d.reps);
+            const weight = parseFloat(d.weight);
+            if (!(weight > 0) || !(reps >= ex.repsMax)) return null;
+            if (weight > maxWeight) maxWeight = weight;
+        }
+
+        // Increment uit de progressieregels van het plan (onder-/bovenlichaam), anders 2.5 kg
+        let increment = 2.5;
+        const guidance = plan && plan.progressionRules && plan.progressionRules.weightIncreaseGuidance;
+        if (guidance) {
+            const groups = (ex.muscleGroups || []).map(mg => this.normalizeMuscleGroup(mg));
+            const lowerBody = groups.includes('legs') || groups.includes('glutes');
+            const g = lowerBody ? guidance.lowerBodyKg : guidance.upperBodyKg;
+            if (g > 0) increment = g;
+        }
+
+        return { prevWeight: maxWeight, newWeight: Math.round((maxWeight + increment) * 10) / 10 };
+    },
+
     renderWorkoutExercises() {
         const list = document.getElementById('workout-exercise-list');
         list.innerHTML = '';
@@ -1177,6 +1203,12 @@ const app = {
                 notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.alternatives.join(', '))}</div>`;
             } else if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
                 notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.optionalAlternatives.join(', '))}</div>`;
+            }
+
+            // Progressive-overload-advies op basis van de vorige sessie
+            const overload = app.getOverloadSuggestion(ex, prevDetails, store.getActivePlan());
+            if (overload) {
+                notesHtml += `<div class="text-sm mt-2 progression-hint"><span class="material-icons-round" style="font-size:1rem; vertical-align:-3px;">trending_up</span> Vorige keer alle sets op ${app.escapeHTML(String(ex.repsMax))} reps met ${app.escapeHTML(String(overload.prevWeight))} kg. Probeer nu ${app.escapeHTML(String(overload.newWeight))} kg.</div>`;
             }
 
             let setsHtml = '';

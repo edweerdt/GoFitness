@@ -455,6 +455,48 @@ describe('renderHistory', () => {
     });
 });
 
+describe('getOverloadSuggestion', () => {
+    it('should suggest more weight when all previous sets hit the top of the rep range', () => {
+        const ex = { name: 'Bench Press', repsMax: 12, muscleGroups: ['chest'], sets: 3 };
+        const prev = [
+            { setNumber: 1, weight: '40', reps: '12' },
+            { setNumber: 2, weight: '40', reps: '13' }
+        ];
+        const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 2.0, lowerBodyKg: 5.0 } } };
+
+        expect(app.getOverloadSuggestion(ex, prev, plan)).toEqual({ prevWeight: 40, newWeight: 42 });
+    });
+
+    it('should use the lower body increment for leg exercises', () => {
+        const ex = { name: 'Squat', repsMax: 10, muscleGroups: ['legs'], sets: 3 };
+        const prev = [{ setNumber: 1, weight: '80', reps: '10' }];
+        const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 2.0, lowerBodyKg: 5.0 } } };
+
+        expect(app.getOverloadSuggestion(ex, prev, plan)).toEqual({ prevWeight: 80, newWeight: 85 });
+    });
+
+    it('should not suggest anything when a set stayed below the top of the rep range', () => {
+        const ex = { name: 'Bench Press', repsMax: 12, muscleGroups: ['chest'] };
+        const prev = [
+            { setNumber: 1, weight: '40', reps: '12' },
+            { setNumber: 2, weight: '40', reps: '9' }
+        ];
+        expect(app.getOverloadSuggestion(ex, prev, null)).toBeNull();
+    });
+
+    it('should fall back to 2.5 kg without progression rules', () => {
+        const ex = { name: 'Row', repsMax: 12, muscleGroups: ['back'] };
+        const prev = [{ setNumber: 1, weight: '50', reps: '12' }];
+
+        expect(app.getOverloadSuggestion(ex, prev, null)).toEqual({ prevWeight: 50, newWeight: 52.5 });
+    });
+
+    it('should not suggest anything for bodyweight sets or missing rep targets', () => {
+        expect(app.getOverloadSuggestion({ name: 'Plank' }, [{ setNumber: 1, weight: '', reps: '60' }], null)).toBeNull();
+        expect(app.getOverloadSuggestion({ name: 'Push-up', repsMax: 15 }, [{ setNumber: 1, weight: '', reps: '15' }], null)).toBeNull();
+    });
+});
+
 describe('exercise progress', () => {
     beforeEach(() => {
         store.plans = [];
