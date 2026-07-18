@@ -14,15 +14,30 @@ class DataStore {
         }
     }
     load() {
-        this.plans = JSON.parse(localStorage.getItem('plans') || '[]');
+        this.plans = this.safeParse('plans', []);
         this.activePlanId = localStorage.getItem('activePlanId') || null;
-        this.logs = JSON.parse(localStorage.getItem('logs') || '[]');
-        this.activeWorkoutState = JSON.parse(localStorage.getItem('activeWorkoutState')) || null;
+        this.logs = this.safeParse('logs', []);
+        this.activeWorkoutState = this.safeParse('activeWorkoutState', null);
         this.theme = localStorage.getItem('theme') || 'auto';
+    }
+    safeParse(key, fallback) {
+        // Corrupte data in localStorage mag de app niet laten crashen bij het opstarten
+        try {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : fallback;
+        } catch (e) {
+            console.warn(`Kon '${key}' niet lezen uit localStorage, standaardwaarde gebruikt.`, e);
+            return fallback;
+        }
     }
     save() {
         localStorage.setItem('plans', JSON.stringify(this.plans));
-        if(this.activePlanId) localStorage.setItem('activePlanId', this.activePlanId);
+        if(this.activePlanId) {
+            localStorage.setItem('activePlanId', this.activePlanId);
+        } else {
+            // Anders blijft een verwijderd actief plan na een reload terugkomen
+            localStorage.removeItem('activePlanId');
+        }
         localStorage.setItem('logs', JSON.stringify(this.logs));
         localStorage.setItem('theme', this.theme);
     }
@@ -68,6 +83,15 @@ class DataStore {
     }
     saveWorkoutLog(log) {
         this.logs.push({ ...log, id: 'log_' + Date.now(), date: new Date().toISOString() });
+        this.save();
+    }
+    restoreBackup(backup) {
+        this.plans = backup.plans;
+        this.logs = backup.logs;
+        // De backup bevat geen activePlanId; kies een geldig plan als het huidige niet (meer) bestaat
+        if (!this.plans.find(p => p.id === this.activePlanId)) {
+            this.activePlanId = this.plans.length > 0 ? this.plans[0].id : null;
+        }
         this.save();
     }
 }
@@ -381,7 +405,7 @@ const app = {
                     existingProgress.style.gridColumn = '1 / -1';
                     statsMini.appendChild(existingProgress);
                 }
-                existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${progressText}</div>`;
+                existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${this.escapeHTML(progressText)}</div>`;
             }
         }
     },
@@ -405,20 +429,20 @@ const app = {
             descriptionText = descriptionText.split(/Voltooiingsregels/i)[0];
             descriptionText = descriptionText.split(/Mijlpalen/i)[0];
             descriptionText = descriptionText.trim();
-            const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${descriptionText}</p>` : '';
-            const recPattern = sched.recommendedPattern || p.recommendedPattern ? 
-                `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${sched.recommendedPattern || p.recommendedPattern}</div>` : '';
-            const recovery = sched.minRecoveryHours || p.minRecoveryHours ? 
-                `<div class="text-sm text-muted"><strong>Herstel:</strong> Minimaal ${sched.minRecoveryHours || p.minRecoveryHours} uur</div>` : '';
-            const weeklyMins = p.estimatedWeeklyMinutes ? 
-                `<div class="text-sm text-muted"><strong>Geschatte tijd per week:</strong> ${p.estimatedWeeklyMinutes} min</div>` : '';
-            const sessionOrder = p.defaultSessionOrder ? 
-                `<div class="text-sm text-muted mt-1"><strong>Sessie volgorde:</strong> ${p.defaultSessionOrder.join(', ')}</div>` : 
-                (p.sessions ? `<div class="text-sm text-muted mt-1"><strong>Sessies:</strong> ${p.sessions.map(s=>s.name).join(', ')}</div>` : '');
+            const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${this.escapeHTML(descriptionText)}</p>` : '';
+            const recPattern = sched.recommendedPattern || p.recommendedPattern ?
+                `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${this.escapeHTML(String(sched.recommendedPattern || p.recommendedPattern))}</div>` : '';
+            const recovery = sched.minRecoveryHours || p.minRecoveryHours ?
+                `<div class="text-sm text-muted"><strong>Herstel:</strong> Minimaal ${this.escapeHTML(String(sched.minRecoveryHours || p.minRecoveryHours))} uur</div>` : '';
+            const weeklyMins = p.estimatedWeeklyMinutes ?
+                `<div class="text-sm text-muted"><strong>Geschatte tijd per week:</strong> ${this.escapeHTML(String(p.estimatedWeeklyMinutes))} min</div>` : '';
+            const sessionOrder = p.defaultSessionOrder ?
+                `<div class="text-sm text-muted mt-1"><strong>Sessie volgorde:</strong> ${this.escapeHTML(p.defaultSessionOrder.join(', '))}</div>` :
+                (p.sessions ? `<div class="text-sm text-muted mt-1"><strong>Sessies:</strong> ${this.escapeHTML(p.sessions.map(s=>s.name).join(', '))}</div>` : '');
 
-            const level = p.level ? `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${p.level}</span>` : '';
-            const goal = p.goal ? `<div class="text-sm text-muted"><strong>Doel:</strong> ${p.goal}</div>` : '';
-            const equipment = p.equipment && p.equipment.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${p.equipment.join(', ')}</div>` : '';
+            const level = p.level ? `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${this.escapeHTML(String(p.level))}</span>` : '';
+            const goal = p.goal ? `<div class="text-sm text-muted"><strong>Doel:</strong> ${this.escapeHTML(String(p.goal))}</div>` : '';
+            const equipment = p.equipment && p.equipment.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${this.escapeHTML(p.equipment.join(', '))}</div>` : '';
 
             const scheduleInfo = this.formatRichField(p.schedule, 'Schema Regels');
             const progressionRules = this.formatRichField(p.progressionRules, 'Progressieregels');
@@ -444,7 +468,7 @@ const app = {
                         <div style="font-weight:600; font-size:0.85rem; color:var(--accent-color);">DETAILS</div>
                         <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
                     </div>
-                    <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${targetSessions}x per week (${p.sessions.length} unieke sessies)</div>
+                    <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${this.escapeHTML(String(targetSessions))}x per week (${p.sessions.length} unieke sessies)</div>
                     ${goal}
                 </div>
 
@@ -573,7 +597,7 @@ const app = {
                         <div class="stat-icon-wrapper" style="width:36px; height:36px; padding:6px; background:rgba(255,255,255,0.05); color:${meta.color};">
                             <span class="material-icons-round" style="font-size:18px;">${meta.icon}</span>
                         </div>
-                        <div style="font-weight:600; font-size:1rem;">${meta.name}</div>
+                        <div style="font-weight:600; font-size:1rem;">${this.escapeHTML(meta.name)}</div>
                     </div>
                     <div class="text-muted text-sm" style="display:flex; flex-direction:column; gap:4px;">
                         <div style="display:flex; justify-content:space-between; gap:8px;">
@@ -664,10 +688,8 @@ const app = {
                 if (diffDays > 1.5 && diffDays <= 2.5) allAchievements.find(a => a.id === 'golden_path').unlocked = true;
             }
 
-            const year = d.getFullYear();
-            const week = Math.ceil((d - new Date(year, 0, 1)) / (1000 * 60 * 60 * 24) / 7);
-            const wKey = year + '-' + week;
-            weeksMap[wKey] = (weeksMap[wKey] || 0) + 1;
+            // Weekstart (maandag) als sleutel, zodat de jaargrens geen rol speelt
+            weeksMap[this.getWeekStart(d)] = true;
 
             lastDate = d;
 
@@ -706,14 +728,15 @@ const app = {
             }
         });
 
-        let consecutiveWeeks = 0;
-        let weekKeys = Object.keys(weeksMap).sort();
-        for(let i=1; i<weekKeys.length; i++) {
-            const currentW = parseInt(weekKeys[i].split('-')[1]);
-            const prevW = parseInt(weekKeys[i-1].split('-')[1]);
-            if (currentW === prevW + 1) consecutiveWeeks++;
-            else consecutiveWeeks = 0;
-            if (consecutiveWeeks >= 3) allAchievements.find(a => a.id === 'rhythm').unlocked = true;
+        // 4 weken op rij getraind: opeenvolgende weekstarts liggen exact 1 week uit elkaar
+        const weekStarts = Object.keys(weeksMap).map(Number).sort((a, b) => a - b);
+        let consecutiveWeeks = 1;
+        for(let i=1; i<weekStarts.length; i++) {
+            const expectedNext = new Date(weekStarts[i-1]);
+            expectedNext.setDate(expectedNext.getDate() + 7);
+            if (expectedNext.getTime() === weekStarts[i]) consecutiveWeeks++;
+            else consecutiveWeeks = 1;
+            if (consecutiveWeeks >= 4) allAchievements.find(a => a.id === 'rhythm').unlocked = true;
         }
 
         // Render grid
@@ -795,7 +818,7 @@ const app = {
                                 let text = `Set ${d.setNumber}:`;
                                 if (d.weight) text += ` ${d.weight}kg`;
                                 if (d.reps) text += ` x ${d.reps}`;
-                                exDetails.push(text);
+                                exDetails.push(app.escapeHTML(text));
                             });
                         }
                         
@@ -832,7 +855,7 @@ const app = {
                 el.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
                         <div>
-                            <div style="font-weight:600;">${log.sessionName || 'Sessie'}</div>
+                            <div style="font-weight:600;">${app.escapeHTML(log.sessionName || 'Sessie')}</div>
                             <div class="text-sm text-muted">${dateStr} • ${log.duration} min • ${log.exercisesCompleted} oefeningen</div>
                         </div>
                         <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
@@ -886,9 +909,36 @@ const app = {
         }
     },
 
+    // Geeft de timestamp van maandag 00:00 van de week waarin `date` valt
+    getWeekStart(date) {
+        const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const day = (d.getDay() + 6) % 7; // maandag = 0, zondag = 6
+        d.setDate(d.getDate() - day);
+        return d.getTime();
+    },
+
     calculateStreak() {
         if(store.logs.length === 0) return 0;
-        return 1; // Simplified for MVP
+
+        const trainedWeeks = new Set();
+        store.logs.forEach(log => {
+            if (log.date) trainedWeeks.add(this.getWeekStart(new Date(log.date)));
+        });
+        if (trainedWeeks.size === 0) return 0;
+
+        // Start in de huidige week; nog niet getraind deze week? Dan telt een
+        // streak t/m vorige week nog gewoon door.
+        const cursor = new Date(this.getWeekStart(new Date()));
+        if (!trainedWeeks.has(cursor.getTime())) {
+            cursor.setDate(cursor.getDate() - 7);
+        }
+
+        let streak = 0;
+        while (trainedWeeks.has(cursor.getTime())) {
+            streak++;
+            cursor.setDate(cursor.getDate() - 7);
+        }
+        return streak;
     },
 
     // --- WORKOUT FLOW ---
@@ -962,23 +1012,23 @@ const app = {
 
             // Build badges
             let badgesHtml = '';
-            if (ex.category) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted); margin-right:4px;">${ex.category}</span>`;
-            if (ex.exerciseType) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${ex.exerciseType}</span>`;
+            if (ex.category) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted); margin-right:4px;">${app.escapeHTML(String(ex.category))}</span>`;
+            if (ex.exerciseType) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${app.escapeHTML(String(ex.exerciseType))}</span>`;
 
             // Build notes & alternatives
             let notesHtml = '';
             if (ex.notes && Array.isArray(ex.notes) && ex.notes.length > 0) {
                 notesHtml += `<ul class="text-sm text-muted mt-2" style="list-style-type: disc; padding-left: 20px;">`;
-                ex.notes.forEach(n => notesHtml += `<li>${n}</li>`);
+                ex.notes.forEach(n => notesHtml += `<li>${app.escapeHTML(String(n))}</li>`);
                 notesHtml += `</ul>`;
             } else if (ex.notes && typeof ex.notes === 'string') {
-                notesHtml += `<div class="text-sm text-muted mt-2">${ex.notes}</div>`;
+                notesHtml += `<div class="text-sm text-muted mt-2">${app.escapeHTML(ex.notes)}</div>`;
             }
 
             if (ex.alternatives && ex.alternatives.length > 0) {
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${ex.alternatives.join(', ')}</div>`;
+                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.alternatives.join(', '))}</div>`;
             } else if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${ex.optionalAlternatives.join(', ')}</div>`;
+                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.optionalAlternatives.join(', '))}</div>`;
             }
 
             let setsHtml = '';
@@ -996,16 +1046,16 @@ const app = {
                 
                 let inputsHtml = '';
                 if (wantsWeight) {
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="${weightPlaceholder}" 
-                        value="${ex.weights ? ex.weights[i] : ''}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">`;
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(weightPlaceholder))}"
+                        value="${app.escapeHTML(String(ex.weights ? ex.weights[i] : ''))}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">`;
                 }
                 if (wantsReps) {
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="${repsPlaceholder}" style="width: 55px;"
-                        value="${ex.actualReps ? ex.actualReps[i] : ''}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(repsPlaceholder))}" style="width: 55px;"
+                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
                 }
                 if (wantsDuration && !wantsReps) {
                      inputsHtml += `<input type="number" class="weight-input" placeholder="sec" style="width: 55px;"
-                        value="${ex.actualReps ? ex.actualReps[i] : ''}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
                 }
 
                 setsHtml += `
@@ -1030,7 +1080,7 @@ const app = {
                             <div class="exercise-title" style="margin:0;">${app.escapeHTML(ex.name)}</div>
                         </div>
                         <div style="margin-bottom:4px;">${badgesHtml}</div>
-                        <div class="exercise-meta">${metaString}</div>
+                        <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
                         ${notesHtml}
                     </div>
                 </div>
@@ -1043,9 +1093,54 @@ const app = {
     },
 
     toggleSet(exIndex, setIndex) {
-        this.activeWorkout.exercises[exIndex].setsCompleted[setIndex] = !this.activeWorkout.exercises[exIndex].setsCompleted[setIndex];
+        const ex = this.activeWorkout.exercises[exIndex];
+        ex.setsCompleted[setIndex] = !ex.setsCompleted[setIndex];
         store.saveActiveWorkoutState(this.activeWorkout);
+
+        // Set afgevinkt en de oefening heeft een rusttijd? Start de rusttimer.
+        if (ex.setsCompleted[setIndex] && ex.restSeconds) {
+            this.startRestTimer(ex.restSeconds);
+        }
+
         this.renderWorkoutExercises();
+    },
+
+    // --- RUSTTIMER ---
+
+    restTimer: null,
+
+    startRestTimer(seconds) {
+        this.stopRestTimer();
+        const el = document.getElementById('rest-timer');
+        const label = document.getElementById('rest-timer-label');
+        if (!el || !label) return;
+
+        let remaining = Math.round(seconds);
+        const update = () => {
+            label.textContent = `Rust: ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
+        };
+        update();
+        el.classList.remove('hidden');
+
+        this.restTimer = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                this.stopRestTimer();
+                if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                this.showToast('Rust voorbij, tijd voor je volgende set!', 'success');
+            } else {
+                update();
+            }
+        }, 1000);
+    },
+
+    stopRestTimer() {
+        if (this.restTimer) {
+            clearInterval(this.restTimer);
+            this.restTimer = null;
+        }
+        const el = document.getElementById('rest-timer');
+        if (el) el.classList.add('hidden');
     },
 
     updateWeight(exIndex, setIndex, val) {
@@ -1068,6 +1163,7 @@ const app = {
 
     finishWorkout() {
         this.hideFinishModal();
+        this.stopRestTimer();
         const duration = Math.round((new Date() - this.activeWorkout.startTime) / 60000);
         let totalExercisesCompleted = 0;
         
@@ -1199,10 +1295,10 @@ const app = {
                         <div class="set-row" style="margin-top: 8px; justify-content: space-between;">
                             <div class="set-info text-muted">Set ${d.setNumber}</div>
                             <div style="display:flex; gap:8px;">
-                                <input type="number" class="input-field" placeholder="kg" style="width:70px; text-align:center;" 
-                                    value="${d.weight || ''}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
-                                <input type="number" class="input-field" placeholder="reps" style="width:70px; text-align:center;" 
-                                    value="${d.reps || ''}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
+                                <input type="number" class="input-field" placeholder="kg" style="width:70px; text-align:center;"
+                                    value="${app.escapeHTML(String(d.weight || ''))}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
+                                <input type="number" class="input-field" placeholder="reps" style="width:70px; text-align:center;"
+                                    value="${app.escapeHTML(String(d.reps || ''))}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
                             </div>
                         </div>
                     `;
@@ -1372,12 +1468,56 @@ const app = {
         dlAnchorElem.setAttribute("href", dataStr);
         dlAnchorElem.setAttribute("download", "go_fitness_backup.json");
         dlAnchorElem.click();
+    },
+
+    validateBackup(data) {
+        if (!data || !Array.isArray(data.plans) || !Array.isArray(data.logs)) {
+            throw new Error("Ongeldig backup-bestand. Verwacht 'plans' en 'logs'.");
+        }
+        return { plans: data.plans, logs: data.logs };
+    },
+
+    handleRestoreFileSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                this.backupToRestore = this.validateBackup(JSON.parse(evt.target.result));
+                const summary = `Backup bevat ${this.backupToRestore.plans.length} schema('s) en ${this.backupToRestore.logs.length} gelogde sessie(s).`;
+                document.getElementById('restore-summary').textContent = summary;
+                document.getElementById('modal-restore').classList.remove('hidden');
+            } catch (err) {
+                this.showToast('Herstellen mislukt: ' + (err.message || 'ongeldige JSON.'), 'error');
+            }
+            // Reset zodat hetzelfde bestand later opnieuw gekozen kan worden
+            e.target.value = '';
+        };
+        reader.readAsText(file);
+    },
+
+    hideRestoreModal() {
+        this.backupToRestore = null;
+        document.getElementById('modal-restore').classList.add('hidden');
+    },
+
+    confirmRestore() {
+        if (!this.backupToRestore) return;
+        store.restoreBackup(this.backupToRestore);
+        this.hideRestoreModal();
+        this.renderPlans();
+        this.renderHome();
+        this.renderProgress();
+        this.renderAchievements();
+        this.showToast('Backup succesvol hersteld!', 'success');
     }
 };
 
 // Ensure we don't crash when running in a Node/test environment
 if (typeof document !== 'undefined' && document.getElementById('import-file')) {
     document.getElementById('import-file').addEventListener('change', (e) => app.handleFileSelect(e));
+    const restoreInput = document.getElementById('restore-file');
+    if (restoreInput) restoreInput.addEventListener('change', (e) => app.handleRestoreFileSelect(e));
 
     // Start app
     app.init();

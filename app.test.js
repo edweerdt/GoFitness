@@ -72,11 +72,60 @@ describe('DataStore', () => {
     it('should handle malformed JSON in localStorage gracefully without crashing', () => {
         // Put invalid JSON in localStorage
         mockLocalStorage.setItem('plans', 'invalid json data');
+        mockLocalStorage.setItem('logs', '{not valid');
 
-        // Ensure parsing invalid json throws as normal
+        let store;
         expect(() => {
-            new DataStore();
-        }).toThrow(SyntaxError);
+            store = new DataStore();
+        }).not.toThrow();
+
+        // Corrupte keys vallen terug op de standaardwaarde
+        expect(store.plans).toEqual([]);
+        expect(store.logs).toEqual([]);
+        expect(store.theme).toBe('auto');
+    });
+
+    it('should remove activePlanId from localStorage when it is cleared', () => {
+        const store = new DataStore();
+        store.activePlanId = 'plan_1';
+        store.save();
+        expect(mockLocalStorage.store['activePlanId']).toBe('plan_1');
+
+        // Actief plan verwijderd -> id moet ook uit localStorage verdwijnen
+        store.activePlanId = null;
+        store.save();
+        expect(mockLocalStorage.getItem('activePlanId')).toBeNull();
+    });
+
+    describe('restoreBackup', () => {
+        it('should replace plans and logs and pick a valid active plan', () => {
+            const store = new DataStore();
+            store.plans = [{ id: 'plan_old', name: 'Oud' }];
+            store.activePlanId = 'plan_old';
+            store.logs = [{ id: 'log_old' }];
+
+            store.restoreBackup({
+                plans: [{ id: 'plan_new', name: 'Nieuw' }],
+                logs: [{ id: 'log_new' }, { id: 'log_new2' }]
+            });
+
+            expect(store.plans).toEqual([{ id: 'plan_new', name: 'Nieuw' }]);
+            expect(store.logs).toHaveLength(2);
+            // Oude activePlanId bestaat niet meer -> eerste plan uit de backup wordt actief
+            expect(store.activePlanId).toBe('plan_new');
+            expect(mockLocalStorage.store['plans']).toContain('plan_new');
+        });
+
+        it('should clear the active plan when the backup contains no plans', () => {
+            const store = new DataStore();
+            store.plans = [{ id: 'plan_old' }];
+            store.activePlanId = 'plan_old';
+
+            store.restoreBackup({ plans: [], logs: [] });
+
+            expect(store.activePlanId).toBeNull();
+            expect(mockLocalStorage.getItem('activePlanId')).toBeNull();
+        });
     });
 
     describe('saveActiveWorkoutState', () => {
@@ -212,10 +261,137 @@ describe('app logic', () => {
             expect(app.calculateStreak()).toBe(0);
         });
 
-        it('should return 1 when there are logs', () => {
-            store.logs = [{ id: 'log1' }];
+        it('should return 1 when there is only a workout in the current week', () => {
+            store.logs = [{ id: 'log1', date: new Date().toISOString() }];
             expect(app.calculateStreak()).toBe(1);
         });
+
+        it('should count consecutive training weeks', () => {
+            const now = new Date();
+            const lastWeek = new Date(now); lastWeek.setDate(now.getDate() - 7);
+            const twoWeeksAgo = new Date(now); twoWeeksAgo.setDate(now.getDate() - 14);
+            store.logs = [
+                { date: twoWeeksAgo.toISOString() },
+                { date: lastWeek.toISOString() },
+                { date: now.toISOString() }
+            ];
+            expect(app.calculateStreak()).toBe(3);
+        });
+
+        it('should keep the streak alive when this week has no workout yet', () => {
+            const now = new Date();
+            const lastWeek = new Date(now); lastWeek.setDate(now.getDate() - 7);
+            const twoWeeksAgo = new Date(now); twoWeeksAgo.setDate(now.getDate() - 14);
+            store.logs = [
+                { date: twoWeeksAgo.toISOString() },
+                { date: lastWeek.toISOString() }
+            ];
+            expect(app.calculateStreak()).toBe(2);
+        });
+
+        it('should break the streak when a week is skipped', () => {
+            const now = new Date();
+            const threeWeeksAgo = new Date(now); threeWeeksAgo.setDate(now.getDate() - 21);
+            store.logs = [
+                { date: threeWeeksAgo.toISOString() },
+                { date: now.toISOString() }
+            ];
+            expect(app.calculateStreak()).toBe(1);
+        });
+    });
+});
+
+describe('rest timer', () => {
+    beforeEach(() => {
+        jest.useFakeTimers();
+        document.body.innerHTML = `
+            <div id="rest-timer" class="hidden"><span id="rest-timer-label"></span></div>
+            <div id="toast-container"></div>
+        `;
+    });
+
+    afterEach(() => {
+        app.stopRestTimer();
+        jest.useRealTimers();
+    });
+
+    it('should show a countdown and hide itself when the rest is over', () => {
+        app.startRestTimer(90);
+        const el = document.getElementById('rest-timer');
+        const label = document.getElementById('rest-timer-label');
+
+        expect(el.classList.contains('hidden')).toBe(false);
+        expect(label.textContent).toBe('Rust: 1:30');
+
+        jest.advanceTimersByTime(1000);
+        expect(label.textContent).toBe('Rust: 1:29');
+
+        jest.advanceTimersByTime(89000);
+        expect(el.classList.contains('hidden')).toBe(true);
+        expect(app.restTimer).toBeNull();
+    });
+
+    it('should be cancellable via stopRestTimer', () => {
+        app.startRestTimer(60);
+        app.stopRestTimer();
+
+        expect(document.getElementById('rest-timer').classList.contains('hidden')).toBe(true);
+        expect(app.restTimer).toBeNull();
+    });
+
+    it('should restart the countdown when a new set is completed', () => {
+        app.startRestTimer(60);
+        jest.advanceTimersByTime(30000);
+        expect(document.getElementById('rest-timer-label').textContent).toBe('Rust: 0:30');
+
+        app.startRestTimer(60);
+        expect(document.getElementById('rest-timer-label').textContent).toBe('Rust: 1:00');
+    });
+});
+
+describe('validateBackup', () => {
+    it('should accept a valid backup with plans and logs', () => {
+        const result = app.validateBackup({ plans: [{ id: 'p1' }], logs: [], exportDate: '2026-01-01' });
+        expect(result).toEqual({ plans: [{ id: 'p1' }], logs: [] });
+    });
+
+    it('should reject data without plans or logs arrays', () => {
+        expect(() => app.validateBackup(null)).toThrow();
+        expect(() => app.validateBackup({})).toThrow();
+        expect(() => app.validateBackup({ plans: 'geen array', logs: [] })).toThrow();
+        expect(() => app.validateBackup({ plans: [], logs: 'geen array' })).toThrow();
+    });
+});
+
+describe('app achievements', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [];
+        document.body.innerHTML = '<div id="achievements-grid"></div>';
+    });
+
+    it('should unlock the rhythm achievement for 4 consecutive weeks across a year boundary', () => {
+        // 4 opeenvolgende maandagen over de jaargrens 2025 -> 2026
+        store.logs = [
+            { date: new Date(2025, 11, 15).toISOString(), duration: 45 },
+            { date: new Date(2025, 11, 22).toISOString(), duration: 45 },
+            { date: new Date(2025, 11, 29).toISOString(), duration: 45 },
+            { date: new Date(2026, 0, 5).toISOString(), duration: 45 }
+        ];
+        app.renderAchievements();
+        expect(document.getElementById('achievements-grid').innerHTML).toContain('Vast in het Ritme');
+    });
+
+    it('should not unlock the rhythm achievement when a week is skipped', () => {
+        store.logs = [
+            { date: new Date(2025, 11, 8).toISOString(), duration: 45 },
+            { date: new Date(2025, 11, 15).toISOString(), duration: 45 },
+            { date: new Date(2025, 11, 29).toISOString(), duration: 45 },
+            { date: new Date(2026, 0, 5).toISOString(), duration: 45 }
+        ];
+        app.renderAchievements();
+        expect(document.getElementById('achievements-grid').innerHTML).not.toContain('Vast in het Ritme');
     });
 });
 
@@ -232,5 +408,28 @@ describe('app XSS Security', () => {
         expect(result).toContain('&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;');
         expect(result).not.toContain('<style>');
         expect(result).toContain('&lt;style&gt;body{display:none}&lt;/style&gt;');
+    });
+
+    it('should escape malicious imported plan fields when rendering plans', () => {
+        document.body.innerHTML = '<div id="plans-list"></div>';
+        store.plans = [{
+            id: 'p1',
+            name: 'Kwaadaardig Plan',
+            description: '<img src=x onerror="alert(1)">',
+            goal: '<script>alert(2)</script>',
+            level: '<b onmouseover=alert(3)>pro</b>',
+            equipment: ['<iframe src=x>'],
+            sessions: [{ id: 's1', name: '<svg onload=alert(4)>', exercises: [] }]
+        }];
+        store.activePlanId = 'p1';
+
+        app.renderPlans();
+
+        const html = document.getElementById('plans-list').innerHTML;
+        expect(html).not.toContain('<img');
+        expect(html).not.toContain('<script>');
+        expect(html).not.toContain('<iframe');
+        expect(html).not.toContain('<svg');
+        expect(html).toContain('&lt;script&gt;alert(2)&lt;/script&gt;');
     });
 });
