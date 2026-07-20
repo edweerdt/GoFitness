@@ -507,14 +507,14 @@ const app = {
 
             el.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <div style="flex:1;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0;">${this.escapeHTML(p.name)}</h3>
+                    <div style="flex:1; min-width:0;">
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0; overflow-wrap:anywhere;">${this.escapeHTML(p.name)}</h3>
                             ${level}
                         </div>
                         ${desc}
                     </div>
-                    <div style="display:flex; align-items:center; gap:8px; margin-left:12px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-left:12px; flex-shrink:0;">
                         ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
                         <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${p.id}')" title="Schema delen">ios_share</span>
                         <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${p.id}')">delete_outline</span>

@@ -47,6 +47,7 @@ body {
 #main-content {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden; /* Voorkom horizontale overflow (bijv. door brede knoprijen) */
     position: relative;
 }
 
@@ -186,7 +187,20 @@ button:disabled {
 
 .actions-row {
     display: flex;
-    gap: 12px;
+    gap: 10px;
+}
+
+/* Knoppen in een actierij gelijkmatig verdelen en op één regel houden */
+.actions-row .btn-secondary {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 8px;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.actions-row .btn-secondary .material-icons-round {
+    font-size: 1.15rem;
 }
 
 /* Stat Boxes */
