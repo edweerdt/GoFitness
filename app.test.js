@@ -72,11 +72,51 @@ describe('DataStore', () => {
     it('should handle malformed JSON in localStorage gracefully without crashing', () => {
         // Put invalid JSON in localStorage
         mockLocalStorage.setItem('plans', 'invalid json data');
+        mockLocalStorage.setItem('logs', '{broken}}}');
 
-        // Ensure parsing invalid json throws as normal
-        expect(() => {
-            new DataStore();
-        }).toThrow(SyntaxError);
+        // Spy on console.error to verify it logs the corruption
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        // Should NOT throw — graceful fallback to defaults
+        const store = new DataStore();
+
+        expect(store.plans).toEqual([]);
+        expect(store.logs).toEqual([]);
+        expect(store.activeWorkoutState).toBeNull();
+        expect(store.theme).toBe('auto');
+
+        // Verify corrupt keys were removed from localStorage
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('plans');
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('logs');
+
+        // Verify errors were logged
+        expect(consoleSpy).toHaveBeenCalled();
+
+        consoleSpy.mockRestore();
+    });
+
+    it('should recover partial data when only some localStorage keys are corrupt', () => {
+        // Valid plans, corrupt logs
+        const validPlans = [{ id: 'plan_1', name: 'Good Plan' }];
+        mockLocalStorage.setItem('plans', JSON.stringify(validPlans));
+        mockLocalStorage.setItem('logs', 'not valid json');
+        mockLocalStorage.setItem('theme', 'dark');
+
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        const store = new DataStore();
+
+        // Valid data should be loaded correctly
+        expect(store.plans).toEqual(validPlans);
+        expect(store.theme).toBe('dark');
+
+        // Corrupt data should fall back to defaults
+        expect(store.logs).toEqual([]);
+
+        // Only the corrupt key should be removed
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('logs');
+
+        consoleSpy.mockRestore();
     });
 
     describe('saveActiveWorkoutState', () => {
