@@ -72,14 +72,16 @@ describe('DataStore', () => {
     it('should handle malformed JSON in localStorage gracefully without crashing', () => {
         // Put invalid JSON in localStorage
         mockLocalStorage.setItem('plans', 'invalid json data');
-<<<<<<< HEAD
         mockLocalStorage.setItem('logs', '{broken}}}');
 
-        // Spy on console.error to verify it logs the corruption
-        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        // Spy on console.warn to verify it logs the corruption
+        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
         // Should NOT throw — graceful fallback to defaults
-        const store = new DataStore();
+        let store;
+        expect(() => {
+            store = new DataStore();
+        }).not.toThrow();
 
         expect(store.plans).toEqual([]);
         expect(store.logs).toEqual([]);
@@ -90,7 +92,7 @@ describe('DataStore', () => {
         expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('plans');
         expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('logs');
 
-        // Verify errors were logged
+        // Verify warnings were logged
         expect(consoleSpy).toHaveBeenCalled();
 
         consoleSpy.mockRestore();
@@ -103,7 +105,7 @@ describe('DataStore', () => {
         mockLocalStorage.setItem('logs', 'not valid json');
         mockLocalStorage.setItem('theme', 'dark');
 
-        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
         const store = new DataStore();
 
@@ -118,18 +120,6 @@ describe('DataStore', () => {
         expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('logs');
 
         consoleSpy.mockRestore();
-=======
-        mockLocalStorage.setItem('logs', '{not valid');
-
-        let store;
-        expect(() => {
-            store = new DataStore();
-        }).not.toThrow();
-
-        // Corrupte keys vallen terug op de standaardwaarde
-        expect(store.plans).toEqual([]);
-        expect(store.logs).toEqual([]);
-        expect(store.theme).toBe('auto');
     });
 
     it('should remove activePlanId from localStorage when it is cleared', () => {
@@ -173,7 +163,6 @@ describe('DataStore', () => {
             expect(store.activePlanId).toBeNull();
             expect(mockLocalStorage.getItem('activePlanId')).toBeNull();
         });
->>>>>>> origin/main
     });
 
     describe('saveActiveWorkoutState', () => {

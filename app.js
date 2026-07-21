@@ -14,15 +14,6 @@ class DataStore {
         }
     }
     load() {
-<<<<<<< HEAD
-        this.plans = this._safeJsonParse('plans', []);
-        this.activePlanId = localStorage.getItem('activePlanId') || null;
-        this.logs = this._safeJsonParse('logs', []);
-        this.activeWorkoutState = this._safeJsonParse('activeWorkoutState', null);
-        this.theme = localStorage.getItem('theme') || 'auto';
-    }
-    _safeJsonParse(key, fallback) {
-=======
         this.plans = this.safeParse('plans', []);
         this.activePlanId = localStorage.getItem('activePlanId') || null;
         this.logs = this.safeParse('logs', []);
@@ -31,17 +22,12 @@ class DataStore {
     }
     safeParse(key, fallback) {
         // Corrupte data in localStorage mag de app niet laten crashen bij het opstarten
->>>>>>> origin/main
         try {
             const raw = localStorage.getItem(key);
             return raw ? JSON.parse(raw) : fallback;
         } catch (e) {
-<<<<<<< HEAD
-            console.error(`Corrupt data in localStorage key "${key}", resetting to default.`, e);
-            localStorage.removeItem(key);
-=======
             console.warn(`Kon '${key}' niet lezen uit localStorage, standaardwaarde gebruikt.`, e);
->>>>>>> origin/main
+            localStorage.removeItem(key);
             return fallback;
         }
     }
