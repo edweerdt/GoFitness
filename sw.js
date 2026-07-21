@@ -1,12 +1,17 @@
-const CACHE_NAME = 'go-fitness-cache';
+// Versienummer ophogen bij wijzigingen aan de assets, zodat oude caches opgeruimd worden
+const CACHE_NAME = 'go-fitness-cache-v2';
 const ASSETS = [
     './',
     './index.html',
     './style.css',
     './app.js',
     './manifest.json',
-    'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
-    'https://fonts.googleapis.com/icon?family=Material+Icons+Round'
+    './fonts/fonts.css',
+    './fonts/inter-latin.woff2',
+    './fonts/material-icons-round.woff2',
+    './icons/icon-192.png',
+    './icons/icon-512.png',
+    './icons/icon-maskable-512.png'
 ];
 
 self.addEventListener('install', (e) => {

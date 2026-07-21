@@ -1,7 +1,8 @@
 {
-  "name": "app",
+  "name": "go-fitness",
   "version": "1.0.0",
-  "description": "**Go Fitness** is een slimme, rustige en overzichtelijke fitness-app (Progressive Web App) speciaal ontworpen voor (beginners in) krachttraining. Geen overvolle dashboards, geen voedingstracking en geen afleidende sociale functies. Gewoon een slimme coach die je helpt consistent te blijven.",
+  "private": true,
+  "description": "Slimme, rustige PWA voor krachttraining: schema-import, slim herstel, voortgang en achievements.",
   "main": "app.js",
   "scripts": {
     "test": "jest --env=jsdom"
@@ -11,7 +12,7 @@
     "url": "git+https://github.com/edweerdt/GoFitness.git"
   },
   "keywords": [],
-  "author": "",
+  "author": "edweerdt",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {

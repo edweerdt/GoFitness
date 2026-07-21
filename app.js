@@ -14,6 +14,7 @@ class DataStore {
         }
     }
     load() {
+<<<<<<< HEAD
         this.plans = this._safeJsonParse('plans', []);
         this.activePlanId = localStorage.getItem('activePlanId') || null;
         this.logs = this._safeJsonParse('logs', []);
@@ -21,18 +22,37 @@ class DataStore {
         this.theme = localStorage.getItem('theme') || 'auto';
     }
     _safeJsonParse(key, fallback) {
+=======
+        this.plans = this.safeParse('plans', []);
+        this.activePlanId = localStorage.getItem('activePlanId') || null;
+        this.logs = this.safeParse('logs', []);
+        this.activeWorkoutState = this.safeParse('activeWorkoutState', null);
+        this.theme = localStorage.getItem('theme') || 'auto';
+    }
+    safeParse(key, fallback) {
+        // Corrupte data in localStorage mag de app niet laten crashen bij het opstarten
+>>>>>>> origin/main
         try {
             const raw = localStorage.getItem(key);
             return raw ? JSON.parse(raw) : fallback;
         } catch (e) {
+<<<<<<< HEAD
             console.error(`Corrupt data in localStorage key "${key}", resetting to default.`, e);
             localStorage.removeItem(key);
+=======
+            console.warn(`Kon '${key}' niet lezen uit localStorage, standaardwaarde gebruikt.`, e);
+>>>>>>> origin/main
             return fallback;
         }
     }
     save() {
         localStorage.setItem('plans', JSON.stringify(this.plans));
-        if(this.activePlanId) localStorage.setItem('activePlanId', this.activePlanId);
+        if(this.activePlanId) {
+            localStorage.setItem('activePlanId', this.activePlanId);
+        } else {
+            // Anders blijft een verwijderd actief plan na een reload terugkomen
+            localStorage.removeItem('activePlanId');
+        }
         localStorage.setItem('logs', JSON.stringify(this.logs));
         localStorage.setItem('theme', this.theme);
     }
@@ -64,11 +84,11 @@ class DataStore {
 
         // Give ids to sessions and exercises if they don't have one
         planData.sessions.forEach(s => {
-            if (!s.id && !s.sessionId) s.id = 'sess_' + Math.random().toString(36).substr(2, 9);
+            if (!s.id && !s.sessionId) s.id = 'sess_' + Math.random().toString(36).slice(2, 11);
             else if (s.sessionId) s.id = s.sessionId;
             
             s.exercises.forEach(e => {
-                if (!e.id && !e.exerciseId) e.id = 'ex_' + Math.random().toString(36).substr(2, 9);
+                if (!e.id && !e.exerciseId) e.id = 'ex_' + Math.random().toString(36).slice(2, 11);
                 else if (e.exerciseId) e.id = e.exerciseId;
             });
         });
@@ -78,6 +98,15 @@ class DataStore {
     }
     saveWorkoutLog(log) {
         this.logs.push({ ...log, id: 'log_' + Date.now(), date: new Date().toISOString() });
+        this.save();
+    }
+    restoreBackup(backup) {
+        this.plans = backup.plans;
+        this.logs = backup.logs;
+        // De backup bevat geen activePlanId; kies een geldig plan als het huidige niet (meer) bestaat
+        if (!this.plans.find(p => p.id === this.activePlanId)) {
+            this.activePlanId = this.plans.length > 0 ? this.plans[0].id : null;
+        }
         this.save();
     }
 }
@@ -97,6 +126,13 @@ const app = {
         }
 
         this.applyTheme();
+
+        // Wake lock vervalt zodra de app naar de achtergrond gaat; vraag opnieuw aan
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && this.activeWorkout && this.currentView === 'workout') {
+                this.requestWakeLock();
+            }
+        });
 
         this.setupNavigation();
         this.renderHome();
@@ -195,28 +231,59 @@ const app = {
     getRecoveryStatus() {
         const plan = store.getActivePlan();
         if(!plan || store.logs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
-        
-        const lastLog = store.logs[store.logs.length - 1];
-        const hoursSinceLast = (new Date() - new Date(lastLog.date)) / (1000 * 60 * 60);
-        let minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
-        
-        // Check muscle group specific recovery
-        if (plan.recoveryRules && plan.recoveryRules.muscleGroupRecoveryHours && lastLog.exercises) {
-            let maxMuscleGroupRecovery = 0;
-            const recentSession = plan.sessions.find(s => s.id === lastLog.sessionId);
-            if (recentSession) {
-                recentSession.exercises.forEach(ex => {
-                    if (ex.muscleGroups) {
-                        ex.muscleGroups.forEach(mg => {
-                            if (plan.recoveryRules.muscleGroupRecoveryHours[mg]) {
-                                maxMuscleGroupRecovery = Math.max(maxMuscleGroupRecovery, plan.recoveryRules.muscleGroupRecoveryHours[mg]);
-                            }
-                        });
-                    }
-                });
-            }
-            if (maxMuscleGroupRecovery > minHours) minHours = maxMuscleGroupRecovery;
+
+        const minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
+        const now = new Date();
+
+        // Herstelregels per spiergroep, genormaliseerd op sleutel
+        const mgRules = {};
+        if (plan.recoveryRules && plan.recoveryRules.muscleGroupRecoveryHours) {
+            Object.entries(plan.recoveryRules.muscleGroupRecoveryHours).forEach(([k, v]) => {
+                mgRules[this.normalizeMuscleGroup(k)] = v;
+            });
         }
+
+        // Per spiergroep: wanneer voor het laatst getraind?
+        const lastTrained = {};
+        store.logs.forEach(log => {
+            if (!log.date || !log.exercises) return;
+            const t = new Date(log.date).getTime();
+            log.exercises.forEach(ex => {
+                (ex.muscleGroups || []).forEach(mg => {
+                    const g = this.normalizeMuscleGroup(mg);
+                    if (!lastTrained[g] || t > lastTrained[g]) lastTrained[g] = t;
+                });
+            });
+        });
+
+        // Spiergroepen die de eerstvolgende (aanbevolen) sessie traint
+        const rec = (plan.sessions && plan.sessions.length > 0) ? this.getRecommendedSession() : null;
+        const nextGroups = [];
+        if (rec && rec.session && rec.session.exercises) {
+            rec.session.exercises.forEach(ex => (ex.muscleGroups || []).forEach(mg => {
+                const g = this.normalizeMuscleGroup(mg);
+                if (!nextGroups.includes(g)) nextGroups.push(g);
+            }));
+        }
+
+        // Spiergroep-specifiek stoplicht: alleen de spiergroepen die de volgende sessie
+        // traint tellen mee. "Benen gisteren, push vandaag" mag dus gewoon groen zijn.
+        if (nextGroups.length > 0 && Object.keys(lastTrained).length > 0) {
+            let worstRatio = Infinity;
+            nextGroups.forEach(g => {
+                if (!lastTrained[g]) return; // nooit getraind -> hersteld
+                const hoursSince = (now - lastTrained[g]) / (1000 * 60 * 60);
+                const required = mgRules[g] || minHours;
+                worstRatio = Math.min(worstRatio, hoursSince / required);
+            });
+            if (worstRatio === Infinity || worstRatio >= 1) return { status: 'green', text: 'Klaar om te trainen' };
+            if (worstRatio < 0.5) return { status: 'red', text: 'Beter rusten' };
+            return { status: 'orange', text: 'Rustig aan' };
+        }
+
+        // Fallback zonder spiergroep-data: algemene rusttijd sinds de laatste sessie
+        const lastLog = store.logs[store.logs.length - 1];
+        const hoursSinceLast = (now - new Date(lastLog.date)) / (1000 * 60 * 60);
 
         if(hoursSinceLast < (minHours * 0.5)) return { status: 'red', text: 'Beter rusten' };
         if(hoursSinceLast < minHours) return { status: 'orange', text: 'Rustig aan' };
@@ -260,6 +327,35 @@ const app = {
     },
 
     // --- UTILS ---
+
+    // Normaliseert spiergroep-namen uit schema's (hoofdletters, synoniemen) naar de interne sleutels
+    normalizeMuscleGroup(mg) {
+        const key = String(mg).toLowerCase().trim();
+        const aliases = {
+            biceps: 'arms', triceps: 'arms', forearms: 'arms',
+            quads: 'legs', hamstrings: 'legs', calves: 'legs',
+            abs: 'core', lats: 'back', traps: 'back'
+        };
+        return aliases[key] || key;
+    },
+
+    // Fallback voor oude logs zonder muscleGroups: raad spiergroepen op basis van de oefennaam
+    guessMuscleGroupsFromName(name) {
+        const n = String(name || '').toLowerCase();
+        const groups = [];
+        if (n.includes('press') || n.includes('push') || n.includes('fly') || n.includes('dip')) {
+            if (n.includes('leg')) groups.push('legs');
+            else if (n.includes('shoulder') || n.includes('overhead') || n.includes('pike')) groups.push('shoulders');
+            else groups.push('chest');
+        }
+        if (n.includes('pull') || n.includes('row') || n.includes('chin') || n.includes('deadlift')) groups.push('back');
+        if (n.includes('squat') || n.includes('lunge') || (n.includes('extension') && n.includes('leg')) || (n.includes('curl') && n.includes('leg'))) groups.push('legs');
+        if (n.includes('thrust') || n.includes('bridge') || n.includes('kickback')) groups.push('glutes');
+        if (n.includes('plank') || n.includes('crunch') || (n.includes('raise') && n.includes('leg'))) groups.push('core');
+        if ((n.includes('curl') || n.includes('extension') || n.includes('skull')) && !n.includes('leg')) groups.push('arms');
+        return [...new Set(groups)];
+    },
+
     escapeHTML(str) {
         if (typeof str !== 'string') return str;
         return str.replace(/[&<>'"]/g,
@@ -337,14 +433,7 @@ const app = {
             document.getElementById('recommended-reason').textContent = "Je was al bezig met deze sessie. Pak hem weer op!";
             btnStart.textContent = "Hervat Nu";
             btnStart.disabled = false;
-            btnStart.onclick = () => {
-                document.getElementById('workout-title').textContent = this.activeWorkout.session.name;
-                this.renderWorkoutExercises();
-                document.getElementById('btn-finish-workout').onclick = () => this.showFinishModal();
-                document.getElementById('bottom-nav').classList.add('hidden');
-                document.getElementById('view-workout').querySelector('.sticky-footer').style.bottom = '0';
-                this.navigate('workout');
-            };
+            btnStart.onclick = () => this.openWorkoutView();
         } else {
             document.getElementById('recommended-card-title').textContent = "Aanbevolen Sessie";
             const recSession = this.getRecommendedSession();
@@ -368,31 +457,28 @@ const app = {
 
         // Target sessions per week progress
         const plan = store.getActivePlan();
-        if (plan) {
-            const targetSessions = (plan.schedule && plan.schedule.targetSessionsPerWeek) ? plan.schedule.targetSessionsPerWeek : plan.targetSessionsPerWeek;
-            if (targetSessions) {
-                const oneWeekAgo = new Date();
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-                const oneWeekAgoStr = oneWeekAgo.toISOString();
-                const recentLogsCount = store.logs.filter(l => l.date > oneWeekAgoStr && l.planId === plan.id).length;
+        const targetSessions = plan ? ((plan.schedule && plan.schedule.targetSessionsPerWeek) ? plan.schedule.targetSessionsPerWeek : plan.targetSessionsPerWeek) : null;
+        let existingProgress = document.getElementById('home-weekly-progress');
+        if (plan && targetSessions) {
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            const oneWeekAgoStr = oneWeekAgo.toISOString();
+            const recentLogsCount = store.logs.filter(l => l.date > oneWeekAgoStr && l.planId === plan.id).length;
 
-                let progressText = `${recentLogsCount}/${targetSessions} sessies deze week`;
-                const progressDiv = document.createElement('div');
-                progressDiv.className = 'text-sm text-muted mt-2';
-                progressDiv.style.textAlign = 'center';
-                progressDiv.textContent = progressText;
+            const progressText = `${recentLogsCount}/${targetSessions} sessies deze week`;
 
-                // Add or update progress text under the streak stats
-                const statsMini = document.querySelector('.stats-mini');
-                let existingProgress = document.getElementById('home-weekly-progress');
-                if (!existingProgress) {
-                    existingProgress = document.createElement('div');
-                    existingProgress.id = 'home-weekly-progress';
-                    existingProgress.style.gridColumn = '1 / -1';
-                    statsMini.appendChild(existingProgress);
-                }
-                existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${progressText}</div>`;
+            // Add or update progress text under the streak stats
+            const statsMini = document.querySelector('.stats-mini');
+            if (!existingProgress) {
+                existingProgress = document.createElement('div');
+                existingProgress.id = 'home-weekly-progress';
+                existingProgress.style.gridColumn = '1 / -1';
+                statsMini.appendChild(existingProgress);
             }
+            existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${this.escapeHTML(progressText)}</div>`;
+        } else if (existingProgress) {
+            // Geen (plan met) weekdoel meer -> oude voortgangsbalk opruimen
+            existingProgress.remove();
         }
     },
 
@@ -415,20 +501,20 @@ const app = {
             descriptionText = descriptionText.split(/Voltooiingsregels/i)[0];
             descriptionText = descriptionText.split(/Mijlpalen/i)[0];
             descriptionText = descriptionText.trim();
-            const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${descriptionText}</p>` : '';
-            const recPattern = sched.recommendedPattern || p.recommendedPattern ? 
-                `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${sched.recommendedPattern || p.recommendedPattern}</div>` : '';
-            const recovery = sched.minRecoveryHours || p.minRecoveryHours ? 
-                `<div class="text-sm text-muted"><strong>Herstel:</strong> Minimaal ${sched.minRecoveryHours || p.minRecoveryHours} uur</div>` : '';
-            const weeklyMins = p.estimatedWeeklyMinutes ? 
-                `<div class="text-sm text-muted"><strong>Geschatte tijd per week:</strong> ${p.estimatedWeeklyMinutes} min</div>` : '';
-            const sessionOrder = p.defaultSessionOrder ? 
-                `<div class="text-sm text-muted mt-1"><strong>Sessie volgorde:</strong> ${p.defaultSessionOrder.join(', ')}</div>` : 
-                (p.sessions ? `<div class="text-sm text-muted mt-1"><strong>Sessies:</strong> ${p.sessions.map(s=>s.name).join(', ')}</div>` : '');
+            const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${this.escapeHTML(descriptionText)}</p>` : '';
+            const recPattern = sched.recommendedPattern || p.recommendedPattern ?
+                `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${this.escapeHTML(String(sched.recommendedPattern || p.recommendedPattern))}</div>` : '';
+            const recovery = sched.minRecoveryHours || p.minRecoveryHours ?
+                `<div class="text-sm text-muted"><strong>Herstel:</strong> Minimaal ${this.escapeHTML(String(sched.minRecoveryHours || p.minRecoveryHours))} uur</div>` : '';
+            const weeklyMins = p.estimatedWeeklyMinutes ?
+                `<div class="text-sm text-muted"><strong>Geschatte tijd per week:</strong> ${this.escapeHTML(String(p.estimatedWeeklyMinutes))} min</div>` : '';
+            const sessionOrder = p.defaultSessionOrder ?
+                `<div class="text-sm text-muted mt-1"><strong>Sessie volgorde:</strong> ${this.escapeHTML(p.defaultSessionOrder.join(', '))}</div>` :
+                (p.sessions ? `<div class="text-sm text-muted mt-1"><strong>Sessies:</strong> ${this.escapeHTML(p.sessions.map(s=>s.name).join(', '))}</div>` : '');
 
-            const level = p.level ? `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${p.level}</span>` : '';
-            const goal = p.goal ? `<div class="text-sm text-muted"><strong>Doel:</strong> ${p.goal}</div>` : '';
-            const equipment = p.equipment && p.equipment.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${p.equipment.join(', ')}</div>` : '';
+            const level = p.level ? `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${this.escapeHTML(String(p.level))}</span>` : '';
+            const goal = p.goal ? `<div class="text-sm text-muted"><strong>Doel:</strong> ${this.escapeHTML(String(p.goal))}</div>` : '';
+            const equipment = p.equipment && p.equipment.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${this.escapeHTML(p.equipment.join(', '))}</div>` : '';
 
             const scheduleInfo = this.formatRichField(p.schedule, 'Schema Regels');
             const progressionRules = this.formatRichField(p.progressionRules, 'Progressieregels');
@@ -436,15 +522,16 @@ const app = {
 
             el.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <div style="flex:1;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0;">${this.escapeHTML(p.name)}</h3>
+                    <div style="flex:1; min-width:0;">
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0; overflow-wrap:anywhere;">${this.escapeHTML(p.name)}</h3>
                             ${level}
                         </div>
                         ${desc}
                     </div>
-                    <div style="display:flex; align-items:center; gap:8px; margin-left:12px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-left:12px; flex-shrink:0;">
                         ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
+                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${p.id}')" title="Schema delen">ios_share</span>
                         <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${p.id}')">delete_outline</span>
                     </div>
                 </div>
@@ -454,7 +541,7 @@ const app = {
                         <div style="font-weight:600; font-size:0.85rem; color:var(--accent-color);">DETAILS</div>
                         <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
                     </div>
-                    <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${targetSessions}x per week (${p.sessions.length} unieke sessies)</div>
+                    <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${this.escapeHTML(String(targetSessions))}x per week (${p.sessions.length} unieke sessies)</div>
                     ${goal}
                 </div>
 
@@ -490,8 +577,138 @@ const app = {
             <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalMinutes}</span><span class="stat-label">Minuten</span></div></div>
             <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalExercises}</span><span class="stat-label">Oefeningen</span></div></div>
         `;
+        this.renderExerciseProgress();
         this.renderMuscleStats();
         this.renderHistory();
+    },
+
+    // Bouwt per oefening een reeks (datum, max gewicht) uit de logs
+    getExerciseProgressSeries() {
+        const series = {};
+        store.logs.forEach(log => {
+            if (!log.exercises || !log.date) return;
+            log.exercises.forEach(ex => {
+                let maxWeight = 0;
+                let bestSet = null;
+                (ex.details || []).forEach(d => {
+                    const w = parseFloat(d.weight);
+                    if (!isNaN(w) && w > maxWeight) {
+                        maxWeight = w;
+                        bestSet = d;
+                    }
+                });
+                if (maxWeight <= 0) return;
+
+                const key = String(ex.name).toLowerCase().trim();
+                if (!series[key]) series[key] = { name: ex.name, points: [] };
+                series[key].points.push({ date: log.date, weight: maxWeight, reps: parseInt(bestSet.reps) || 0 });
+            });
+        });
+
+        // Alleen oefeningen met minstens 2 metingen, punten op datumvolgorde
+        return Object.values(series)
+            .map(s => ({ ...s, points: [...s.points].sort((a, b) => (a.date < b.date ? -1 : 1)) }))
+            .filter(s => s.points.length >= 2);
+    },
+
+    // Epley-formule: geschat 1-rep-max op basis van gewicht en herhalingen
+    estimate1RM(weight, reps) {
+        if (!(weight > 0) || !(reps > 0)) return null;
+        if (reps === 1) return weight;
+        return weight * (1 + reps / 30);
+    },
+
+    buildSparklineSVG(points) {
+        // Vaste viewBox met behoud van verhouding, zodat de gewichtslabels niet vervormen
+        const w = 320, h = 96;
+        const padX = 26, padTop = 20, padBottom = 14;
+        const weights = points.map(p => p.weight);
+        const min = Math.min(...weights);
+        const max = Math.max(...weights);
+        const range = (max - min) || 1;
+        const step = points.length > 1 ? (w - padX * 2) / (points.length - 1) : 0;
+
+        const coords = points.map((p, i) => {
+            const x = padX + i * step;
+            const y = h - padBottom - ((p.weight - min) / range) * (h - padTop - padBottom);
+            return { x, y, weight: p.weight };
+        });
+
+        // Bij veel metingen alle labels tonen wordt te druk: dan alleen eerste, laatste en de piek
+        const showAll = points.length <= 6;
+        const maxIdx = weights.indexOf(max);
+        const labelIdx = showAll
+            ? points.map((_, i) => i)
+            : [...new Set([0, maxIdx, points.length - 1])];
+
+        const line = `<polyline points="${coords.map(c => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ')}" fill="none" stroke="var(--accent-color)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+        const dots = coords.map(c =>
+            `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="3" fill="var(--accent-color)"/>`
+        ).join('');
+
+        const labels = labelIdx.map(i => {
+            const c = coords[i];
+            // Labels aan de randen naar binnen uitlijnen zodat ze binnen de viewBox blijven
+            let anchor = 'middle';
+            if (i === 0 && points.length > 1) anchor = 'start';
+            else if (i === points.length - 1) anchor = 'end';
+            // Piek onderin het bereik? Label dan onder de punt tekenen i.p.v. erboven
+            const above = c.y > padTop + 6;
+            const ly = above ? c.y - 7 : c.y + 13;
+            return `<text x="${c.x.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anchor}" font-size="12" font-weight="600" fill="var(--text-primary)">${this.escapeHTML(String(c.weight))}</text>`;
+        }).join('');
+
+        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:auto; display:block; overflow:visible;">
+            ${line}${dots}${labels}
+        </svg>`;
+    },
+
+    renderExerciseProgress() {
+        const container = document.getElementById('exercise-progress-list');
+        if (!container) return;
+
+        const series = this.getExerciseProgressSeries();
+        if (series.length === 0) {
+            container.innerHTML = '<p class="text-muted text-sm">Log minimaal twee sessies met gewichten om je progressie te zien.</p>';
+            return;
+        }
+
+        // Meest gelogde oefeningen bovenaan, maximaal 8 grafieken
+        series.sort((a, b) => b.points.length - a.points.length);
+
+        let html = '';
+        series.slice(0, 8).forEach(s => {
+            const first = s.points[0].weight;
+            const last = s.points[s.points.length - 1].weight;
+            const diff = Math.round((last - first) * 10) / 10;
+            const diffText = diff === 0 ? 'gelijk' : (diff > 0 ? `+${diff} kg` : `${diff} kg`);
+            const diffColor = diff > 0 ? 'var(--status-green)' : (diff < 0 ? 'var(--status-red)' : 'var(--text-muted)');
+
+            // Beste geschatte 1RM over alle sessies van deze oefening
+            let best1RM = 0;
+            s.points.forEach(p => {
+                const est = this.estimate1RM(p.weight, p.reps);
+                if (est && est > best1RM) best1RM = est;
+            });
+            const rmHtml = best1RM > 0 ? `<span>Geschat 1RM: ${Math.round(best1RM)} kg</span>` : '';
+
+            html += `
+                <div class="glass-panel" style="padding: 12px 16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+                        <div style="font-weight:600; font-size:0.9rem;">${this.escapeHTML(String(s.name))}</div>
+                        <div class="text-sm" style="color:${diffColor}; white-space:nowrap;">${diffText}</div>
+                    </div>
+                    <div class="mt-2">${this.buildSparklineSVG(s.points)}</div>
+                    <div class="text-sm text-muted" style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+                        <span>${s.points.length} sessies</span>
+                        ${rmHtml}
+                        <span>Laatst: ${last} kg</span>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
     },
 
     renderMuscleStats() {
@@ -538,6 +755,8 @@ const app = {
                     if (!muscles || muscles.length === 0) {
                         muscles = fallbackMap[ex.name] || ['overig'];
                     }
+                    // Normaliseren zodat 'Chest' en 'chest' (en synoniemen) samen tellen
+                    muscles = [...new Set(muscles.map(m => this.normalizeMuscleGroup(m)))];
 
                     muscles.forEach(m => {
                         sessionMuscles.add(m);
@@ -583,7 +802,7 @@ const app = {
                         <div class="stat-icon-wrapper" style="width:36px; height:36px; padding:6px; background:rgba(255,255,255,0.05); color:${meta.color};">
                             <span class="material-icons-round" style="font-size:18px;">${meta.icon}</span>
                         </div>
-                        <div style="font-weight:600; font-size:1rem;">${meta.name}</div>
+                        <div style="font-weight:600; font-size:1rem;">${this.escapeHTML(meta.name)}</div>
                     </div>
                     <div class="text-muted text-sm" style="display:flex; flex-direction:column; gap:4px;">
                         <div style="display:flex; justify-content:space-between; gap:8px;">
@@ -674,73 +893,63 @@ const app = {
                 if (diffDays > 1.5 && diffDays <= 2.5) allAchievements.find(a => a.id === 'golden_path').unlocked = true;
             }
 
-            const year = d.getFullYear();
-            const week = Math.ceil((d - new Date(year, 0, 1)) / (1000 * 60 * 60 * 24) / 7);
-            const wKey = year + '-' + week;
-            weeksMap[wKey] = (weeksMap[wKey] || 0) + 1;
+            // Weekstart (maandag) als sleutel, zodat de jaargrens geen rol speelt
+            weeksMap[this.getWeekStart(d)] = true;
 
             lastDate = d;
 
             if (log.exercises && log.exercises.length > 0) {
-                let chestCount=0, backCount=0, shoulderCount=0, legCount=0, gluteCount=0, coreCount=0, armCount=0, bwCount=0, weightCount=0;
-                
+                // Tel per spiergroep via de schema-metadata; alleen bij oude logs zonder
+                // muscleGroups vallen we terug op naam-herkenning
+                const groupCounts = {};
+                let bwCount = 0, weightCount = 0;
+
                 log.exercises.forEach(ex => {
-                    const n = ex.name.toLowerCase();
-                    if (n.includes('press') || n.includes('push') || n.includes('fly') || n.includes('dip')) {
-                        if (n.includes('leg')) legCount++;
-                        else if (n.includes('shoulder') || n.includes('overhead') || n.includes('pike')) shoulderCount++;
-                        else chestCount++;
-                    }
-                    if (n.includes('pull') || n.includes('row') || n.includes('chin') || n.includes('deadlift')) backCount++;
-                    if (n.includes('squat') || n.includes('lunge') || n.includes('extension') || n.includes('curl') && n.includes('leg')) legCount++;
-                    if (n.includes('thrust') || n.includes('bridge') || n.includes('kickback')) gluteCount++;
-                    if (n.includes('plank') || n.includes('crunch') || n.includes('raise') && n.includes('leg')) coreCount++;
-                    if (n.includes('curl') || n.includes('extension') || n.includes('skull')) {
-                        if (!n.includes('leg')) armCount++;
-                    }
-                    
-                    if (n.includes('push-up') || n.includes('pull-up') || n.includes('dip') || n.includes('plank') || n.includes('squat') && !n.includes('barbell')) bwCount++;
-                    if (n.includes('barbell') || n.includes('dumbbell') || n.includes('machine') || n.includes('cable')) weightCount++;
+                    const groups = (ex.muscleGroups && ex.muscleGroups.length > 0)
+                        ? [...new Set(ex.muscleGroups.map(mg => this.normalizeMuscleGroup(mg)))]
+                        : this.guessMuscleGroupsFromName(ex.name);
+                    groups.forEach(g => groupCounts[g] = (groupCounts[g] || 0) + 1);
+
+                    // Gewicht gelogd? Dan telt de oefening als krachtwerk, anders als bodyweight
+                    const hasWeight = ex.details && ex.details.some(d => parseFloat(d.weight) > 0);
+                    if (hasWeight) weightCount++;
+                    else bwCount++;
                 });
 
-                if (chestCount >= 3) allAchievements.find(a => a.id === 'chest').unlocked = true;
-                if (backCount >= 3) allAchievements.find(a => a.id === 'back').unlocked = true;
-                if (shoulderCount >= 3) allAchievements.find(a => a.id === 'shoulders').unlocked = true;
-                if (legCount >= 3) allAchievements.find(a => a.id === 'legs').unlocked = true;
-                if (gluteCount >= 2) allAchievements.find(a => a.id === 'glutes').unlocked = true;
-                if (coreCount >= 3) allAchievements.find(a => a.id === 'core').unlocked = true;
-                if (armCount >= 3) allAchievements.find(a => a.id === 'arms').unlocked = true;
+                if ((groupCounts['chest'] || 0) >= 3) allAchievements.find(a => a.id === 'chest').unlocked = true;
+                if ((groupCounts['back'] || 0) >= 3) allAchievements.find(a => a.id === 'back').unlocked = true;
+                if ((groupCounts['shoulders'] || 0) >= 3) allAchievements.find(a => a.id === 'shoulders').unlocked = true;
+                if ((groupCounts['legs'] || 0) >= 3) allAchievements.find(a => a.id === 'legs').unlocked = true;
+                if ((groupCounts['glutes'] || 0) >= 2) allAchievements.find(a => a.id === 'glutes').unlocked = true;
+                if ((groupCounts['core'] || 0) >= 3) allAchievements.find(a => a.id === 'core').unlocked = true;
+                if ((groupCounts['arms'] || 0) >= 3) allAchievements.find(a => a.id === 'arms').unlocked = true;
 
                 if (bwCount > weightCount && bwCount >= 3) allAchievements.find(a => a.id === 'calisthenics').unlocked = true;
                 if (weightCount > bwCount && weightCount >= 3) allAchievements.find(a => a.id === 'iron').unlocked = true;
             }
         });
 
-        let consecutiveWeeks = 0;
-        let weekKeys = Object.keys(weeksMap).sort();
-        for(let i=1; i<weekKeys.length; i++) {
-            const currentW = parseInt(weekKeys[i].split('-')[1]);
-            const prevW = parseInt(weekKeys[i-1].split('-')[1]);
-            if (currentW === prevW + 1) consecutiveWeeks++;
-            else consecutiveWeeks = 0;
-            if (consecutiveWeeks >= 3) allAchievements.find(a => a.id === 'rhythm').unlocked = true;
+        // 4 weken op rij getraind: opeenvolgende weekstarts liggen exact 1 week uit elkaar
+        const weekStarts = Object.keys(weeksMap).map(Number).sort((a, b) => a - b);
+        let consecutiveWeeks = 1;
+        for(let i=1; i<weekStarts.length; i++) {
+            const expectedNext = new Date(weekStarts[i-1]);
+            expectedNext.setDate(expectedNext.getDate() + 7);
+            if (expectedNext.getTime() === weekStarts[i]) consecutiveWeeks++;
+            else consecutiveWeeks = 1;
+            if (consecutiveWeeks >= 4) allAchievements.find(a => a.id === 'rhythm').unlocked = true;
         }
 
-        // Render grid
+        // Render grid: behaalde badges eerst, daarna de nog te verdienen (vergrijsd)
         grid.innerHTML = '';
-        
-        const unlockedAchievements = allAchievements.filter(ach => ach.unlocked);
-        
-        if (unlockedAchievements.length === 0) {
-            grid.style.display = 'block';
-            grid.innerHTML = '<div class="glass-panel text-center text-muted" style="padding: 32px 16px;">Nog geen achievements behaald.<br>Voltooi een training om je eerste badge vrij te spelen!</div>';
-            return;
-        }
-        
         grid.style.display = 'grid';
-        unlockedAchievements.forEach(ach => {
+
+        const sortedAchievements = [...allAchievements].sort((a, b) => (b.unlocked ? 1 : 0) - (a.unlocked ? 1 : 0));
+
+        sortedAchievements.forEach(ach => {
             const el = document.createElement('div');
-            el.className = 'glass-panel';
+            el.className = `glass-panel achievement ${ach.unlocked ? 'unlocked' : 'locked'}`;
+            el.dataset.achievementId = ach.id;
             el.style.textAlign = 'center';
             el.style.padding = '16px';
             el.style.display = 'flex';
@@ -751,7 +960,7 @@ const app = {
 
             el.innerHTML = `
                 <div class="stat-icon-wrapper text-accent" style="width:48px; height:48px; margin: 0 auto; background:rgba(59, 130, 246, 0.2);">
-                    <span class="material-icons-round">${ach.icon}</span>
+                    <span class="material-icons-round">${ach.unlocked ? ach.icon : 'lock'}</span>
                 </div>
                 <div style="font-weight:600; font-size:0.85rem; line-height:1.2; margin-top:4px;">${ach.title}</div>
                 <div class="text-sm text-muted" style="font-size:0.7rem; line-height:1.3;">${ach.desc}</div>
@@ -805,7 +1014,7 @@ const app = {
                                 let text = `Set ${d.setNumber}:`;
                                 if (d.weight) text += ` ${d.weight}kg`;
                                 if (d.reps) text += ` x ${d.reps}`;
-                                exDetails.push(text);
+                                exDetails.push(app.escapeHTML(text));
                             });
                         }
                         
@@ -842,7 +1051,7 @@ const app = {
                 el.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
                         <div>
-                            <div style="font-weight:600;">${log.sessionName || 'Sessie'}</div>
+                            <div style="font-weight:600;">${app.escapeHTML(log.sessionName || 'Sessie')}</div>
                             <div class="text-sm text-muted">${dateStr} • ${log.duration} min • ${log.exercisesCompleted} oefeningen</div>
                         </div>
                         <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
@@ -896,9 +1105,36 @@ const app = {
         }
     },
 
+    // Geeft de timestamp van maandag 00:00 van de week waarin `date` valt
+    getWeekStart(date) {
+        const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const day = (d.getDay() + 6) % 7; // maandag = 0, zondag = 6
+        d.setDate(d.getDate() - day);
+        return d.getTime();
+    },
+
     calculateStreak() {
         if(store.logs.length === 0) return 0;
-        return 1; // Simplified for MVP
+
+        const trainedWeeks = new Set();
+        store.logs.forEach(log => {
+            if (log.date) trainedWeeks.add(this.getWeekStart(new Date(log.date)));
+        });
+        if (trainedWeeks.size === 0) return 0;
+
+        // Start in de huidige week; nog niet getraind deze week? Dan telt een
+        // streak t/m vorige week nog gewoon door.
+        const cursor = new Date(this.getWeekStart(new Date()));
+        if (!trainedWeeks.has(cursor.getTime())) {
+            cursor.setDate(cursor.getDate() - 7);
+        }
+
+        let streak = 0;
+        while (trainedWeeks.has(cursor.getTime())) {
+            streak++;
+            cursor.setDate(cursor.getDate() - 7);
+        }
+        return streak;
     },
 
     // --- WORKOUT FLOW ---
@@ -915,15 +1151,20 @@ const app = {
             }))
         };
         store.saveActiveWorkoutState(this.activeWorkout);
-        
-        document.getElementById('workout-title').textContent = session.name;
+        this.openWorkoutView();
+    },
+
+    // Opent de workout-view voor de actieve workout (zowel starten als hervatten)
+    openWorkoutView() {
+        document.getElementById('workout-title').textContent = this.activeWorkout.session.name;
         this.renderWorkoutExercises();
-        
+
         document.getElementById('btn-finish-workout').onclick = () => this.showFinishModal();
-        
+
         document.getElementById('bottom-nav').classList.add('hidden');
         document.getElementById('view-workout').querySelector('.sticky-footer').style.bottom = '0';
-        
+
+        this.requestWakeLock();
         this.navigate('workout');
     },
 
@@ -940,6 +1181,32 @@ const app = {
             }
         }
         return null;
+    },
+
+    // Advies voor progressive overload: vorige sessie alle sets (met gewicht) aan de
+    // bovenkant van de herhalingsrange gehaald? Stel dan een licht hoger gewicht voor.
+    getOverloadSuggestion(ex, prevDetails, plan) {
+        if (!prevDetails || prevDetails.length === 0 || !ex.repsMax) return null;
+
+        let maxWeight = 0;
+        for (const d of prevDetails) {
+            const reps = parseInt(d.reps);
+            const weight = parseFloat(d.weight);
+            if (!(weight > 0) || !(reps >= ex.repsMax)) return null;
+            if (weight > maxWeight) maxWeight = weight;
+        }
+
+        // Increment uit de progressieregels van het plan (onder-/bovenlichaam), anders 2.5 kg
+        let increment = 2.5;
+        const guidance = plan && plan.progressionRules && plan.progressionRules.weightIncreaseGuidance;
+        if (guidance) {
+            const groups = (ex.muscleGroups || []).map(mg => this.normalizeMuscleGroup(mg));
+            const lowerBody = groups.includes('legs') || groups.includes('glutes');
+            const g = lowerBody ? guidance.lowerBodyKg : guidance.upperBodyKg;
+            if (g > 0) increment = g;
+        }
+
+        return { prevWeight: maxWeight, newWeight: Math.round((maxWeight + increment) * 10) / 10 };
     },
 
     renderWorkoutExercises() {
@@ -972,23 +1239,29 @@ const app = {
 
             // Build badges
             let badgesHtml = '';
-            if (ex.category) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted); margin-right:4px;">${ex.category}</span>`;
-            if (ex.exerciseType) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${ex.exerciseType}</span>`;
+            if (ex.category) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted); margin-right:4px;">${app.escapeHTML(String(ex.category))}</span>`;
+            if (ex.exerciseType) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${app.escapeHTML(String(ex.exerciseType))}</span>`;
 
             // Build notes & alternatives
             let notesHtml = '';
             if (ex.notes && Array.isArray(ex.notes) && ex.notes.length > 0) {
                 notesHtml += `<ul class="text-sm text-muted mt-2" style="list-style-type: disc; padding-left: 20px;">`;
-                ex.notes.forEach(n => notesHtml += `<li>${n}</li>`);
+                ex.notes.forEach(n => notesHtml += `<li>${app.escapeHTML(String(n))}</li>`);
                 notesHtml += `</ul>`;
             } else if (ex.notes && typeof ex.notes === 'string') {
-                notesHtml += `<div class="text-sm text-muted mt-2">${ex.notes}</div>`;
+                notesHtml += `<div class="text-sm text-muted mt-2">${app.escapeHTML(ex.notes)}</div>`;
             }
 
             if (ex.alternatives && ex.alternatives.length > 0) {
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${ex.alternatives.join(', ')}</div>`;
+                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.alternatives.join(', '))}</div>`;
             } else if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${ex.optionalAlternatives.join(', ')}</div>`;
+                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.optionalAlternatives.join(', '))}</div>`;
+            }
+
+            // Progressive-overload-advies op basis van de vorige sessie
+            const overload = app.getOverloadSuggestion(ex, prevDetails, store.getActivePlan());
+            if (overload) {
+                notesHtml += `<div class="text-sm mt-2 progression-hint"><span class="material-icons-round" style="font-size:1rem; vertical-align:-3px;">trending_up</span> Vorige keer alle sets op ${app.escapeHTML(String(ex.repsMax))} reps met ${app.escapeHTML(String(overload.prevWeight))} kg. Probeer nu ${app.escapeHTML(String(overload.newWeight))} kg.</div>`;
             }
 
             let setsHtml = '';
@@ -1006,16 +1279,16 @@ const app = {
                 
                 let inputsHtml = '';
                 if (wantsWeight) {
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="${weightPlaceholder}" 
-                        value="${ex.weights ? ex.weights[i] : ''}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">`;
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(weightPlaceholder))}"
+                        value="${app.escapeHTML(String(ex.weights ? ex.weights[i] : ''))}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">`;
                 }
                 if (wantsReps) {
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="${repsPlaceholder}" style="width: 55px;"
-                        value="${ex.actualReps ? ex.actualReps[i] : ''}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(repsPlaceholder))}" style="width: 55px;"
+                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
                 }
                 if (wantsDuration && !wantsReps) {
                      inputsHtml += `<input type="number" class="weight-input" placeholder="sec" style="width: 55px;"
-                        value="${ex.actualReps ? ex.actualReps[i] : ''}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
                 }
 
                 setsHtml += `
@@ -1040,7 +1313,7 @@ const app = {
                             <div class="exercise-title" style="margin:0;">${app.escapeHTML(ex.name)}</div>
                         </div>
                         <div style="margin-bottom:4px;">${badgesHtml}</div>
-                        <div class="exercise-meta">${metaString}</div>
+                        <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
                         ${notesHtml}
                     </div>
                 </div>
@@ -1053,9 +1326,76 @@ const app = {
     },
 
     toggleSet(exIndex, setIndex) {
-        this.activeWorkout.exercises[exIndex].setsCompleted[setIndex] = !this.activeWorkout.exercises[exIndex].setsCompleted[setIndex];
+        const ex = this.activeWorkout.exercises[exIndex];
+        ex.setsCompleted[setIndex] = !ex.setsCompleted[setIndex];
         store.saveActiveWorkoutState(this.activeWorkout);
+
+        // Set afgevinkt en de oefening heeft een rusttijd? Start de rusttimer.
+        if (ex.setsCompleted[setIndex] && ex.restSeconds) {
+            this.startRestTimer(ex.restSeconds);
+        }
+
         this.renderWorkoutExercises();
+    },
+
+    // --- WAKE LOCK ---
+
+    wakeLock: null,
+
+    // Houdt het scherm aan tijdens een workout (waar ondersteund)
+    async requestWakeLock() {
+        try {
+            if (typeof navigator !== 'undefined' && navigator.wakeLock) {
+                this.wakeLock = await navigator.wakeLock.request('screen');
+            }
+        } catch (e) {
+            // Geen ramp: het scherm valt dan gewoon in slaap volgens de systeeminstelling
+        }
+    },
+
+    releaseWakeLock() {
+        if (this.wakeLock) {
+            this.wakeLock.release();
+            this.wakeLock = null;
+        }
+    },
+
+    // --- RUSTTIMER ---
+
+    restTimer: null,
+
+    startRestTimer(seconds) {
+        this.stopRestTimer();
+        const el = document.getElementById('rest-timer');
+        const label = document.getElementById('rest-timer-label');
+        if (!el || !label) return;
+
+        let remaining = Math.round(seconds);
+        const update = () => {
+            label.textContent = `Rust: ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
+        };
+        update();
+        el.classList.remove('hidden');
+
+        this.restTimer = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                this.stopRestTimer();
+                if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                this.showToast('Rust voorbij, tijd voor je volgende set!', 'success');
+            } else {
+                update();
+            }
+        }, 1000);
+    },
+
+    stopRestTimer() {
+        if (this.restTimer) {
+            clearInterval(this.restTimer);
+            this.restTimer = null;
+        }
+        const el = document.getElementById('rest-timer');
+        if (el) el.classList.add('hidden');
     },
 
     updateWeight(exIndex, setIndex, val) {
@@ -1078,7 +1418,20 @@ const app = {
 
     finishWorkout() {
         this.hideFinishModal();
-        const duration = Math.round((new Date() - this.activeWorkout.startTime) / 60000);
+        this.stopRestTimer();
+        this.releaseWakeLock();
+
+        // Een sessie die per ongeluk uren of dagen open bleef staan levert een
+        // onrealistische duur op; begrens die zodat statistieken kloppen. De gebruiker
+        // kan de duur naderhand alsnog aanpassen in het logboek.
+        const MAX_SESSION_MINUTES = 240;
+        let duration = Math.round((new Date() - this.activeWorkout.startTime) / 60000);
+        if (!(duration >= 0)) duration = 0;
+        if (duration > MAX_SESSION_MINUTES) {
+            duration = MAX_SESSION_MINUTES;
+            this.showToast('Sessieduur leek onrealistisch lang en is begrensd. Pas hem eventueel aan in het logboek.', 'error');
+        }
+
         let totalExercisesCompleted = 0;
         
         const exerciseLogs = [];
@@ -1180,6 +1533,14 @@ const app = {
         document.getElementById('modal-edit-log').classList.add('hidden');
     },
 
+    updateEditLogDuration(val) {
+        const parsed = parseInt(val, 10);
+        // Alleen een geldige, niet-negatieve waarde overnemen; anders de vorige behouden
+        if (!isNaN(parsed) && parsed >= 0) {
+            this.logToEdit.duration = parsed;
+        }
+    },
+
     updateEditLogWeight(exIndex, setIndex, val) {
         const detail = this.logToEdit.exercises[exIndex].details.find(d => d.setNumber === setIndex + 1);
         if (detail) detail.weight = val;
@@ -1194,8 +1555,25 @@ const app = {
         const container = document.getElementById('edit-log-container');
         container.innerHTML = '';
 
+        // Duur-veld: altijd bewerkbaar, ook bij oude sessies zonder oefening-details
+        const durationCard = document.createElement('div');
+        durationCard.className = 'glass-panel';
+        durationCard.style.padding = '12px';
+        durationCard.innerHTML = `
+            <div class="set-row" style="justify-content: space-between; align-items:center;">
+                <div style="font-weight:600;">Duur (minuten)</div>
+                <input type="number" min="0" class="input-field" style="width:90px; text-align:center;"
+                    value="${app.escapeHTML(String(this.logToEdit.duration != null ? this.logToEdit.duration : ''))}"
+                    onchange="app.updateEditLogDuration(this.value)">
+            </div>
+        `;
+        container.appendChild(durationCard);
+
         if (!this.logToEdit.exercises || this.logToEdit.exercises.length === 0) {
-            container.innerHTML = '<p class="text-muted">Geen details beschikbaar voor deze oude sessie.</p>';
+            const note = document.createElement('p');
+            note.className = 'text-muted';
+            note.textContent = 'Geen oefening-details beschikbaar voor deze oude sessie.';
+            container.appendChild(note);
             return;
         }
 
@@ -1209,10 +1587,10 @@ const app = {
                         <div class="set-row" style="margin-top: 8px; justify-content: space-between;">
                             <div class="set-info text-muted">Set ${d.setNumber}</div>
                             <div style="display:flex; gap:8px;">
-                                <input type="number" class="input-field" placeholder="kg" style="width:70px; text-align:center;" 
-                                    value="${d.weight || ''}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
-                                <input type="number" class="input-field" placeholder="reps" style="width:70px; text-align:center;" 
-                                    value="${d.reps || ''}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
+                                <input type="number" class="input-field" placeholder="kg" style="width:70px; text-align:center;"
+                                    value="${app.escapeHTML(String(d.weight || ''))}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
+                                <input type="number" class="input-field" placeholder="reps" style="width:70px; text-align:center;"
+                                    value="${app.escapeHTML(String(d.reps || ''))}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
                             </div>
                         </div>
                     `;
@@ -1382,12 +1760,89 @@ const app = {
         dlAnchorElem.setAttribute("href", dataStr);
         dlAnchorElem.setAttribute("download", "go_fitness_backup.json");
         dlAnchorElem.click();
+    },
+
+    // Deelt een schema als JSON via de Web Share API, met klembord als fallback
+    async sharePlan(planId) {
+        const plan = store.plans.find(p => p.id === planId);
+        if (!plan) return;
+
+        // Interne id niet meegeven; de ontvanger krijgt bij import een eigen id
+        const shareable = { ...plan };
+        delete shareable.id;
+        const json = JSON.stringify(shareable, null, 2);
+        const fileName = `${String(plan.name || 'schema').toLowerCase().replace(/[^a-z0-9]+/g, '_')}.json`;
+
+        try {
+            if (typeof navigator !== 'undefined' && navigator.share) {
+                const file = new File([json], fileName, { type: 'application/json' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file], title: plan.name });
+                } else {
+                    await navigator.share({ title: plan.name, text: json });
+                }
+                return;
+            }
+            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                await navigator.clipboard.writeText(json);
+                this.showToast('Schema-JSON gekopieerd naar het klembord!', 'success');
+                return;
+            }
+            this.showToast('Delen wordt niet ondersteund in deze browser.', 'error');
+        } catch (e) {
+            if (e && e.name === 'AbortError') return; // gebruiker annuleerde het delen
+            this.showToast('Delen mislukt: ' + (e.message || e), 'error');
+        }
+    },
+
+    validateBackup(data) {
+        if (!data || !Array.isArray(data.plans) || !Array.isArray(data.logs)) {
+            throw new Error("Ongeldig backup-bestand. Verwacht 'plans' en 'logs'.");
+        }
+        return { plans: data.plans, logs: data.logs };
+    },
+
+    handleRestoreFileSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                this.backupToRestore = this.validateBackup(JSON.parse(evt.target.result));
+                const summary = `Backup bevat ${this.backupToRestore.plans.length} schema('s) en ${this.backupToRestore.logs.length} gelogde sessie(s).`;
+                document.getElementById('restore-summary').textContent = summary;
+                document.getElementById('modal-restore').classList.remove('hidden');
+            } catch (err) {
+                this.showToast('Herstellen mislukt: ' + (err.message || 'ongeldige JSON.'), 'error');
+            }
+            // Reset zodat hetzelfde bestand later opnieuw gekozen kan worden
+            e.target.value = '';
+        };
+        reader.readAsText(file);
+    },
+
+    hideRestoreModal() {
+        this.backupToRestore = null;
+        document.getElementById('modal-restore').classList.add('hidden');
+    },
+
+    confirmRestore() {
+        if (!this.backupToRestore) return;
+        store.restoreBackup(this.backupToRestore);
+        this.hideRestoreModal();
+        this.renderPlans();
+        this.renderHome();
+        this.renderProgress();
+        this.renderAchievements();
+        this.showToast('Backup succesvol hersteld!', 'success');
     }
 };
 
 // Ensure we don't crash when running in a Node/test environment
 if (typeof document !== 'undefined' && document.getElementById('import-file')) {
     document.getElementById('import-file').addEventListener('change', (e) => app.handleFileSelect(e));
+    const restoreInput = document.getElementById('restore-file');
+    if (restoreInput) restoreInput.addEventListener('change', (e) => app.handleRestoreFileSelect(e));
 
     // Start app
     app.init();
