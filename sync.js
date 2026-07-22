@@ -9,7 +9,7 @@
 // "Authorized JavaScript origins", schakel de Google Drive API in en vul het
 // Client ID hieronder in.
 
-const GOOGLE_CLIENT_ID = ''; // <-- OAuth 2.0 Client ID invullen om sync te activeren
+const GOOGLE_CLIENT_ID = '1064597245112-8vvkjkce2s40id51elnl4k0djfjfhlg6.apps.googleusercontent.com'; // <-- OAuth 2.0 Client ID invullen om sync te activeren
 
 const SYNC_SCOPES = 'https://www.googleapis.com/auth/drive.appdata openid email';
 const SYNC_FILE_NAME = 'gofitness-data.json';
