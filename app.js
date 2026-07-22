@@ -1417,11 +1417,38 @@ const app = {
     },
 
     showFinishModal() {
-        document.getElementById('modal-finish-workout').classList.remove('hidden');
+        const modal = document.getElementById('modal-finish-workout');
+        if (modal) modal.classList.remove('hidden');
     },
 
     hideFinishModal() {
-        document.getElementById('modal-finish-workout').classList.add('hidden');
+        const modal = document.getElementById('modal-finish-workout');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    showCancelWorkoutModal() {
+        const modal = document.getElementById('modal-cancel-workout');
+        if (modal) modal.classList.remove('hidden');
+    },
+
+    hideCancelWorkoutModal() {
+        const modal = document.getElementById('modal-cancel-workout');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    cancelWorkout() {
+        this.hideCancelWorkoutModal();
+        this.stopRestTimer();
+        this.releaseWakeLock();
+
+        this.activeWorkout = null;
+        store.saveActiveWorkoutState(null);
+
+        const bottomNav = document.getElementById('bottom-nav');
+        if (bottomNav) bottomNav.classList.remove('hidden');
+
+        this.navigate('home');
+        this.showToast('Training geannuleerd.', 'error');
     },
 
     finishWorkout() {

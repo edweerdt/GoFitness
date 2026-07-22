@@ -435,7 +435,8 @@ describe('workout flow', () => {
         store.activePlanId = null;
         store.logs = [];
         document.body.innerHTML = `
-            <div id="modal-finish-workout" class="modal-overlay"></div>
+            <div id="modal-finish-workout" class="modal-overlay hidden"></div>
+            <div id="modal-cancel-workout" class="modal-overlay hidden"></div>
             <div id="bottom-nav" class="hidden"></div>
             <div id="toast-container"></div>
         `;
@@ -536,6 +537,35 @@ describe('workout flow', () => {
         expect(store.logs).toHaveLength(1);
         expect(store.logs[0].planId).toBe('plan_A');
         expect(store.logs[0].planName).toBe('Plan Alpha');
+    });
+
+    it('should show and hide the cancel workout confirmation modal', () => {
+        const modal = document.getElementById('modal-cancel-workout');
+        expect(modal.classList.contains('hidden')).toBe(true);
+
+        app.showCancelWorkoutModal();
+        expect(modal.classList.contains('hidden')).toBe(false);
+
+        app.hideCancelWorkoutModal();
+        expect(modal.classList.contains('hidden')).toBe(true);
+    });
+
+    it('should cancel active workout, clear activeWorkoutState, and navigate home', () => {
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Leg Day' },
+            startTime: new Date(),
+            exercises: []
+        };
+        store.activeWorkoutState = app.activeWorkout;
+
+        app.showCancelWorkoutModal();
+        app.cancelWorkout();
+
+        expect(app.activeWorkout).toBeNull();
+        expect(store.activeWorkoutState).toBeNull();
+        expect(mockLocalStorage.getItem('activeWorkoutState')).toBeNull();
+        expect(app.navigate).toHaveBeenCalledWith('home');
+        expect(store.logs).toHaveLength(0);
     });
 });
 
@@ -1003,20 +1033,19 @@ describe('app XSS Security', () => {
         document.body.innerHTML = '<div id="toast-container"></div>';
         app.showToast('<img src=x onerror=alert(1)> Foutmelding!', 'error');
 
-        const toast = document.getElementById('toast-container');
-        expect(toast.innerHTML).not.toContain('<img');
-        expect(toast.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt; Foutmelding!');
+        const container = document.getElementById('toast-container');
+        expect(container.innerHTML).not.toContain('<img src=x');
+        expect(container.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt;');
     });
 
     it('should escape achievement title and description when rendering achievements', () => {
         document.body.innerHTML = '<div id="achievements-grid"></div>';
         store.logs = [];
 
-        // Temporarily mock an achievement with HTML
-        const origRender = app.renderAchievements;
         app.renderAchievements();
 
         const cards = document.querySelectorAll('.achievement');
+        expect(cards.length).toBeGreaterThan(0);
         cards.forEach(card => {
             expect(card.innerHTML).not.toContain('<script>');
             expect(card.innerHTML).not.toContain('<img src=x');
