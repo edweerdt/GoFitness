@@ -435,7 +435,8 @@ describe('workout flow', () => {
         store.activePlanId = null;
         store.logs = [];
         document.body.innerHTML = `
-            <div id="modal-finish-workout" class="modal-overlay"></div>
+            <div id="modal-finish-workout" class="modal-overlay hidden"></div>
+            <div id="modal-cancel-workout" class="modal-overlay hidden"></div>
             <div id="bottom-nav" class="hidden"></div>
             <div id="toast-container"></div>
         `;
@@ -536,6 +537,35 @@ describe('workout flow', () => {
         expect(store.logs).toHaveLength(1);
         expect(store.logs[0].planId).toBe('plan_A');
         expect(store.logs[0].planName).toBe('Plan Alpha');
+    });
+
+    it('should show and hide the cancel workout confirmation modal', () => {
+        const modal = document.getElementById('modal-cancel-workout');
+        expect(modal.classList.contains('hidden')).toBe(true);
+
+        app.showCancelWorkoutModal();
+        expect(modal.classList.contains('hidden')).toBe(false);
+
+        app.hideCancelWorkoutModal();
+        expect(modal.classList.contains('hidden')).toBe(true);
+    });
+
+    it('should cancel active workout, clear activeWorkoutState, and navigate home', () => {
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Leg Day' },
+            startTime: new Date(),
+            exercises: []
+        };
+        store.activeWorkoutState = app.activeWorkout;
+
+        app.showCancelWorkoutModal();
+        app.cancelWorkout();
+
+        expect(app.activeWorkout).toBeNull();
+        expect(store.activeWorkoutState).toBeNull();
+        expect(mockLocalStorage.getItem('activeWorkoutState')).toBeNull();
+        expect(app.navigate).toHaveBeenCalledWith('home');
+        expect(store.logs).toHaveLength(0);
     });
 });
 
