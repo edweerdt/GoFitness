@@ -234,6 +234,10 @@ const app = {
         const plan = store.getActivePlan();
         if(!plan || store.logs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
 
+        // Filter logs die bij het actieve plan horen (of legacy logs zonder planId)
+        const planLogs = store.logs.filter(log => !log.planId || log.planId === plan.id);
+        if (planLogs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
+
         const minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
         const now = new Date();
 
@@ -245,9 +249,9 @@ const app = {
             });
         }
 
-        // Per spiergroep: wanneer voor het laatst getraind?
+        // Per spiergroep: wanneer voor het laatst getraind (binnen dit plan)?
         const lastTrained = {};
-        store.logs.forEach(log => {
+        planLogs.forEach(log => {
             if (!log.date || !log.exercises) return;
             const t = new Date(log.date).getTime();
             log.exercises.forEach(ex => {
@@ -283,8 +287,8 @@ const app = {
             return { status: 'orange', text: 'Rustig aan' };
         }
 
-        // Fallback zonder spiergroep-data: algemene rusttijd sinds de laatste sessie
-        const lastLog = store.logs[store.logs.length - 1];
+        // Fallback zonder spiergroep-data: algemene rusttijd sinds de laatste sessie van DIT plan
+        const lastLog = planLogs[planLogs.length - 1];
         const hoursSinceLast = (now - new Date(lastLog.date)) / (1000 * 60 * 60);
 
         if(hoursSinceLast < (minHours * 0.5)) return { status: 'red', text: 'Beter rusten' };
@@ -300,7 +304,7 @@ const app = {
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const sevenDaysAgoStr = sevenDaysAgo.toISOString();
         
-        const recentLogs = store.logs.filter(l => l.date > sevenDaysAgoStr);
+        const recentLogs = store.logs.filter(l => l.date > sevenDaysAgoStr && (!l.planId || l.planId === plan.id));
         const doneSessionIds = recentLogs.map(l => l.sessionId);
         
         let orderedSessions = [...plan.sessions];

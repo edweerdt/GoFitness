@@ -335,6 +335,23 @@ describe('app logic', () => {
 
             expect(app.getRecoveryStatus().status).toBe('red');
         });
+
+        it('should ignore logs from other plans when calculating recovery status', () => {
+            const tenHoursAgo = new Date();
+            tenHoursAgo.setHours(tenHoursAgo.getHours() - 10);
+
+            const plan1 = { id: 'plan_1', minRecoveryHours: 48, sessions: [{ id: 'push1', name: 'Push 1', exercises: [{ name: 'Bench', muscleGroups: ['chest'] }] }] };
+            const plan2 = { id: 'plan_2', minRecoveryHours: 48, sessions: [{ id: 'push2', name: 'Push 2', exercises: [{ name: 'Bench', muscleGroups: ['chest'] }] }] };
+
+            store.plans = [plan1, plan2];
+            store.activePlanId = 'plan_1';
+
+            // Log belongs to plan_2 (recent)
+            store.logs = [{ planId: 'plan_2', sessionId: 'push2', date: tenHoursAgo.toISOString(), exercises: [{ name: 'Bench', muscleGroups: ['chest'] }] }];
+
+            // For plan_1, no logs exist -> green
+            expect(app.getRecoveryStatus().status).toBe('green');
+        });
     });
 
     describe('getRecommendedSession', () => {
@@ -381,6 +398,23 @@ describe('app logic', () => {
             const recommended = app.getRecommendedSession();
             expect(recommended.session).toEqual(session1);
             expect(recommended.reason).toContain('we beginnen weer vooraan');
+        });
+
+        it('should ignore recent logs from other plans when recommending next session', () => {
+            const session1 = { id: 's1', name: 'Session 1' };
+            const session2 = { id: 's2', name: 'Session 2' };
+            store.plans = [
+                { id: 'plan_1', name: 'Plan 1', sessions: [session1, session2] },
+                { id: 'plan_2', name: 'Plan 2', sessions: [session1, session2] }
+            ];
+            store.activePlanId = 'plan_1';
+
+            // s1 was completed recently under plan_2
+            store.logs = [{ planId: 'plan_2', sessionId: 's1', date: new Date().toISOString() }];
+
+            // For plan_1, s1 has not been done yet -> recommend s1
+            const recommended = app.getRecommendedSession();
+            expect(recommended.session).toEqual(session1);
         });
     });
 
