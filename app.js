@@ -11,6 +11,7 @@ class DataStore {
             this.logs = [];
             this.activeWorkoutState = null;
             this.theme = 'auto';
+            this.deleted = { plans: [], logs: [] };
         }
     }
     load() {
@@ -19,6 +20,8 @@ class DataStore {
         this.logs = this.safeParse('logs', []);
         this.activeWorkoutState = this.safeParse('activeWorkoutState', null);
         this.theme = localStorage.getItem('theme') || 'auto';
+        // Tombstones: ids van verwijderde items, zodat cloud-sync ze niet terugbrengt
+        this.deleted = this.safeParse('deleted', { plans: [], logs: [] });
     }
     safeParse(key, fallback) {
         // Corrupte data in localStorage mag de app niet laten crashen bij het opstarten
@@ -40,6 +43,14 @@ class DataStore {
         }
         localStorage.setItem('logs', JSON.stringify(this.logs));
         localStorage.setItem('theme', this.theme);
+        localStorage.setItem('deleted', JSON.stringify(this.deleted));
+    }
+    // Onthoudt een verwijdering zodat sync die op andere devices ook doorvoert
+    recordDeletion(type, id) {
+        if (!this.deleted[type]) this.deleted[type] = [];
+        if (!this.deleted[type].includes(id)) this.deleted[type].push(id);
+        // Begrens de lijst zodat localStorage niet volloopt
+        if (this.deleted[type].length > 500) this.deleted[type] = this.deleted[type].slice(-500);
     }
     saveActiveWorkoutState(state) {
         this.activeWorkoutState = state;
@@ -92,6 +103,8 @@ class DataStore {
         if (!this.plans.find(p => p.id === this.activePlanId)) {
             this.activePlanId = this.plans.length > 0 ? this.plans[0].id : null;
         }
+        // Tombstones wissen, anders zou sync zojuist herstelde items direct weer verwijderen
+        this.deleted = { plans: [], logs: [] };
         this.save();
     }
 }
@@ -1073,6 +1086,7 @@ const app = {
         if (!this.itemToDelete || this.itemToDelete.type !== type) return;
 
         if (type === 'plan') {
+            store.recordDeletion('plans', this.itemToDelete.id);
             store.plans = store.plans.filter(p => p.id !== this.itemToDelete.id);
             if (store.activePlanId === this.itemToDelete.id) {
                 store.activePlanId = null;
@@ -1082,6 +1096,7 @@ const app = {
             this.renderPlans();
             this.renderHome();
         } else if (type === 'log') {
+            store.recordDeletion('logs', this.itemToDelete.id);
             store.logs = store.logs.filter(l => l.id !== this.itemToDelete.id);
             store.save();
             this.hideDeleteModal('log');
@@ -1608,6 +1623,8 @@ const app = {
         
         this.logToEdit.exercises = this.logToEdit.exercises.filter(ex => ex.setsCompleted > 0);
         this.logToEdit.exercisesCompleted = totalExercisesCompleted;
+        // Timestamp zodat cloud-sync bij een conflict de nieuwste bewerking kan kiezen
+        this.logToEdit.updatedAt = new Date().toISOString();
 
         const index = store.logs.findIndex(l => l.id === this.logToEdit.id);
         if (index > -1) {

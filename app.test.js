@@ -97,6 +97,37 @@ describe('DataStore', () => {
         expect(mockLocalStorage.getItem('activePlanId')).toBeNull();
     });
 
+    describe('deletion tombstones', () => {
+        it('should record and persist deleted ids', () => {
+            const store = new DataStore();
+            store.recordDeletion('plans', 'plan_1');
+            store.recordDeletion('logs', 'log_1');
+            store.recordDeletion('logs', 'log_1'); // dubbel registreren blijft 1 entry
+            store.save();
+
+            expect(store.deleted.plans).toEqual(['plan_1']);
+            expect(store.deleted.logs).toEqual(['log_1']);
+            expect(JSON.parse(mockLocalStorage.store['deleted'])).toEqual({ plans: ['plan_1'], logs: ['log_1'] });
+
+            const reloaded = new DataStore();
+            expect(reloaded.deleted.plans).toEqual(['plan_1']);
+        });
+
+        it('should cap the tombstone list at 500 entries', () => {
+            const store = new DataStore();
+            for (let i = 0; i < 510; i++) store.recordDeletion('logs', 'log_' + i);
+            expect(store.deleted.logs).toHaveLength(500);
+            expect(store.deleted.logs[0]).toBe('log_10');
+        });
+
+        it('should clear tombstones when restoring a backup', () => {
+            const store = new DataStore();
+            store.recordDeletion('plans', 'plan_1');
+            store.restoreBackup({ plans: [], logs: [] });
+            expect(store.deleted).toEqual({ plans: [], logs: [] });
+        });
+    });
+
     describe('restoreBackup', () => {
         it('should replace plans and logs and pick a valid active plan', () => {
             const store = new DataStore();
@@ -427,6 +458,8 @@ describe('editing session duration', () => {
         expect(store.logs[0].duration).toBe(55);
         // Overige gegevens blijven behouden
         expect(store.logs[0].exercises[0].details[0].weight).toBe('40');
+        // Bewerking krijgt een timestamp voor conflict-detectie bij sync
+        expect(store.logs[0].updatedAt).toBeDefined();
     });
 
     it('should ignore invalid or negative duration input', () => {
