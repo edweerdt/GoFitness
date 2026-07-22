@@ -165,6 +165,65 @@ describe('DataStore', () => {
         });
     });
 
+    describe('quota handling', () => {
+        it('should not crash when localStorage is full on save()', () => {
+            const store = new DataStore();
+            store.plans = [{ id: 'plan_1', name: 'Test' }];
+            store.logs = [{ id: 'log_1' }];
+
+            // Simulate QuotaExceededError
+            mockLocalStorage.setItem = jest.fn(() => {
+                throw new DOMException('quota exceeded', 'QuotaExceededError');
+            });
+
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+            // Should not throw and return false
+            expect(() => {
+                const result = store.save();
+                expect(result).toBe(false);
+            }).not.toThrow();
+
+            // In-memory state should still be intact
+            expect(store.plans).toEqual([{ id: 'plan_1', name: 'Test' }]);
+            expect(store.logs).toEqual([{ id: 'log_1' }]);
+
+            expect(consoleSpy).toHaveBeenCalled();
+            consoleSpy.mockRestore();
+        });
+
+        it('should return true on successful save()', () => {
+            const store = new DataStore();
+            store.plans = [];
+            store.logs = [];
+            const result = store.save();
+            expect(result).toBe(true);
+        });
+
+        it('should not crash when localStorage is full on saveActiveWorkoutState()', () => {
+            const store = new DataStore();
+            const mockState = { exerciseId: 'ex_1', sets: [true, false] };
+
+            // Simulate QuotaExceededError
+            mockLocalStorage.setItem = jest.fn(() => {
+                throw new DOMException('quota exceeded', 'QuotaExceededError');
+            });
+
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+            // Should not throw
+            expect(() => {
+                store.saveActiveWorkoutState(mockState);
+            }).not.toThrow();
+
+            // In-memory state should still be updated
+            expect(store.activeWorkoutState).toEqual(mockState);
+
+            expect(consoleSpy).toHaveBeenCalled();
+            consoleSpy.mockRestore();
+        });
+    });
+
     describe('saveActiveWorkoutState', () => {
         it('should save active workout state to localStorage when state is provided', () => {
             const store = new DataStore();
