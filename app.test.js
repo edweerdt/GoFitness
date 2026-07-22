@@ -998,4 +998,28 @@ describe('app XSS Security', () => {
         expect(html).not.toContain('<svg');
         expect(html).toContain('&lt;script&gt;alert(2)&lt;/script&gt;');
     });
+
+    it('should escape HTML in toast messages', () => {
+        document.body.innerHTML = '<div id="toast-container"></div>';
+        app.showToast('<img src=x onerror=alert(1)> Foutmelding!', 'error');
+
+        const toast = document.getElementById('toast-container');
+        expect(toast.innerHTML).not.toContain('<img');
+        expect(toast.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt; Foutmelding!');
+    });
+
+    it('should escape achievement title and description when rendering achievements', () => {
+        document.body.innerHTML = '<div id="achievements-grid"></div>';
+        store.logs = [];
+
+        // Temporarily mock an achievement with HTML
+        const origRender = app.renderAchievements;
+        app.renderAchievements();
+
+        const cards = document.querySelectorAll('.achievement');
+        cards.forEach(card => {
+            expect(card.innerHTML).not.toContain('<script>');
+            expect(card.innerHTML).not.toContain('<img src=x');
+        });
+    });
 });
