@@ -30,20 +30,30 @@ class DataStore {
             return raw ? JSON.parse(raw) : fallback;
         } catch (e) {
             console.warn(`Kon '${key}' niet lezen uit localStorage, standaardwaarde gebruikt.`, e);
+            localStorage.removeItem(key);
             return fallback;
         }
     }
     save() {
-        localStorage.setItem('plans', JSON.stringify(this.plans));
-        if(this.activePlanId) {
-            localStorage.setItem('activePlanId', this.activePlanId);
-        } else {
-            // Anders blijft een verwijderd actief plan na een reload terugkomen
-            localStorage.removeItem('activePlanId');
+        try {
+            localStorage.setItem('plans', JSON.stringify(this.plans));
+            if(this.activePlanId) {
+                localStorage.setItem('activePlanId', this.activePlanId);
+            } else {
+                // Anders blijft een verwijderd actief plan na een reload terugkomen
+                localStorage.removeItem('activePlanId');
+            }
+            localStorage.setItem('logs', JSON.stringify(this.logs));
+            localStorage.setItem('theme', this.theme);
+            localStorage.setItem('deleted', JSON.stringify(this.deleted));
+            return true;
+        } catch (e) {
+            console.error('Opslaan naar localStorage mislukt:', e);
+            if (typeof app !== 'undefined' && app.showToast) {
+                app.showToast('⚠️ Opslag vol! Data kon niet worden opgeslagen.', 'error');
+            }
+            return false;
         }
-        localStorage.setItem('logs', JSON.stringify(this.logs));
-        localStorage.setItem('theme', this.theme);
-        localStorage.setItem('deleted', JSON.stringify(this.deleted));
     }
     // Onthoudt een verwijdering zodat sync die op andere devices ook doorvoert
     recordDeletion(type, id) {
@@ -54,10 +64,17 @@ class DataStore {
     }
     saveActiveWorkoutState(state) {
         this.activeWorkoutState = state;
-        if(state) {
-            localStorage.setItem('activeWorkoutState', JSON.stringify(state));
-        } else {
-            localStorage.removeItem('activeWorkoutState');
+        try {
+            if(state) {
+                localStorage.setItem('activeWorkoutState', JSON.stringify(state));
+            } else {
+                localStorage.removeItem('activeWorkoutState');
+            }
+        } catch (e) {
+            console.error('Workout-state opslaan mislukt:', e);
+            if (typeof app !== 'undefined' && app.showToast) {
+                app.showToast('⚠️ Opslag vol! Workout-voortgang kon niet worden bewaard.', 'error');
+            }
         }
     }
     getActivePlan() {
@@ -159,7 +176,7 @@ const app = {
 
         toast.innerHTML = `
             <span class="material-icons-round" style="color: ${iconColor};">${iconName}</span>
-            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${message}</div>
+            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${this.escapeHTML(String(message))}</div>
         `;
 
         container.appendChild(toast);
@@ -230,6 +247,11 @@ const app = {
         const plan = store.getActivePlan();
         if(!plan || store.logs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
 
+        // Filter logs die bij het actieve plan horen (of legacy logs / plans zonder id)
+        const activePlanId = plan.id || null;
+        const planLogs = store.logs.filter(log => (!log.planId || !activePlanId || log.planId === activePlanId) && log.date);
+        if (planLogs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
+
         const minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
         const now = new Date();
 
@@ -241,13 +263,14 @@ const app = {
             });
         }
 
-        // Per spiergroep: wanneer voor het laatst getraind?
+        // Per spiergroep: wanneer voor het laatst getraind (binnen dit plan)?
         const lastTrained = {};
-        store.logs.forEach(log => {
+        planLogs.forEach(log => {
             if (!log.date || !log.exercises) return;
             const t = new Date(log.date).getTime();
             log.exercises.forEach(ex => {
-                (ex.muscleGroups || []).forEach(mg => {
+                const groups = (ex.muscleGroups && ex.muscleGroups.length > 0) ? ex.muscleGroups : this.guessMuscleGroupsFromName(ex.name);
+                groups.forEach(mg => {
                     const g = this.normalizeMuscleGroup(mg);
                     if (!lastTrained[g] || t > lastTrained[g]) lastTrained[g] = t;
                 });
@@ -258,10 +281,13 @@ const app = {
         const rec = (plan.sessions && plan.sessions.length > 0) ? this.getRecommendedSession() : null;
         const nextGroups = [];
         if (rec && rec.session && rec.session.exercises) {
-            rec.session.exercises.forEach(ex => (ex.muscleGroups || []).forEach(mg => {
-                const g = this.normalizeMuscleGroup(mg);
-                if (!nextGroups.includes(g)) nextGroups.push(g);
-            }));
+            rec.session.exercises.forEach(ex => {
+                const groups = (ex.muscleGroups && ex.muscleGroups.length > 0) ? ex.muscleGroups : this.guessMuscleGroupsFromName(ex.name);
+                groups.forEach(mg => {
+                    const g = this.normalizeMuscleGroup(mg);
+                    if (!nextGroups.includes(g)) nextGroups.push(g);
+                });
+            });
         }
 
         // Spiergroep-specifiek stoplicht: alleen de spiergroepen die de volgende sessie
@@ -279,8 +305,8 @@ const app = {
             return { status: 'orange', text: 'Rustig aan' };
         }
 
-        // Fallback zonder spiergroep-data: algemene rusttijd sinds de laatste sessie
-        const lastLog = store.logs[store.logs.length - 1];
+        // Fallback zonder spiergroep-data: algemene rusttijd sinds de laatste sessie van DIT plan
+        const lastLog = planLogs[planLogs.length - 1];
         const hoursSinceLast = (now - new Date(lastLog.date)) / (1000 * 60 * 60);
 
         if(hoursSinceLast < (minHours * 0.5)) return { status: 'red', text: 'Beter rusten' };
@@ -290,20 +316,22 @@ const app = {
 
     getRecommendedSession() {
         const plan = store.getActivePlan();
-        if(!plan) return null;
+        if(!plan || !plan.sessions || plan.sessions.length === 0) return null;
         
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const sevenDaysAgoStr = sevenDaysAgo.toISOString();
         
-        const recentLogs = store.logs.filter(l => l.date > sevenDaysAgoStr);
+        const activePlanId = plan.id || null;
+        const recentLogs = store.logs.filter(l => l.date > sevenDaysAgoStr && (!l.planId || !activePlanId || l.planId === activePlanId));
         const doneSessionIds = recentLogs.map(l => l.sessionId);
         
         let orderedSessions = [...plan.sessions];
 
         // Use defaultSessionOrder from rich schema if available
         if (plan.schedule && plan.schedule.defaultSessionOrder && plan.schedule.defaultSessionOrder.length > 0) {
-            orderedSessions = plan.schedule.defaultSessionOrder.map(id => plan.sessions.find(s => s.id === id || s.sessionId === id)).filter(Boolean);
+            const mapped = plan.schedule.defaultSessionOrder.map(id => plan.sessions.find(s => s.id === id || s.sessionId === id)).filter(Boolean);
+            if (mapped.length > 0) orderedSessions = mapped;
         } else {
             // Sort by dayOrderHint if available
             orderedSessions.sort((a, b) => (a.dayOrderHint || 99) - (b.dayOrderHint || 99));
@@ -314,7 +342,7 @@ const app = {
         if(nextSession) {
             return {
                 session: nextSession,
-                reason: `Dit is de volgende in je schema (${plan.name}).`
+                reason: `Dit is de volgende in je schema (${plan.name || 'Schema'}).`
             };
         }
         
@@ -326,9 +354,8 @@ const app = {
 
     // --- UTILS ---
 
-    // Normaliseert spiergroep-namen uit schema's (hoofdletters, synoniemen) naar de interne sleutels
     normalizeMuscleGroup(mg) {
-        const key = String(mg).toLowerCase().trim();
+        const key = String(mg || '').toLowerCase().trim();
         const aliases = {
             biceps: 'arms', triceps: 'arms', forearms: 'arms',
             quads: 'legs', hamstrings: 'legs', calves: 'legs',
@@ -529,8 +556,8 @@ const app = {
                     </div>
                     <div style="display:flex; align-items:center; gap:8px; margin-left:12px; flex-shrink:0;">
                         ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
-                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${p.id}')" title="Schema delen">ios_share</span>
-                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${p.id}')">delete_outline</span>
+                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${this.escapeHTML(p.id)}')" title="Schema delen">ios_share</span>
+                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${this.escapeHTML(p.id)}')">delete_outline</span>
                     </div>
                 </div>
                 
@@ -958,10 +985,10 @@ const app = {
 
             el.innerHTML = `
                 <div class="stat-icon-wrapper text-accent" style="width:48px; height:48px; margin: 0 auto; background:rgba(59, 130, 246, 0.2);">
-                    <span class="material-icons-round">${ach.unlocked ? ach.icon : 'lock'}</span>
+                    <span class="material-icons-round">${ach.unlocked ? this.escapeHTML(ach.icon) : 'lock'}</span>
                 </div>
-                <div style="font-weight:600; font-size:0.85rem; line-height:1.2; margin-top:4px;">${ach.title}</div>
-                <div class="text-sm text-muted" style="font-size:0.7rem; line-height:1.3;">${ach.desc}</div>
+                <div style="font-weight:600; font-size:0.85rem; line-height:1.2; margin-top:4px;">${this.escapeHTML(ach.title)}</div>
+                <div class="text-sm text-muted" style="font-size:0.7rem; line-height:1.3;">${this.escapeHTML(ach.desc)}</div>
             `;
             grid.appendChild(el);
         });
@@ -1029,17 +1056,18 @@ const app = {
                     summaryHtml = '<div class="text-sm text-muted mt-2">Geen details beschikbaar (oude sessie).</div>';
                 }
 
+                const safeLogId = app.escapeHTML(log.id);
                 if (log.exercises && log.exercises.length > 0) {
                     summaryHtml += `
                         <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal('${log.id}')">edit_note</span>
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${log.id}')">delete_outline</span>
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal('${safeLogId}')">edit_note</span>
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${safeLogId}')">delete_outline</span>
                         </div>
                     `;
                 } else {
                     summaryHtml += `
                         <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${log.id}')">delete_outline</span>
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${safeLogId}')">delete_outline</span>
                         </div>
                     `;
                 }
@@ -1140,7 +1168,12 @@ const app = {
     // --- WORKOUT FLOW ---
 
     startWorkout(session) {
+        // Snapshot plan-info zodat wisselen van actief plan tijdens de workout
+        // niet leidt tot een log die aan het verkeerde plan wordt gekoppeld
+        const activePlan = store.getActivePlan();
         this.activeWorkout = {
+            planId: activePlan ? activePlan.id : null,
+            planName: activePlan ? activePlan.name : 'Overige Sessies',
             session: session,
             startTime: new Date(),
             exercises: session.exercises.map(e => ({
@@ -1409,11 +1442,38 @@ const app = {
     },
 
     showFinishModal() {
-        document.getElementById('modal-finish-workout').classList.remove('hidden');
+        const modal = document.getElementById('modal-finish-workout');
+        if (modal) modal.classList.remove('hidden');
     },
 
     hideFinishModal() {
-        document.getElementById('modal-finish-workout').classList.add('hidden');
+        const modal = document.getElementById('modal-finish-workout');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    showCancelWorkoutModal() {
+        const modal = document.getElementById('modal-cancel-workout');
+        if (modal) modal.classList.remove('hidden');
+    },
+
+    hideCancelWorkoutModal() {
+        const modal = document.getElementById('modal-cancel-workout');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    cancelWorkout() {
+        this.hideCancelWorkoutModal();
+        this.stopRestTimer();
+        this.releaseWakeLock();
+
+        this.activeWorkout = null;
+        store.saveActiveWorkoutState(null);
+
+        const bottomNav = document.getElementById('bottom-nav');
+        if (bottomNav) bottomNav.classList.remove('hidden');
+
+        this.navigate('home');
+        this.showToast('Training geannuleerd.', 'error');
     },
 
     finishWorkout() {
@@ -1462,11 +1522,15 @@ const app = {
             }
         });
 
-        const activePlan = store.getActivePlan();
+        // Gebruik het plan dat bij de start is opgeslagen (niet het huidige actieve plan)
+        // Fallback naar store.getActivePlan() voor oude workout-states zonder planId
+        const snapshotPlanId = this.activeWorkout.planId;
+        const snapshotPlanName = this.activeWorkout.planName;
+        const fallbackPlan = (snapshotPlanId === undefined) ? store.getActivePlan() : null;
 
         store.saveWorkoutLog({
-            planId: activePlan ? activePlan.id : null,
-            planName: activePlan ? activePlan.name : 'Overige Sessies',
+            planId: snapshotPlanId !== undefined ? snapshotPlanId : (fallbackPlan ? fallbackPlan.id : null),
+            planName: snapshotPlanName !== undefined ? snapshotPlanName : (fallbackPlan ? fallbackPlan.name : 'Overige Sessies'),
             sessionId: this.activeWorkout.session.id,
             sessionName: this.activeWorkout.session.name,
             duration: duration,

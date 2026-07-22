@@ -67,7 +67,7 @@
             <!-- Workout View -->
             <section id="view-workout" class="view">
                 <header class="workout-header">
-                    <button class="icon-btn" onclick="app.navigate('home')"><span class="material-icons-round">close</span></button>
+                    <button class="icon-btn" onclick="app.showCancelWorkoutModal()" title="Training annuleren"><span class="material-icons-round">close</span></button>
                     <h2 id="workout-title">Training</h2>
                     <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen">
                         <span class="material-icons-round">brightness_auto</span>
@@ -209,6 +209,21 @@
                 </div>
             </div>
         </div>
+        <!-- Cancel Workout Modal -->
+        <div id="modal-cancel-workout" class="modal-overlay hidden">
+            <div class="modal-content glass-panel" style="text-align: center;">
+                <div class="stat-icon-wrapper" style="margin: 0 auto 16px auto; width: 64px; height: 64px; font-size: 32px; background: rgba(255, 82, 82, 0.1); color: #ff5252;">
+                    <span class="material-icons-round" style="font-size: 32px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">cancel</span>
+                </div>
+                <h3>Training Annuleren?</h3>
+                <p class="text-sm text-muted mt-2">Weet je zeker dat je deze training wilt annuleren? Niet-opgeslagen sets gaan verloren en de sessie wordt niet opgeslagen.</p>
+                <div class="modal-actions mt-6">
+                    <button class="btn-secondary flex-1" onclick="app.hideCancelWorkoutModal()">Verder Trainen</button>
+                    <button class="btn-primary flex-1" style="background: #ff5252; color: white;" onclick="app.cancelWorkout()">Ja, Annuleren</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Delete Log Modal -->
         <div id="modal-delete-log" class="modal-overlay hidden">
             <div class="modal-content glass-panel" style="text-align: center;">

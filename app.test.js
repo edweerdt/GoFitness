@@ -72,17 +72,54 @@ describe('DataStore', () => {
     it('should handle malformed JSON in localStorage gracefully without crashing', () => {
         // Put invalid JSON in localStorage
         mockLocalStorage.setItem('plans', 'invalid json data');
-        mockLocalStorage.setItem('logs', '{not valid');
+        mockLocalStorage.setItem('logs', '{broken}}}');
 
+        // Spy on console.warn to verify it logs the corruption
+        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        // Should NOT throw — graceful fallback to defaults
         let store;
         expect(() => {
             store = new DataStore();
         }).not.toThrow();
 
-        // Corrupte keys vallen terug op de standaardwaarde
         expect(store.plans).toEqual([]);
         expect(store.logs).toEqual([]);
+        expect(store.activeWorkoutState).toBeNull();
         expect(store.theme).toBe('auto');
+
+        // Verify corrupt keys were removed from localStorage
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('plans');
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('logs');
+
+        // Verify warnings were logged
+        expect(consoleSpy).toHaveBeenCalled();
+
+        consoleSpy.mockRestore();
+    });
+
+    it('should recover partial data when only some localStorage keys are corrupt', () => {
+        // Valid plans, corrupt logs
+        const validPlans = [{ id: 'plan_1', name: 'Good Plan' }];
+        mockLocalStorage.setItem('plans', JSON.stringify(validPlans));
+        mockLocalStorage.setItem('logs', 'not valid json');
+        mockLocalStorage.setItem('theme', 'dark');
+
+        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const store = new DataStore();
+
+        // Valid data should be loaded correctly
+        expect(store.plans).toEqual(validPlans);
+        expect(store.theme).toBe('dark');
+
+        // Corrupt data should fall back to defaults
+        expect(store.logs).toEqual([]);
+
+        // Only the corrupt key should be removed
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('logs');
+
+        consoleSpy.mockRestore();
     });
 
     it('should remove activePlanId from localStorage when it is cleared', () => {
@@ -156,6 +193,65 @@ describe('DataStore', () => {
 
             expect(store.activePlanId).toBeNull();
             expect(mockLocalStorage.getItem('activePlanId')).toBeNull();
+        });
+    });
+
+    describe('quota handling', () => {
+        it('should not crash when localStorage is full on save()', () => {
+            const store = new DataStore();
+            store.plans = [{ id: 'plan_1', name: 'Test' }];
+            store.logs = [{ id: 'log_1' }];
+
+            // Simulate QuotaExceededError
+            mockLocalStorage.setItem = jest.fn(() => {
+                throw new DOMException('quota exceeded', 'QuotaExceededError');
+            });
+
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+            // Should not throw and return false
+            expect(() => {
+                const result = store.save();
+                expect(result).toBe(false);
+            }).not.toThrow();
+
+            // In-memory state should still be intact
+            expect(store.plans).toEqual([{ id: 'plan_1', name: 'Test' }]);
+            expect(store.logs).toEqual([{ id: 'log_1' }]);
+
+            expect(consoleSpy).toHaveBeenCalled();
+            consoleSpy.mockRestore();
+        });
+
+        it('should return true on successful save()', () => {
+            const store = new DataStore();
+            store.plans = [];
+            store.logs = [];
+            const result = store.save();
+            expect(result).toBe(true);
+        });
+
+        it('should not crash when localStorage is full on saveActiveWorkoutState()', () => {
+            const store = new DataStore();
+            const mockState = { exerciseId: 'ex_1', sets: [true, false] };
+
+            // Simulate QuotaExceededError
+            mockLocalStorage.setItem = jest.fn(() => {
+                throw new DOMException('quota exceeded', 'QuotaExceededError');
+            });
+
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+            // Should not throw
+            expect(() => {
+                store.saveActiveWorkoutState(mockState);
+            }).not.toThrow();
+
+            // In-memory state should still be updated
+            expect(store.activeWorkoutState).toEqual(mockState);
+
+            expect(consoleSpy).toHaveBeenCalled();
+            consoleSpy.mockRestore();
         });
     });
 
@@ -270,10 +366,33 @@ describe('app logic', () => {
 
             expect(app.getRecoveryStatus().status).toBe('red');
         });
+
+        it('should ignore logs from other plans when calculating recovery status', () => {
+            const tenHoursAgo = new Date();
+            tenHoursAgo.setHours(tenHoursAgo.getHours() - 10);
+
+            const plan1 = { id: 'plan_1', minRecoveryHours: 48, sessions: [{ id: 'push1', name: 'Push 1', exercises: [{ name: 'Bench', muscleGroups: ['chest'] }] }] };
+            const plan2 = { id: 'plan_2', minRecoveryHours: 48, sessions: [{ id: 'push2', name: 'Push 2', exercises: [{ name: 'Bench', muscleGroups: ['chest'] }] }] };
+
+            store.plans = [plan1, plan2];
+            store.activePlanId = 'plan_1';
+
+            // Log belongs to plan_2 (recent)
+            store.logs = [{ planId: 'plan_2', sessionId: 'push2', date: tenHoursAgo.toISOString(), exercises: [{ name: 'Bench', muscleGroups: ['chest'] }] }];
+
+            // For plan_1, no logs exist -> green
+            expect(app.getRecoveryStatus().status).toBe('green');
+        });
     });
 
     describe('getRecommendedSession', () => {
         it('should return null when no plan is active', () => {
+            expect(app.getRecommendedSession()).toBeNull();
+        });
+
+        it('should return null when active plan has no sessions', () => {
+            store.plans = [{ id: 'plan_1', name: 'Empty Plan' }];
+            store.activePlanId = 'plan_1';
             expect(app.getRecommendedSession()).toBeNull();
         });
 
@@ -316,6 +435,23 @@ describe('app logic', () => {
             const recommended = app.getRecommendedSession();
             expect(recommended.session).toEqual(session1);
             expect(recommended.reason).toContain('we beginnen weer vooraan');
+        });
+
+        it('should ignore recent logs from other plans when recommending next session', () => {
+            const session1 = { id: 's1', name: 'Session 1' };
+            const session2 = { id: 's2', name: 'Session 2' };
+            store.plans = [
+                { id: 'plan_1', name: 'Plan 1', sessions: [session1, session2] },
+                { id: 'plan_2', name: 'Plan 2', sessions: [session1, session2] }
+            ];
+            store.activePlanId = 'plan_1';
+
+            // s1 was completed recently under plan_2
+            store.logs = [{ planId: 'plan_2', sessionId: 's1', date: new Date().toISOString() }];
+
+            // For plan_1, s1 has not been done yet -> recommend s1
+            const recommended = app.getRecommendedSession();
+            expect(recommended.session).toEqual(session1);
         });
     });
 
@@ -370,11 +506,13 @@ describe('workout flow', () => {
         store.activePlanId = null;
         store.logs = [];
         document.body.innerHTML = `
-            <div id="modal-finish-workout" class="modal-overlay"></div>
+            <div id="modal-finish-workout" class="modal-overlay hidden"></div>
+            <div id="modal-cancel-workout" class="modal-overlay hidden"></div>
             <div id="bottom-nav" class="hidden"></div>
             <div id="toast-container"></div>
         `;
         jest.spyOn(app, 'navigate').mockImplementation(() => {});
+        jest.spyOn(app, 'openWorkoutView').mockImplementation(() => {});
     });
 
     afterEach(() => {
@@ -421,6 +559,84 @@ describe('workout flow', () => {
 
         expect(store.logs).toHaveLength(1);
         expect(store.logs[0].duration).toBe(240);
+    });
+
+    it('should snapshot planId and planName at workout start and retain them on finish even if active plan changes', () => {
+        const planA = { id: 'plan_A', name: 'Plan Alpha', sessions: [] };
+        const planB = { id: 'plan_B', name: 'Plan Beta', sessions: [] };
+        store.plans = [planA, planB];
+        store.activePlanId = 'plan_A';
+
+        const session = { id: 's1', name: 'Leg Day', exercises: [] };
+
+        // Start workout under Plan Alpha
+        app.startWorkout(session);
+
+        expect(app.activeWorkout.planId).toBe('plan_A');
+        expect(app.activeWorkout.planName).toBe('Plan Alpha');
+
+        // Switch active plan to Plan Beta mid-workout
+        store.activePlanId = 'plan_B';
+
+        // Complete workout
+        app.activeWorkout.exercises = [
+            { name: 'Squat', muscleGroups: ['legs'], sets: 1, setsCompleted: [true], weights: ['100'], actualReps: ['5'] }
+        ];
+        app.finishWorkout();
+
+        expect(store.logs).toHaveLength(1);
+        expect(store.logs[0].planId).toBe('plan_A');
+        expect(store.logs[0].planName).toBe('Plan Alpha');
+    });
+
+    it('should fallback to store.getActivePlan() when finishing an activeWorkout lacking snapshot planId', () => {
+        const planA = { id: 'plan_A', name: 'Plan Alpha' };
+        store.plans = [planA];
+        store.activePlanId = 'plan_A';
+
+        // Legacy active workout object without planId/planName
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Arm Day' },
+            startTime: new Date(),
+            exercises: [
+                { name: 'Curl', muscleGroups: ['biceps'], sets: 1, setsCompleted: [true], weights: ['15'], actualReps: ['10'] }
+            ]
+        };
+
+        app.finishWorkout();
+
+        expect(store.logs).toHaveLength(1);
+        expect(store.logs[0].planId).toBe('plan_A');
+        expect(store.logs[0].planName).toBe('Plan Alpha');
+    });
+
+    it('should show and hide the cancel workout confirmation modal', () => {
+        const modal = document.getElementById('modal-cancel-workout');
+        expect(modal.classList.contains('hidden')).toBe(true);
+
+        app.showCancelWorkoutModal();
+        expect(modal.classList.contains('hidden')).toBe(false);
+
+        app.hideCancelWorkoutModal();
+        expect(modal.classList.contains('hidden')).toBe(true);
+    });
+
+    it('should cancel active workout, clear activeWorkoutState, and navigate home', () => {
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Leg Day' },
+            startTime: new Date(),
+            exercises: []
+        };
+        store.activeWorkoutState = app.activeWorkout;
+
+        app.showCancelWorkoutModal();
+        app.cancelWorkout();
+
+        expect(app.activeWorkout).toBeNull();
+        expect(store.activeWorkoutState).toBeNull();
+        expect(localStorage.getItem('activeWorkoutState')).toBeNull();
+        expect(app.navigate).toHaveBeenCalledWith('home');
+        expect(store.logs).toHaveLength(0);
     });
 });
 
@@ -884,5 +1100,28 @@ describe('app XSS Security', () => {
         expect(html).not.toContain('<iframe');
         expect(html).not.toContain('<svg');
         expect(html).toContain('&lt;script&gt;alert(2)&lt;/script&gt;');
+    });
+
+    it('should escape HTML in toast messages', () => {
+        document.body.innerHTML = '<div id="toast-container"></div>';
+        app.showToast('<img src=x onerror=alert(1)> Foutmelding!', 'error');
+
+        const container = document.getElementById('toast-container');
+        expect(container.innerHTML).not.toContain('<img src=x');
+        expect(container.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    });
+
+    it('should escape achievement title and description when rendering achievements', () => {
+        document.body.innerHTML = '<div id="achievements-grid"></div>';
+        store.logs = [];
+
+        app.renderAchievements();
+
+        const cards = document.querySelectorAll('.achievement');
+        expect(cards.length).toBeGreaterThan(0);
+        cards.forEach(card => {
+            expect(card.innerHTML).not.toContain('<script>');
+            expect(card.innerHTML).not.toContain('<img src=x');
+        });
     });
 });
