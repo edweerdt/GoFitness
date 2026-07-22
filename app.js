@@ -163,7 +163,7 @@ const app = {
 
         toast.innerHTML = `
             <span class="material-icons-round" style="color: ${iconColor};">${iconName}</span>
-            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${message}</div>
+            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${this.escapeHTML(String(message))}</div>
         `;
 
         container.appendChild(toast);
@@ -533,8 +533,8 @@ const app = {
                     </div>
                     <div style="display:flex; align-items:center; gap:8px; margin-left:12px; flex-shrink:0;">
                         ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
-                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${p.id}')" title="Schema delen">ios_share</span>
-                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${p.id}')">delete_outline</span>
+                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${this.escapeHTML(p.id)}')" title="Schema delen">ios_share</span>
+                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${this.escapeHTML(p.id)}')">delete_outline</span>
                     </div>
                 </div>
                 
@@ -962,10 +962,10 @@ const app = {
 
             el.innerHTML = `
                 <div class="stat-icon-wrapper text-accent" style="width:48px; height:48px; margin: 0 auto; background:rgba(59, 130, 246, 0.2);">
-                    <span class="material-icons-round">${ach.unlocked ? ach.icon : 'lock'}</span>
+                    <span class="material-icons-round">${ach.unlocked ? this.escapeHTML(ach.icon) : 'lock'}</span>
                 </div>
-                <div style="font-weight:600; font-size:0.85rem; line-height:1.2; margin-top:4px;">${ach.title}</div>
-                <div class="text-sm text-muted" style="font-size:0.7rem; line-height:1.3;">${ach.desc}</div>
+                <div style="font-weight:600; font-size:0.85rem; line-height:1.2; margin-top:4px;">${this.escapeHTML(ach.title)}</div>
+                <div class="text-sm text-muted" style="font-size:0.7rem; line-height:1.3;">${this.escapeHTML(ach.desc)}</div>
             `;
             grid.appendChild(el);
         });
@@ -1033,17 +1033,18 @@ const app = {
                     summaryHtml = '<div class="text-sm text-muted mt-2">Geen details beschikbaar (oude sessie).</div>';
                 }
 
+                const safeLogId = app.escapeHTML(log.id);
                 if (log.exercises && log.exercises.length > 0) {
                     summaryHtml += `
                         <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal('${log.id}')">edit_note</span>
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${log.id}')">delete_outline</span>
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal('${safeLogId}')">edit_note</span>
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${safeLogId}')">delete_outline</span>
                         </div>
                     `;
                 } else {
                     summaryHtml += `
                         <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${log.id}')">delete_outline</span>
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${safeLogId}')">delete_outline</span>
                         </div>
                     `;
                 }
