@@ -355,6 +355,10 @@ describe('app logic', () => {
     });
 
     describe('getRecommendedSession', () => {
+        it('should return null when no plan is active', () => {
+            expect(app.getRecommendedSession()).toBeNull();
+        });
+
         it('should return null when active plan has no sessions', () => {
             store.plans = [{ id: 'plan_1', name: 'Empty Plan' }];
             store.activePlanId = 'plan_1';
