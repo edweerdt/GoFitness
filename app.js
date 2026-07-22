@@ -32,22 +32,38 @@ class DataStore {
         }
     }
     save() {
-        localStorage.setItem('plans', JSON.stringify(this.plans));
-        if(this.activePlanId) {
-            localStorage.setItem('activePlanId', this.activePlanId);
-        } else {
-            // Anders blijft een verwijderd actief plan na een reload terugkomen
-            localStorage.removeItem('activePlanId');
+        try {
+            localStorage.setItem('plans', JSON.stringify(this.plans));
+            if(this.activePlanId) {
+                localStorage.setItem('activePlanId', this.activePlanId);
+            } else {
+                // Anders blijft een verwijderd actief plan na een reload terugkomen
+                localStorage.removeItem('activePlanId');
+            }
+            localStorage.setItem('logs', JSON.stringify(this.logs));
+            localStorage.setItem('theme', this.theme);
+            return true;
+        } catch (e) {
+            console.error('Opslaan naar localStorage mislukt:', e);
+            if (typeof app !== 'undefined' && app.showToast) {
+                app.showToast('⚠️ Opslag vol! Data kon niet worden opgeslagen.', 'error');
+            }
+            return false;
         }
-        localStorage.setItem('logs', JSON.stringify(this.logs));
-        localStorage.setItem('theme', this.theme);
     }
     saveActiveWorkoutState(state) {
         this.activeWorkoutState = state;
-        if(state) {
-            localStorage.setItem('activeWorkoutState', JSON.stringify(state));
-        } else {
-            localStorage.removeItem('activeWorkoutState');
+        try {
+            if(state) {
+                localStorage.setItem('activeWorkoutState', JSON.stringify(state));
+            } else {
+                localStorage.removeItem('activeWorkoutState');
+            }
+        } catch (e) {
+            console.error('Workout-state opslaan mislukt:', e);
+            if (typeof app !== 'undefined' && app.showToast) {
+                app.showToast('⚠️ Opslag vol! Workout-voortgang kon niet worden bewaard.', 'error');
+            }
         }
     }
     getActivePlan() {
