@@ -234,6 +234,11 @@ const app = {
         const plan = store.getActivePlan();
         if(!plan || store.logs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
 
+        // Filter logs die bij het actieve plan horen (of legacy logs / plans zonder id)
+        const activePlanId = plan.id || null;
+        const planLogs = store.logs.filter(log => (!log.planId || !activePlanId || log.planId === activePlanId) && log.date);
+        if (planLogs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
+
         const minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
         const now = new Date();
 
@@ -245,13 +250,14 @@ const app = {
             });
         }
 
-        // Per spiergroep: wanneer voor het laatst getraind?
+        // Per spiergroep: wanneer voor het laatst getraind (binnen dit plan)?
         const lastTrained = {};
-        store.logs.forEach(log => {
+        planLogs.forEach(log => {
             if (!log.date || !log.exercises) return;
             const t = new Date(log.date).getTime();
             log.exercises.forEach(ex => {
-                (ex.muscleGroups || []).forEach(mg => {
+                const groups = (ex.muscleGroups && ex.muscleGroups.length > 0) ? ex.muscleGroups : this.guessMuscleGroupsFromName(ex.name);
+                groups.forEach(mg => {
                     const g = this.normalizeMuscleGroup(mg);
                     if (!lastTrained[g] || t > lastTrained[g]) lastTrained[g] = t;
                 });
@@ -262,10 +268,13 @@ const app = {
         const rec = (plan.sessions && plan.sessions.length > 0) ? this.getRecommendedSession() : null;
         const nextGroups = [];
         if (rec && rec.session && rec.session.exercises) {
-            rec.session.exercises.forEach(ex => (ex.muscleGroups || []).forEach(mg => {
-                const g = this.normalizeMuscleGroup(mg);
-                if (!nextGroups.includes(g)) nextGroups.push(g);
-            }));
+            rec.session.exercises.forEach(ex => {
+                const groups = (ex.muscleGroups && ex.muscleGroups.length > 0) ? ex.muscleGroups : this.guessMuscleGroupsFromName(ex.name);
+                groups.forEach(mg => {
+                    const g = this.normalizeMuscleGroup(mg);
+                    if (!nextGroups.includes(g)) nextGroups.push(g);
+                });
+            });
         }
 
         // Spiergroep-specifiek stoplicht: alleen de spiergroepen die de volgende sessie
@@ -283,8 +292,8 @@ const app = {
             return { status: 'orange', text: 'Rustig aan' };
         }
 
-        // Fallback zonder spiergroep-data: algemene rusttijd sinds de laatste sessie
-        const lastLog = store.logs[store.logs.length - 1];
+        // Fallback zonder spiergroep-data: algemene rusttijd sinds de laatste sessie van DIT plan
+        const lastLog = planLogs[planLogs.length - 1];
         const hoursSinceLast = (now - new Date(lastLog.date)) / (1000 * 60 * 60);
 
         if(hoursSinceLast < (minHours * 0.5)) return { status: 'red', text: 'Beter rusten' };
@@ -294,20 +303,22 @@ const app = {
 
     getRecommendedSession() {
         const plan = store.getActivePlan();
-        if(!plan) return null;
+        if(!plan || !plan.sessions || plan.sessions.length === 0) return null;
         
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const sevenDaysAgoStr = sevenDaysAgo.toISOString();
         
-        const recentLogs = store.logs.filter(l => l.date > sevenDaysAgoStr);
+        const activePlanId = plan.id || null;
+        const recentLogs = store.logs.filter(l => l.date > sevenDaysAgoStr && (!l.planId || !activePlanId || l.planId === activePlanId));
         const doneSessionIds = recentLogs.map(l => l.sessionId);
         
         let orderedSessions = [...plan.sessions];
 
         // Use defaultSessionOrder from rich schema if available
         if (plan.schedule && plan.schedule.defaultSessionOrder && plan.schedule.defaultSessionOrder.length > 0) {
-            orderedSessions = plan.schedule.defaultSessionOrder.map(id => plan.sessions.find(s => s.id === id || s.sessionId === id)).filter(Boolean);
+            const mapped = plan.schedule.defaultSessionOrder.map(id => plan.sessions.find(s => s.id === id || s.sessionId === id)).filter(Boolean);
+            if (mapped.length > 0) orderedSessions = mapped;
         } else {
             // Sort by dayOrderHint if available
             orderedSessions.sort((a, b) => (a.dayOrderHint || 99) - (b.dayOrderHint || 99));
@@ -318,7 +329,7 @@ const app = {
         if(nextSession) {
             return {
                 session: nextSession,
-                reason: `Dit is de volgende in je schema (${plan.name}).`
+                reason: `Dit is de volgende in je schema (${plan.name || 'Schema'}).`
             };
         }
         
@@ -330,9 +341,8 @@ const app = {
 
     // --- UTILS ---
 
-    // Normaliseert spiergroep-namen uit schema's (hoofdletters, synoniemen) naar de interne sleutels
     normalizeMuscleGroup(mg) {
-        const key = String(mg).toLowerCase().trim();
+        const key = String(mg || '').toLowerCase().trim();
         const aliases = {
             biceps: 'arms', triceps: 'arms', forearms: 'arms',
             quads: 'legs', hamstrings: 'legs', calves: 'legs',
