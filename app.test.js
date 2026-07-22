@@ -440,6 +440,7 @@ describe('workout flow', () => {
             <div id="toast-container"></div>
         `;
         jest.spyOn(app, 'navigate').mockImplementation(() => {});
+        jest.spyOn(app, 'openWorkoutView').mockImplementation(() => {});
     });
 
     afterEach(() => {
