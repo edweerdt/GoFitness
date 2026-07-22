@@ -487,6 +487,55 @@ describe('workout flow', () => {
         expect(store.logs).toHaveLength(1);
         expect(store.logs[0].duration).toBe(240);
     });
+
+    it('should snapshot planId and planName at workout start and retain them on finish even if active plan changes', () => {
+        const planA = { id: 'plan_A', name: 'Plan Alpha', sessions: [] };
+        const planB = { id: 'plan_B', name: 'Plan Beta', sessions: [] };
+        store.plans = [planA, planB];
+        store.activePlanId = 'plan_A';
+
+        const session = { id: 's1', name: 'Leg Day', exercises: [] };
+
+        // Start workout under Plan Alpha
+        app.startWorkout(session);
+
+        expect(app.activeWorkout.planId).toBe('plan_A');
+        expect(app.activeWorkout.planName).toBe('Plan Alpha');
+
+        // Switch active plan to Plan Beta mid-workout
+        store.activePlanId = 'plan_B';
+
+        // Complete workout
+        app.activeWorkout.exercises = [
+            { name: 'Squat', muscleGroups: ['legs'], sets: 1, setsCompleted: [true], weights: ['100'], actualReps: ['5'] }
+        ];
+        app.finishWorkout();
+
+        expect(store.logs).toHaveLength(1);
+        expect(store.logs[0].planId).toBe('plan_A');
+        expect(store.logs[0].planName).toBe('Plan Alpha');
+    });
+
+    it('should fallback to store.getActivePlan() when finishing an activeWorkout lacking snapshot planId', () => {
+        const planA = { id: 'plan_A', name: 'Plan Alpha' };
+        store.plans = [planA];
+        store.activePlanId = 'plan_A';
+
+        // Legacy active workout object without planId/planName
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Arm Day' },
+            startTime: new Date(),
+            exercises: [
+                { name: 'Curl', muscleGroups: ['biceps'], sets: 1, setsCompleted: [true], weights: ['15'], actualReps: ['10'] }
+            ]
+        };
+
+        app.finishWorkout();
+
+        expect(store.logs).toHaveLength(1);
+        expect(store.logs[0].planId).toBe('plan_A');
+        expect(store.logs[0].planName).toBe('Plan Alpha');
+    });
 });
 
 describe('editing session duration', () => {

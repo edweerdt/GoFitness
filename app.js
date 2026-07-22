@@ -1142,7 +1142,12 @@ const app = {
     // --- WORKOUT FLOW ---
 
     startWorkout(session) {
+        // Snapshot plan-info zodat wisselen van actief plan tijdens de workout
+        // niet leidt tot een log die aan het verkeerde plan wordt gekoppeld
+        const activePlan = store.getActivePlan();
         this.activeWorkout = {
+            planId: activePlan ? activePlan.id : null,
+            planName: activePlan ? activePlan.name : 'Overige Sessies',
             session: session,
             startTime: new Date(),
             exercises: session.exercises.map(e => ({
@@ -1464,11 +1469,15 @@ const app = {
             }
         });
 
-        const activePlan = store.getActivePlan();
+        // Gebruik het plan dat bij de start is opgeslagen (niet het huidige actieve plan)
+        // Fallback naar store.getActivePlan() voor oude workout-states zonder planId
+        const snapshotPlanId = this.activeWorkout.planId;
+        const snapshotPlanName = this.activeWorkout.planName;
+        const fallbackPlan = (snapshotPlanId === undefined) ? store.getActivePlan() : null;
 
         store.saveWorkoutLog({
-            planId: activePlan ? activePlan.id : null,
-            planName: activePlan ? activePlan.name : 'Overige Sessies',
+            planId: snapshotPlanId !== undefined ? snapshotPlanId : (fallbackPlan ? fallbackPlan.id : null),
+            planName: snapshotPlanName !== undefined ? snapshotPlanName : (fallbackPlan ? fallbackPlan.name : 'Overige Sessies'),
             sessionId: this.activeWorkout.session.id,
             sessionName: this.activeWorkout.session.name,
             duration: duration,
