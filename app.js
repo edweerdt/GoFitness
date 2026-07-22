@@ -234,8 +234,9 @@ const app = {
         const plan = store.getActivePlan();
         if(!plan || store.logs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
 
-        // Filter logs die bij het actieve plan horen (of legacy logs zonder planId)
-        const planLogs = store.logs.filter(log => !log.planId || log.planId === plan.id);
+        // Filter logs die bij het actieve plan horen (of legacy logs / plans zonder id)
+        const activePlanId = plan.id || null;
+        const planLogs = store.logs.filter(log => !log.planId || !activePlanId || log.planId === activePlanId);
         if (planLogs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
 
         const minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
@@ -304,7 +305,8 @@ const app = {
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const sevenDaysAgoStr = sevenDaysAgo.toISOString();
         
-        const recentLogs = store.logs.filter(l => l.date > sevenDaysAgoStr && (!l.planId || l.planId === plan.id));
+        const activePlanId = plan.id || null;
+        const recentLogs = store.logs.filter(l => l.date > sevenDaysAgoStr && (!l.planId || !activePlanId || l.planId === activePlanId));
         const doneSessionIds = recentLogs.map(l => l.sessionId);
         
         let orderedSessions = [...plan.sessions];
