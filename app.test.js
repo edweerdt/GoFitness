@@ -1033,20 +1033,19 @@ describe('app XSS Security', () => {
         document.body.innerHTML = '<div id="toast-container"></div>';
         app.showToast('<img src=x onerror=alert(1)> Foutmelding!', 'error');
 
-        const toast = document.getElementById('toast-container');
-        expect(toast.innerHTML).not.toContain('<img');
-        expect(toast.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt; Foutmelding!');
+        const container = document.getElementById('toast-container');
+        expect(container.innerHTML).not.toContain('<img src=x');
+        expect(container.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt;');
     });
 
     it('should escape achievement title and description when rendering achievements', () => {
         document.body.innerHTML = '<div id="achievements-grid"></div>';
         store.logs = [];
 
-        // Temporarily mock an achievement with HTML
-        const origRender = app.renderAchievements;
         app.renderAchievements();
 
         const cards = document.querySelectorAll('.achievement');
+        expect(cards.length).toBeGreaterThan(0);
         cards.forEach(card => {
             expect(card.innerHTML).not.toContain('<script>');
             expect(card.innerHTML).not.toContain('<img src=x');
