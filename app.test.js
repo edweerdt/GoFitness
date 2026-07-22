@@ -1052,3 +1052,27 @@ describe('app XSS Security', () => {
         });
     });
 });
+
+describe('PWA manifest', () => {
+    it('should have all required PWA manifest fields including id, scope, lang, categories and icons', () => {
+        const fs = require('fs');
+        const path = require('path');
+        const manifestPath = path.join(__dirname, 'manifest.json');
+        const manifestRaw = fs.readFileSync(manifestPath, 'utf8');
+        const manifest = JSON.parse(manifestRaw);
+
+        expect(manifest.id).toBe('./');
+        expect(manifest.scope).toBe('./');
+        expect(manifest.lang).toBe('nl');
+        expect(manifest.name).toBe('Go Fitness');
+        expect(manifest.start_url).toBe('./index.html');
+        expect(manifest.display).toBe('standalone');
+        expect(Array.isArray(manifest.categories)).toBe(true);
+        expect(manifest.categories).toContain('fitness');
+
+        expect(Array.isArray(manifest.icons)).toBe(true);
+        expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
+        const maskableIcon = manifest.icons.find(i => i.purpose === 'maskable');
+        expect(maskableIcon).toBeDefined();
+    });
+});
