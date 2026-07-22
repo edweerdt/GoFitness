@@ -98,6 +98,17 @@
                         <button class="btn-secondary flex-1" onclick="document.getElementById('restore-file').click()"><span class="material-icons-round">restore</span> Herstel</button>
                     </div>
                     <input type="file" id="restore-file" accept=".json" class="hidden">
+
+                    <!-- Cloud-sync via Google -->
+                    <div class="glass-panel mt-4" id="sync-panel">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                            <div style="font-weight:600;">Cloud-sync</div>
+                            <span id="sync-status" class="status-badge" style="padding:2px 10px; font-size:0.7rem;">uit</span>
+                        </div>
+                        <div id="sync-detail" class="text-sm text-muted mt-1"></div>
+                        <div class="actions-row mt-3" id="sync-actions"></div>
+                    </div>
+
                     <div id="plans-list" class="mt-4 flex-col gap-3">
                         <!-- Plans injected here -->
                     </div>
@@ -280,7 +291,9 @@
     </div>
     
     <script src="app.js"></script>
+    <script src="sync.js"></script>
     <script>
+        CloudSync.init({ store: store, app: app });
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(reg => console.log('SW geregistreerd!'))
