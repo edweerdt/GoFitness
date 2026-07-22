@@ -603,7 +603,7 @@ describe('workout flow', () => {
 
         expect(app.activeWorkout).toBeNull();
         expect(store.activeWorkoutState).toBeNull();
-        expect(mockLocalStorage.getItem('activeWorkoutState')).toBeNull();
+        expect(localStorage.getItem('activeWorkoutState')).toBeNull();
         expect(app.navigate).toHaveBeenCalledWith('home');
         expect(store.logs).toHaveLength(0);
     });
