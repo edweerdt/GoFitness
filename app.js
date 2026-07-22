@@ -298,7 +298,7 @@ const app = {
 
     getRecommendedSession() {
         const plan = store.getActivePlan();
-        if(!plan) return null;
+        if(!plan || !plan.sessions || plan.sessions.length === 0) return null;
         
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
