@@ -37,6 +37,10 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+    // Alleen same-origin GET-requests afhandelen: externe calls (Google-login,
+    // Drive API) mogen nooit gecachet of beantwoord worden door de service worker
+    if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return;
+
     e.respondWith(
         // Network-first strategie: haal altijd eerst de nieuwste versie op
         fetch(e.request).then(response => {
