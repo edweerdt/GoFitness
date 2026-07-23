@@ -1018,23 +1018,23 @@ describe('validatePlanSchema', () => {
     };
 
     it('should accept a valid plan schema', () => {
-        expect(app.validatePlanSchema(validPlan)).toBe(true);
+        expect(DataStore.validatePlanSchema(validPlan)).toBe(true);
     });
 
     it('should reject non-object or null plan data', () => {
-        expect(() => app.validatePlanSchema(null)).toThrow("JSON-object");
-        expect(() => app.validatePlanSchema("invalid")).toThrow("JSON-object");
-        expect(() => app.validatePlanSchema([])).toThrow("JSON-object");
+        expect(() => DataStore.validatePlanSchema(null)).toThrow("JSON-object");
+        expect(() => DataStore.validatePlanSchema("invalid")).toThrow("JSON-object");
+        expect(() => DataStore.validatePlanSchema([])).toThrow("JSON-object");
     });
 
     it('should reject plan data with missing or empty name', () => {
-        expect(() => app.validatePlanSchema({ sessions: validPlan.sessions })).toThrow("Schema-naam ('name') is verplicht");
-        expect(() => app.validatePlanSchema({ name: '  ', sessions: validPlan.sessions })).toThrow("Schema-naam ('name') is verplicht");
+        expect(() => DataStore.validatePlanSchema({ sessions: validPlan.sessions })).toThrow("Schema-naam ('name') is verplicht");
+        expect(() => DataStore.validatePlanSchema({ name: '  ', sessions: validPlan.sessions })).toThrow("Schema-naam ('name') is verplicht");
     });
 
     it('should reject plan data with missing or empty sessions array', () => {
-        expect(() => app.validatePlanSchema({ name: 'Plan' })).toThrow("minstens één sessie");
-        expect(() => app.validatePlanSchema({ name: 'Plan', sessions: [] })).toThrow("minstens één sessie");
+        expect(() => DataStore.validatePlanSchema({ name: 'Plan' })).toThrow("minstens één sessie");
+        expect(() => DataStore.validatePlanSchema({ name: 'Plan', sessions: [] })).toThrow("minstens één sessie");
     });
 
     it('should reject session missing a valid name', () => {
@@ -1042,7 +1042,7 @@ describe('validatePlanSchema', () => {
             name: 'Plan',
             sessions: [{ name: '', exercises: [{ name: 'Squat', sets: 3 }] }]
         };
-        expect(() => app.validatePlanSchema(invalid)).toThrow("Sessienaam ('name') is verplicht");
+        expect(() => DataStore.validatePlanSchema(invalid)).toThrow("Sessienaam ('name') is verplicht");
     });
 
     it('should reject session missing an exercises array or having empty exercises', () => {
@@ -1054,8 +1054,8 @@ describe('validatePlanSchema', () => {
             name: 'Plan',
             sessions: [{ name: 'Sessie A', exercises: [] }]
         };
-        expect(() => app.validatePlanSchema(invalid1)).toThrow("minstens één oefening");
-        expect(() => app.validatePlanSchema(invalid2)).toThrow("minstens één oefening");
+        expect(() => DataStore.validatePlanSchema(invalid1)).toThrow("minstens één oefening");
+        expect(() => DataStore.validatePlanSchema(invalid2)).toThrow("minstens één oefening");
     });
 
     it('should reject exercise missing a name', () => {
@@ -1063,7 +1063,7 @@ describe('validatePlanSchema', () => {
             name: 'Plan',
             sessions: [{ name: 'Sessie A', exercises: [{ sets: 3 }] }]
         };
-        expect(() => app.validatePlanSchema(invalid)).toThrow("Oefeningnaam ('name') is verplicht");
+        expect(() => DataStore.validatePlanSchema(invalid)).toThrow("Oefeningnaam ('name') is verplicht");
     });
 
     it('should reject exercise with missing, non-numeric, or <= 0 sets', () => {
@@ -1079,9 +1079,9 @@ describe('validatePlanSchema', () => {
             name: 'Plan',
             sessions: [{ name: 'Sessie A', exercises: [{ name: 'Squat', sets: 'vijf' }] }]
         };
-        expect(() => app.validatePlanSchema(invalid1)).toThrow("Aantal sets ('sets') moet een getal groter dan 0 zijn");
-        expect(() => app.validatePlanSchema(invalid2)).toThrow("Aantal sets ('sets') moet een getal groter dan 0 zijn");
-        expect(() => app.validatePlanSchema(invalid3)).toThrow("Aantal sets ('sets') moet een getal groter dan 0 zijn");
+        expect(() => DataStore.validatePlanSchema(invalid1)).toThrow("Aantal sets ('sets') moet een getal groter dan 0 zijn");
+        expect(() => DataStore.validatePlanSchema(invalid2)).toThrow("Aantal sets ('sets') moet een getal groter dan 0 zijn");
+        expect(() => DataStore.validatePlanSchema(invalid3)).toThrow("Aantal sets ('sets') moet een getal groter dan 0 zijn");
     });
 
     it('should prevent importing invalid plans into store.importPlan', () => {
