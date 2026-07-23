@@ -22,6 +22,21 @@ class DataStore {
         this.theme = localStorage.getItem('theme') || 'auto';
         // Tombstones: ids van verwijderde items, zodat cloud-sync ze niet terugbrengt
         this.deleted = this.safeParse('deleted', { plans: [], logs: [] });
+        this.sanitizeLogPlanIds();
+    }
+    sanitizeLogPlanIds() {
+        if (!this.plans || !this.logs) return;
+        this.logs.forEach(log => {
+            if (log.planId && !this.plans.some(p => p.id === log.planId)) {
+                const matchedPlan = this.plans.find(p => 
+                    (p.planId && p.planId === log.planId) ||
+                    (log.planName && p.name && log.planName.toLowerCase().trim() === p.name.toLowerCase().trim())
+                );
+                if (matchedPlan) {
+                    log.planId = matchedPlan.id;
+                }
+            }
+        });
     }
     safeParse(key, fallback) {
         // Corrupte data in localStorage mag de app niet laten crashen bij het opstarten
@@ -285,14 +300,27 @@ const app = {
     },
 
     // --- LOGIC ---
+
+    isLogForPlan(log, plan) {
+        if (!log || !plan) return false;
+        if (!log.planId && !log.planName) return true;
+
+        const pId = plan.id || null;
+        const pPlanId = plan.planId || null;
+        const pName = plan.name ? plan.name.toLowerCase().trim() : null;
+
+        if (log.planId && (log.planId === pId || log.planId === pPlanId)) return true;
+        if (log.planName && pName && log.planName.toLowerCase().trim() === pName) return true;
+
+        return false;
+    },
     
     getRecoveryStatus() {
         const plan = store.getActivePlan();
         if(!plan || store.logs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
 
-        // Filter logs die bij het actieve plan horen (of legacy logs / plans zonder id)
-        const activePlanId = plan.id || null;
-        const planLogs = store.logs.filter(log => (!log.planId || !activePlanId || log.planId === activePlanId) && log.date);
+        // Filter logs die bij het actieve plan horen (of legacy logs / matching op naam/id)
+        const planLogs = store.logs.filter(log => this.isLogForPlan(log, plan) && log.date);
         if (planLogs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
 
         const minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
@@ -349,7 +377,8 @@ const app = {
         }
 
         // Fallback zonder spiergroep-data: algemene rusttijd sinds de laatste sessie van DIT plan
-        const lastLog = planLogs[planLogs.length - 1];
+        const sortedLogs = [...planLogs].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const lastLog = sortedLogs[0];
         const hoursSinceLast = (now - new Date(lastLog.date)) / (1000 * 60 * 60);
 
         if(hoursSinceLast < (minHours * 0.5)) return { status: 'red', text: 'Beter rusten' };
@@ -372,8 +401,7 @@ const app = {
             orderedSessions.sort((a, b) => (a.dayOrderHint || 99) - (b.dayOrderHint || 99));
         }
 
-        const activePlanId = plan.id || null;
-        const planLogs = store.logs.filter(l => (!l.planId || !activePlanId || l.planId === activePlanId));
+        const planLogs = store.logs.filter(l => this.isLogForPlan(l, plan));
         
         if (planLogs.length === 0) {
             return {
@@ -582,7 +610,7 @@ const app = {
             const oneWeekAgo = new Date();
             oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
             const oneWeekAgoStr = oneWeekAgo.toISOString();
-            const recentLogsCount = store.logs.filter(l => l.date > oneWeekAgoStr && l.planId === plan.id).length;
+            const recentLogsCount = store.logs.filter(l => l.date > oneWeekAgoStr && this.isLogForPlan(l, plan)).length;
 
             const progressText = `${recentLogsCount}/${targetSessions} sessies deze week`;
 

@@ -477,6 +477,35 @@ describe('app logic', () => {
             const recommended = app.getRecommendedSession();
             expect(recommended.session).toEqual(session1);
         });
+
+        it('should match logs by planName when planId differs due to plan re-import', () => {
+            const sessionA = { id: 'full-body-a', name: 'Full Body A' };
+            const sessionB = { id: 'full-body-b', name: 'Full Body B' };
+            const plan = { id: 'plan_new', planId: 'my-schema', name: 'My Schema', sessions: [sessionA, sessionB] };
+            store.plans = [plan];
+            store.activePlanId = 'plan_new';
+
+            // Log has an old planId from a previous import, but same planName
+            const recentLog = {
+                planId: 'plan_old',
+                planName: 'My Schema',
+                sessionId: 'full-body-a',
+                date: new Date(Date.now() - 3600000).toISOString(),
+                exercises: [{ name: 'Leg Press', muscleGroups: ['legs'] }]
+            };
+            store.logs = [recentLog];
+
+            // isLogForPlan should match this log to the active plan
+            expect(app.isLogForPlan(recentLog, plan)).toBe(true);
+
+            // getRecoveryStatus should recognize the recent log and not blindly return green
+            const recStatus = app.getRecoveryStatus();
+            expect(recStatus.status).not.toBe('green');
+
+            // sanitizeLogPlanIds should update the log planId to matched active plan.id
+            store.sanitizeLogPlanIds();
+            expect(store.logs[0].planId).toBe('plan_new');
+        });
     });
 
     describe('calculateStreak', () => {
