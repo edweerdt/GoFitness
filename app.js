@@ -654,7 +654,7 @@ const app = {
                                             <div style="font-weight:500; font-size:0.9rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${this.escapeHTML(s.name)}</div>
                                             <div class="text-sm text-muted">${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}</div>
                                         </div>
-                                        <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;" onclick="app.startWorkoutBySessionId('${this.escapeHTML(p.id)}', '${sId}')" title="Start ${this.escapeHTML(s.name)}">
+                                        <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;" onclick="app.startWorkoutBySessionId('${this.escapeHTML(p.id)}', '${sId}')" title="Start sessie">
                                             <span class="material-icons-round" style="font-size:1rem;">play_arrow</span> Start
                                         </button>
                                     </div>

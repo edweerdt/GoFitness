@@ -529,6 +529,7 @@ describe('workout flow', () => {
         store.plans = [];
         store.activePlanId = null;
         store.logs = [];
+        app.activeWorkout = null;
         document.body.innerHTML = `
             <div id="modal-finish-workout" class="modal-overlay hidden"></div>
             <div id="modal-cancel-workout" class="modal-overlay hidden"></div>
