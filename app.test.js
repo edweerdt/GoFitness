@@ -638,6 +638,61 @@ describe('workout flow', () => {
         expect(app.navigate).toHaveBeenCalledWith('home');
         expect(store.logs).toHaveLength(0);
     });
+
+    it('should start a specific session via startWorkoutBySessionId and make its plan active', () => {
+        const session1 = { id: 's1', name: 'Push', exercises: [{ name: 'Bench', sets: 3 }] };
+        const session2 = { id: 's2', name: 'Pull', exercises: [{ name: 'Row', sets: 3 }] };
+        const plan = { id: 'plan_1', name: 'PPL Plan', sessions: [session1, session2] };
+
+        store.plans = [plan];
+        store.activePlanId = null;
+
+        app.startWorkoutBySessionId('plan_1', 's2');
+
+        expect(store.activePlanId).toBe('plan_1');
+        expect(app.activeWorkout).not.toBeNull();
+        expect(app.activeWorkout.session.name).toBe('Pull');
+        expect(app.activeWorkout.planId).toBe('plan_1');
+        expect(app.activeWorkout.planName).toBe('PPL Plan');
+    });
+
+    it('should populate session picker on home view when plan has multiple sessions', () => {
+        document.body.innerHTML = `
+            <div id="recovery-status" class="status-badge"><span class="material-icons-round"></span></div>
+            <div id="recovery-text"></div>
+            <div id="recommended-card-title"></div>
+            <div id="recommended-session-name"></div>
+            <div id="recommended-reason"></div>
+            <div id="session-picker-wrapper" class="hidden"><select id="home-session-select"></select></div>
+            <button id="btn-start-session"></button>
+            <div id="home-date"></div>
+            <div id="stat-completed"></div>
+            <div id="stat-streak"></div>
+            <div class="stats-mini"></div>
+        `;
+
+        const session1 = { id: 's1', name: 'Sessie 1', exercises: [{ name: 'Squat', sets: 3 }] };
+        const session2 = { id: 's2', name: 'Sessie 2', exercises: [{ name: 'Bench', sets: 3 }] };
+        const plan = { id: 'plan_1', name: 'Duo Schema', sessions: [session1, session2] };
+
+        store.plans = [plan];
+        store.activePlanId = 'plan_1';
+        store.logs = [];
+
+        app.renderHome();
+
+        const pickerWrapper = document.getElementById('session-picker-wrapper');
+        const sessionSelect = document.getElementById('home-session-select');
+        expect(pickerWrapper.classList.contains('hidden')).toBe(false);
+        expect(sessionSelect.children.length).toBe(2);
+
+        // Change dropdown to session 2
+        sessionSelect.value = 's2';
+        sessionSelect.onchange();
+
+        expect(document.getElementById('recommended-session-name').textContent).toBe('Sessie 2');
+        expect(document.getElementById('recommended-card-title').textContent).toBe('Gekozen Sessie');
+    });
 });
 
 describe('editing session duration', () => {

@@ -494,8 +494,11 @@ const app = {
         badge.querySelector('.material-icons-round').textContent = icon;
 
         const btnStart = document.getElementById('btn-start-session');
+        const pickerWrapper = document.getElementById('session-picker-wrapper');
+        const sessionSelect = document.getElementById('home-session-select');
         
         if (this.activeWorkout) {
+            if (pickerWrapper) pickerWrapper.classList.add('hidden');
             document.getElementById('recommended-card-title').textContent = "Sessie in uitvoering";
             document.getElementById('recommended-session-name').textContent = this.activeWorkout.session.name;
             document.getElementById('recommended-reason').textContent = "Je was al bezig met deze sessie. Pak hem weer op!";
@@ -503,15 +506,44 @@ const app = {
             btnStart.disabled = false;
             btnStart.onclick = () => this.openWorkoutView();
         } else {
-            document.getElementById('recommended-card-title').textContent = "Aanbevolen Sessie";
+            const activePlan = store.getActivePlan();
             const recSession = this.getRecommendedSession();
-            if(recSession) {
+
+            if (recSession && activePlan && activePlan.sessions && activePlan.sessions.length > 0) {
+                if (pickerWrapper && sessionSelect && activePlan.sessions.length > 1) {
+                    sessionSelect.innerHTML = activePlan.sessions.map(s => {
+                        const sId = s.id || s.sessionId;
+                        const isRec = sId === (recSession.session.id || recSession.session.sessionId);
+                        const label = isRec ? `${this.escapeHTML(s.name)} (Aanbevolen)` : this.escapeHTML(s.name);
+                        return `<option value="${this.escapeHTML(sId)}"${isRec ? ' selected' : ''}>${label}</option>`;
+                    }).join('');
+
+                    pickerWrapper.classList.remove('hidden');
+
+                    sessionSelect.onchange = () => {
+                        const chosenId = sessionSelect.value;
+                        const chosenSession = activePlan.sessions.find(s => (s.id || s.sessionId) === chosenId);
+                        if (!chosenSession) return;
+
+                        const isRecChoice = (chosenSession.id || chosenSession.sessionId) === (recSession.session.id || recSession.session.sessionId);
+                        document.getElementById('recommended-card-title').textContent = isRecChoice ? "Aanbevolen Sessie" : "Gekozen Sessie";
+                        document.getElementById('recommended-session-name').textContent = chosenSession.name;
+                        document.getElementById('recommended-reason').textContent = isRecChoice ? recSession.reason : `Handmatig gekozen uit schema (${activePlan.name}).`;
+                        btnStart.onclick = () => this.startWorkout(chosenSession, activePlan);
+                    };
+                } else if (pickerWrapper) {
+                    pickerWrapper.classList.add('hidden');
+                }
+
+                document.getElementById('recommended-card-title').textContent = "Aanbevolen Sessie";
                 document.getElementById('recommended-session-name').textContent = recSession.session.name;
                 document.getElementById('recommended-reason').textContent = recSession.reason;
                 btnStart.textContent = "Start Nu";
                 btnStart.disabled = false;
-                btnStart.onclick = () => this.startWorkout(recSession.session);
+                btnStart.onclick = () => this.startWorkout(recSession.session, activePlan);
             } else {
+                if (pickerWrapper) pickerWrapper.classList.add('hidden');
+                document.getElementById('recommended-card-title').textContent = "Aanbevolen Sessie";
                 document.getElementById('recommended-session-name').textContent = "Geen schema actief";
                 document.getElementById('recommended-reason').textContent = "Importeer eerst een trainingsschema via Schema's.";
                 btnStart.textContent = "Start Nu";
@@ -588,6 +620,32 @@ const app = {
             const progressionRules = this.formatRichField(p.progressionRules, 'Progressieregels');
 
 
+            let sessionsListHtml = '';
+            if (p.sessions && p.sessions.length > 0) {
+                sessionsListHtml = `
+                    <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+                        <div style="font-weight:600; font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:6px;">Sessies in dit schema</div>
+                        <div class="flex-col gap-2">
+                            ${p.sessions.map(s => {
+                                const sId = this.escapeHTML(s.id || s.sessionId);
+                                const exCount = (s.exercises || []).length;
+                                return `
+                                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.03); padding:8px 12px; border-radius:8px;">
+                                        <div style="min-width:0; flex:1; margin-right:8px;">
+                                            <div style="font-weight:500; font-size:0.9rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${this.escapeHTML(s.name)}</div>
+                                            <div class="text-sm text-muted">${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}</div>
+                                        </div>
+                                        <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;" onclick="app.startWorkoutBySessionId('${this.escapeHTML(p.id)}', '${sId}')" title="Start ${this.escapeHTML(s.name)}">
+                                            <span class="material-icons-round" style="font-size:1rem;">play_arrow</span> Start
+                                        </button>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
             el.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div style="flex:1; min-width:0;">
@@ -622,6 +680,8 @@ const app = {
                     ${recPattern}
                     ${sessionOrder}
                 </div>
+
+                ${sessionsListHtml}
                 
                 ${!isActive ? `<button class="btn-secondary mt-3 w-full" onclick="app.setActivePlan('${p.id}')">Maak Actief</button>` : ''}
             `;
@@ -1210,13 +1270,15 @@ const app = {
 
     // --- WORKOUT FLOW ---
 
-    startWorkout(session) {
-        // Snapshot plan-info zodat wisselen van actief plan tijdens de workout
-        // niet leidt tot een log die aan het verkeerde plan wordt gekoppeld
-        const activePlan = store.getActivePlan();
+    startWorkout(session, planOverride = null) {
+        const plan = planOverride || store.getActivePlan();
+        if (planOverride && store.activePlanId !== planOverride.id) {
+            store.activePlanId = planOverride.id;
+            store.save();
+        }
         this.activeWorkout = {
-            planId: activePlan ? activePlan.id : null,
-            planName: activePlan ? activePlan.name : 'Overige Sessies',
+            planId: plan ? plan.id : null,
+            planName: plan ? plan.name : 'Overige Sessies',
             session: session,
             startTime: new Date(),
             exercises: session.exercises.map(e => ({
@@ -1228,6 +1290,14 @@ const app = {
         };
         store.saveActiveWorkoutState(this.activeWorkout);
         this.openWorkoutView();
+    },
+
+    startWorkoutBySessionId(planId, sessionId) {
+        const plan = store.plans.find(p => p.id === planId);
+        if (!plan) return;
+        const session = (plan.sessions || []).find(s => (s.id || s.sessionId) === sessionId);
+        if (!session) return;
+        this.startWorkout(session, plan);
     },
 
     // Opent de workout-view voor de actieve workout (zowel starten als hervatten)
