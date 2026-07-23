@@ -80,7 +80,50 @@ class DataStore {
     getActivePlan() {
         return this.plans.find(p => p.id === this.activePlanId) || null;
     }
+    static validatePlanSchema(data) {
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+            throw new Error("Ongeldig formaat. Het schema moet een JSON-object zijn.");
+        }
+        if (!data.name || typeof data.name !== 'string' || !data.name.trim()) {
+            throw new Error("Ongeldig formaat: Schema-naam ('name') is verplicht.");
+        }
+        if (!data.sessions || !Array.isArray(data.sessions) || data.sessions.length === 0) {
+            throw new Error("Ongeldig formaat: Het schema moet minstens één sessie ('sessions') bevatten.");
+        }
+
+        data.sessions.forEach((s, sIdx) => {
+            if (!s || typeof s !== 'object' || Array.isArray(s)) {
+                throw new Error(`Ongeldige sessie op positie ${sIdx + 1}: moet een object zijn.`);
+            }
+            const sessionName = (typeof s.name === 'string' && s.name.trim()) ? s.name.trim() : (s.id || s.sessionId || `Sessie ${sIdx + 1}`);
+            if (!s.name || typeof s.name !== 'string' || !s.name.trim()) {
+                throw new Error(`Ongeldige sessie #${sIdx + 1}: Sessienaam ('name') is verplicht.`);
+            }
+            if (!s.exercises || !Array.isArray(s.exercises) || s.exercises.length === 0) {
+                throw new Error(`Ongeldige sessie '${sessionName}': Moet minstens één oefening ('exercises') bevatten.`);
+            }
+
+            s.exercises.forEach((ex, exIdx) => {
+                if (!ex || typeof ex !== 'object' || Array.isArray(ex)) {
+                    throw new Error(`Ongeldige oefening op positie ${exIdx + 1} in sessie '${sessionName}': moet een object zijn.`);
+                }
+                const exName = (typeof ex.name === 'string' && ex.name.trim()) ? ex.name.trim() : `Oefening ${exIdx + 1}`;
+                if (!ex.name || typeof ex.name !== 'string' || !ex.name.trim()) {
+                    throw new Error(`Ongeldige oefening #${exIdx + 1} in sessie '${sessionName}': Oefeningnaam ('name') is verplicht.`);
+                }
+                const setsNum = Number(ex.sets);
+                if (ex.sets === undefined || ex.sets === null || isNaN(setsNum) || setsNum <= 0) {
+                    throw new Error(`Ongeldige oefening '${exName}' in sessie '${sessionName}': Aantal sets ('sets') moet een getal groter dan 0 zijn.`);
+                }
+            });
+        });
+
+        return true;
+    }
+
     importPlan(planData) {
+        DataStore.validatePlanSchema(planData);
+
         planData.id = 'plan_' + Date.now();
 
         // Normalize top-level rich schema fields
@@ -1759,6 +1802,7 @@ const app = {
         reader.readAsText(file);
     },
 
+
     previewImport() {
         const text = document.getElementById('import-json-text').value;
         const errEl = document.getElementById('import-error');
@@ -1766,9 +1810,7 @@ const app = {
         
         try {
             const data = JSON.parse(text);
-            if(!data.name || !data.sessions || !Array.isArray(data.sessions)) {
-                throw new Error("Ongeldig formaat. Mist 'name' of 'sessions'.");
-            }
+            DataStore.validatePlanSchema(data);
             
             const prevEl = document.getElementById('import-preview');
             const totalEx = data.sessions.reduce((sum, s) => sum + (s.exercises ? s.exercises.length : 0), 0);
