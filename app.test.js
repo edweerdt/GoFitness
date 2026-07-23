@@ -710,9 +710,9 @@ describe('import flow', () => {
     });
 
     it('should keep the existing active plan when importing another plan', () => {
-        store.importPlan({ name: 'Plan A', sessions: [] });
+        store.importPlan({ name: 'Plan A', sessions: [{ name: 'S1', exercises: [{ name: 'E1', sets: 3 }] }] });
         const firstId = store.activePlanId;
-        store.importPlan({ name: 'Plan B', sessions: [] });
+        store.importPlan({ name: 'Plan B', sessions: [{ name: 'S1', exercises: [{ name: 'E1', sets: 3 }] }] });
 
         expect(store.plans).toHaveLength(2);
         expect(store.activePlanId).toBe(firstId);
