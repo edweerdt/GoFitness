@@ -361,14 +361,6 @@ const app = {
         const plan = store.getActivePlan();
         if(!plan || !plan.sessions || plan.sessions.length === 0) return null;
         
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const sevenDaysAgoStr = sevenDaysAgo.toISOString();
-        
-        const activePlanId = plan.id || null;
-        const recentLogs = store.logs.filter(l => l.date > sevenDaysAgoStr && (!l.planId || !activePlanId || l.planId === activePlanId));
-        const doneSessionIds = recentLogs.map(l => l.sessionId);
-        
         let orderedSessions = [...plan.sessions];
 
         // Use defaultSessionOrder from rich schema if available
@@ -380,18 +372,45 @@ const app = {
             orderedSessions.sort((a, b) => (a.dayOrderHint || 99) - (b.dayOrderHint || 99));
         }
 
-        const nextSession = orderedSessions.find(s => !doneSessionIds.includes(s.id));
+        const activePlanId = plan.id || null;
+        const planLogs = store.logs.filter(l => (!l.planId || !activePlanId || l.planId === activePlanId));
         
-        if(nextSession) {
+        if (planLogs.length === 0) {
             return {
-                session: nextSession,
+                session: orderedSessions[0],
                 reason: `Dit is de volgende in je schema (${plan.name || 'Schema'}).`
             };
         }
-        
+
+        // Sorteer logs op datum (meest recente bovenaan)
+        const sortedLogs = [...planLogs].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const lastLog = sortedLogs[0];
+
+        // Vind de positie van de laatst voltooide sessie in orderedSessions
+        const lastIndex = orderedSessions.findIndex(s => 
+            (s.id && s.id === lastLog.sessionId) || 
+            (s.sessionId && s.sessionId === lastLog.sessionId)
+        );
+
+        if (lastIndex === -1) {
+            // Fallback als de laatst gedane sessie niet (meer) in de lijst voorkomt
+            return {
+                session: orderedSessions[0],
+                reason: `Dit is de volgende in je schema (${plan.name || 'Schema'}).`
+            };
+        }
+
+        const nextIndex = (lastIndex + 1) % orderedSessions.length;
+        const nextSession = orderedSessions[nextIndex];
+
+        const isCycleStart = (nextIndex === 0);
+        const reason = isCycleStart
+            ? `Je hebt alle sessies gehad, we beginnen weer vooraan.`
+            : `Dit is de volgende in je schema (${plan.name || 'Schema'}).`;
+
         return {
-            session: orderedSessions[0],
-            reason: `Je hebt alle sessies gehad, we beginnen weer vooraan.`
+            session: nextSession,
+            reason: reason
         };
     },
 

@@ -426,15 +426,39 @@ describe('app logic', () => {
             store.plans = [{ id: 'plan_1', name: 'Test Plan', sessions: [session1, session2] }];
             store.activePlanId = 'plan_1';
 
-            const logDate = new Date();
+            const now = Date.now();
             store.logs = [
-                { sessionId: 's1', date: logDate.toISOString() },
-                { sessionId: 's2', date: logDate.toISOString() }
+                { sessionId: 's2', date: new Date(now).toISOString() },
+                { sessionId: 's1', date: new Date(now - 86400000).toISOString() }
             ];
 
             const recommended = app.getRecommendedSession();
             expect(recommended.session).toEqual(session1);
             expect(recommended.reason).toContain('we beginnen weer vooraan');
+        });
+
+        it('should continuously alternate sessions A-B-A-B across multiple cycles', () => {
+            const sessionA = { id: 'sA', name: 'Full Body A' };
+            const sessionB = { id: 'sB', name: 'Full Body B' };
+            store.plans = [{ id: 'plan_1', name: 'Test Plan', sessions: [sessionA, sessionB] }];
+            store.activePlanId = 'plan_1';
+
+            const now = Date.now();
+            // Log sequence: A (oldest), B, A (most recent)
+            store.logs = [
+                { sessionId: 'sA', date: new Date(now).toISOString() },
+                { sessionId: 'sB', date: new Date(now - 86400000).toISOString() },
+                { sessionId: 'sA', date: new Date(now - 172800000).toISOString() }
+            ];
+
+            // After completing A, next should be B
+            const rec1 = app.getRecommendedSession();
+            expect(rec1.session).toEqual(sessionB);
+
+            // Simulate completing B
+            store.logs.unshift({ sessionId: 'sB', date: new Date(now + 86400000).toISOString() });
+            const rec2 = app.getRecommendedSession();
+            expect(rec2.session).toEqual(sessionA);
         });
 
         it('should ignore recent logs from other plans when recommending next session', () => {
