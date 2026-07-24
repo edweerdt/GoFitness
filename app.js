@@ -1387,30 +1387,85 @@ const app = {
         return null;
     },
 
+    getRealisticIncrement(ex, plan) {
+        if (!ex) return 2.5;
+
+        if (typeof ex.weightIncrement === 'number' && ex.weightIncrement > 0) {
+            return ex.weightIncrement;
+        }
+        if (ex.progressionRuleOverride && typeof ex.progressionRuleOverride.weightIncrement === 'number' && ex.progressionRuleOverride.weightIncrement > 0) {
+            return ex.progressionRuleOverride.weightIncrement;
+        }
+
+        const name = (ex.name || '').toLowerCase().trim();
+        const equipmentStr = Array.isArray(ex.equipment) ? ex.equipment.join(' ').toLowerCase() : (typeof ex.equipment === 'string' ? ex.equipment.toLowerCase() : '');
+        const fullText = `${name} ${equipmentStr}`;
+        const category = (ex.category || '').toLowerCase();
+        const groups = (ex.muscleGroups || []).map(mg => this.normalizeMuscleGroup ? this.normalizeMuscleGroup(mg) : mg);
+        const isLowerBody = groups.includes('legs') || groups.includes('glutes');
+
+        const isDumbbell = fullText.includes('dumbbell') || fullText.includes(' db') || fullText.includes('kettlebell') || fullText.includes(' kb');
+        const isBarbell = fullText.includes('barbell') || fullText.includes('bench press') || fullText.includes('squat') || fullText.includes('deadlift') || fullText.includes('halterschijf');
+        const isIsolation = category === 'isolation' || category === 'supporting' ||
+            fullText.includes('curl') || fullText.includes('raise') || fullText.includes('fly') || fullText.includes('flye') || fullText.includes('extension') || fullText.includes('kickback') || fullText.includes('pushdown');
+
+        const guidance = plan && plan.progressionRules && plan.progressionRules.weightIncreaseGuidance;
+        let planGuidance = null;
+        if (guidance) {
+            const g = isLowerBody ? guidance.lowerBodyKg : guidance.upperBodyKg;
+            if (typeof g === 'number' && g > 0) planGuidance = g;
+        }
+
+        if (isDumbbell) {
+            if (isLowerBody) {
+                return planGuidance ? Math.min(planGuidance, 2.0) : 2.0;
+            }
+            return planGuidance ? Math.min(planGuidance, 1.0) : 1.0;
+        }
+
+        if (isIsolation) {
+            if (isLowerBody) {
+                return planGuidance ? Math.min(planGuidance, 2.0) : 2.0;
+            }
+            return planGuidance ? Math.min(planGuidance, 1.0) : 1.0;
+        }
+
+        if (isLowerBody) {
+            return planGuidance ? planGuidance : 2.5;
+        }
+
+        return planGuidance ? planGuidance : 2.5;
+    },
+
     // Advies voor progressive overload: vorige sessie alle sets (met gewicht) aan de
     // bovenkant van de herhalingsrange gehaald? Stel dan een licht hoger gewicht voor.
     getOverloadSuggestion(ex, prevDetails, plan) {
         if (!prevDetails || prevDetails.length === 0 || !ex.repsMax) return null;
 
         let maxWeight = 0;
+        let minWeight = Infinity;
         for (const d of prevDetails) {
             const reps = parseInt(d.reps);
             const weight = parseFloat(d.weight);
             if (!(weight > 0) || !(reps >= ex.repsMax)) return null;
             if (weight > maxWeight) maxWeight = weight;
+            if (weight < minWeight) minWeight = weight;
         }
 
-        // Increment uit de progressieregels van het plan (onder-/bovenlichaam), anders 2.5 kg
-        let increment = 2.5;
-        const guidance = plan && plan.progressionRules && plan.progressionRules.weightIncreaseGuidance;
-        if (guidance) {
-            const groups = (ex.muscleGroups || []).map(mg => this.normalizeMuscleGroup(mg));
-            const lowerBody = groups.includes('legs') || groups.includes('glutes');
-            const g = lowerBody ? guidance.lowerBodyKg : guidance.upperBodyKg;
-            if (g > 0) increment = g;
-        }
+        if (minWeight === Infinity) return null;
 
-        return { prevWeight: maxWeight, newWeight: Math.round((maxWeight + increment) * 10) / 10 };
+        const increment = this.getRealisticIncrement(ex, plan);
+        const allSameWeight = (minWeight === maxWeight);
+        const newWeight = Math.round((maxWeight + increment) * 10) / 10;
+
+        return {
+            prevWeight: maxWeight,
+            maxWeight: maxWeight,
+            minWeight: minWeight,
+            allSameWeight: allSameWeight,
+            newWeight: newWeight,
+            increment: increment
+        };
     },
 
     renderWorkoutExercises() {
@@ -1465,7 +1520,13 @@ const app = {
             // Progressive-overload-advies op basis van de vorige sessie
             const overload = app.getOverloadSuggestion(ex, prevDetails, store.getActivePlan());
             if (overload) {
-                notesHtml += `<div class="text-sm mt-2 progression-hint"><span class="material-icons-round" style="font-size:1rem; vertical-align:-3px;">trending_up</span> Vorige keer alle sets op ${app.escapeHTML(String(ex.repsMax))} reps met ${app.escapeHTML(String(overload.prevWeight))} kg. Probeer nu ${app.escapeHTML(String(overload.newWeight))} kg.</div>`;
+                let hintText = '';
+                if (overload.allSameWeight) {
+                    hintText = `Vorige keer alle sets op ${app.escapeHTML(String(ex.repsMax))} reps met ${app.escapeHTML(String(overload.maxWeight))} kg. Probeer nu ${app.escapeHTML(String(overload.newWeight))} kg.`;
+                } else {
+                    hintText = `Vorige keer alle sets op ${app.escapeHTML(String(ex.repsMax))} reps (${app.escapeHTML(String(overload.minWeight))}-${app.escapeHTML(String(overload.maxWeight))} kg). Probeer nu ${app.escapeHTML(String(overload.newWeight))} kg op je zwaarste set.`;
+                }
+                notesHtml += `<div class="text-sm mt-2 progression-hint"><span class="material-icons-round" style="font-size:1rem; vertical-align:-3px;">trending_up</span> ${hintText}</div>`;
             }
 
             let setsHtml = '';

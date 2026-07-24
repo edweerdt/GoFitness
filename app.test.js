@@ -894,7 +894,54 @@ describe('getOverloadSuggestion', () => {
         ];
         const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 2.0, lowerBodyKg: 5.0 } } };
 
-        expect(app.getOverloadSuggestion(ex, prev, plan)).toEqual({ prevWeight: 40, newWeight: 42 });
+        expect(app.getOverloadSuggestion(ex, prev, plan)).toEqual({
+            prevWeight: 40,
+            maxWeight: 40,
+            minWeight: 40,
+            allSameWeight: true,
+            newWeight: 42,
+            increment: 2
+        });
+    });
+
+    it('should correctly handle varied set weights and report min and max weight', () => {
+        const ex = { name: 'Dumbbell Shoulder Press', repsMax: 12, muscleGroups: ['shoulders'], sets: 3 };
+        const prev = [
+            { setNumber: 1, weight: '10', reps: '12' },
+            { setNumber: 2, weight: '12.5', reps: '12' },
+            { setNumber: 3, weight: '15', reps: '12' }
+        ];
+        const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 2.0, lowerBodyKg: 5.0 } } };
+
+        const suggestion = app.getOverloadSuggestion(ex, prev, plan);
+        expect(suggestion).toEqual({
+            prevWeight: 15,
+            maxWeight: 15,
+            minWeight: 10,
+            allSameWeight: false,
+            newWeight: 16,
+            increment: 1
+        });
+    });
+
+    it('should cap dumbbell exercise increments to realistic +1 kg step for upper body', () => {
+        const ex = { name: 'Dumbbell Curl', repsMax: 12, muscleGroups: ['biceps'] };
+        const prev = [{ setNumber: 1, weight: '15', reps: '12' }];
+        const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 5.0, lowerBodyKg: 6.0 } } };
+
+        const suggestion = app.getOverloadSuggestion(ex, prev, plan);
+        expect(suggestion.increment).toBe(1);
+        expect(suggestion.newWeight).toBe(16);
+    });
+
+    it('should cap dumbbell exercise increments to realistic +2 kg step for lower body', () => {
+        const ex = { name: 'Dumbbell Lunge', repsMax: 10, muscleGroups: ['legs'] };
+        const prev = [{ setNumber: 1, weight: '15', reps: '10' }];
+        const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 5.0, lowerBodyKg: 6.0 } } };
+
+        const suggestion = app.getOverloadSuggestion(ex, prev, plan);
+        expect(suggestion.increment).toBe(2);
+        expect(suggestion.newWeight).toBe(17);
     });
 
     it('should use the lower body increment for leg exercises', () => {
@@ -902,7 +949,14 @@ describe('getOverloadSuggestion', () => {
         const prev = [{ setNumber: 1, weight: '80', reps: '10' }];
         const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 2.0, lowerBodyKg: 5.0 } } };
 
-        expect(app.getOverloadSuggestion(ex, prev, plan)).toEqual({ prevWeight: 80, newWeight: 85 });
+        expect(app.getOverloadSuggestion(ex, prev, plan)).toEqual({
+            prevWeight: 80,
+            maxWeight: 80,
+            minWeight: 80,
+            allSameWeight: true,
+            newWeight: 85,
+            increment: 5
+        });
     });
 
     it('should not suggest anything when a set stayed below the top of the rep range', () => {
@@ -918,7 +972,14 @@ describe('getOverloadSuggestion', () => {
         const ex = { name: 'Row', repsMax: 12, muscleGroups: ['back'] };
         const prev = [{ setNumber: 1, weight: '50', reps: '12' }];
 
-        expect(app.getOverloadSuggestion(ex, prev, null)).toEqual({ prevWeight: 50, newWeight: 52.5 });
+        expect(app.getOverloadSuggestion(ex, prev, null)).toEqual({
+            prevWeight: 50,
+            maxWeight: 50,
+            minWeight: 50,
+            allSameWeight: true,
+            newWeight: 52.5,
+            increment: 2.5
+        });
     });
 
     it('should not suggest anything for bodyweight sets or missing rep targets', () => {
