@@ -468,7 +468,9 @@ const app = {
         if (n.includes('squat') || n.includes('lunge') || (n.includes('extension') && n.includes('leg')) || (n.includes('curl') && n.includes('leg'))) groups.push('legs');
         if (n.includes('thrust') || n.includes('bridge') || n.includes('kickback')) groups.push('glutes');
         if (n.includes('plank') || n.includes('crunch') || (n.includes('raise') && n.includes('leg'))) groups.push('core');
-        if ((n.includes('curl') || n.includes('extension') || n.includes('skull')) && !n.includes('leg')) groups.push('arms');
+        if (n.includes('curl') && !n.includes('leg')) groups.push('biceps');
+        if ((n.includes('tricep') || n.includes('pushdown') || n.includes('skull') || (n.includes('extension') && !n.includes('leg')))) groups.push('triceps');
+        if (groups.length === 0 && (n.includes('arm') || n.includes('forearm'))) groups.push('arms');
         return [...new Set(groups)];
     },
 
@@ -976,7 +978,9 @@ const app = {
         let html = '';
         muscleKeys.forEach(m => {
             const data = stats[m];
-            const meta = muscleMeta[m] || { name: m, icon: 'fitness_center', color: '#a78bfa' };
+            const fallbackName = m ? (m.charAt(0).toUpperCase() + m.slice(1).replace(/_/g, ' ')) : 'Overig';
+            const meta = muscleMeta[m] || { name: fallbackName, icon: 'fitness_center', color: '#a78bfa' };
+            const maxWeightDisplay = data.maxWeight > 0 ? `${data.maxWeight} kg` : '-';
             
             html += `
                 <div class="glass-panel" style="display:flex; flex-direction:column; gap:12px; padding:16px;">
@@ -997,7 +1001,7 @@ const app = {
                         </div>
                         <div style="display:flex; justify-content:space-between; gap:8px;">
                             <span style="white-space:nowrap;">Max gewicht:</span>
-                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${data.maxWeight} kg</span>
+                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${maxWeightDisplay}</span>
                         </div>
                         <div style="display:flex; justify-content:space-between; gap:8px;">
                             <span style="white-space:nowrap;">Max reps:</span>
