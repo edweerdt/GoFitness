@@ -365,6 +365,38 @@
                 "rule": "Verleng de tijd binnen de range voordat je een zwaardere variant kiest"
               },
               "id": "a-plank"
+            },
+            {
+              "exerciseId": "a-dumbbell-bicep-curls",
+              "order": 8,
+              "name": "Dumbbell Bicep Curls",
+              "category": "supporting",
+              "exerciseType": "strength",
+              "muscleGroups": [
+                "biceps"
+              ],
+              "movementPattern": "bicep_curl",
+              "sets": 2,
+              "repsMin": 10,
+              "repsMax": 12,
+              "restSeconds": 60,
+              "weightMode": "working_weight",
+              "trackMetrics": [
+                "weight",
+                "reps",
+                "completed"
+              ],
+              "alternatives": [
+                "Dumbbell Bicep Curls",
+                "Hammer Curls",
+                "Cable Bicep Curl"
+              ],
+              "notes": [
+                "Houd bovenarmen stil langs het lichaam",
+                "Geen momentum of zwaaien met de rug"
+              ],
+              "progressionRuleOverride": null,
+              "id": "a-dumbbell-bicep-curls"
             }
           ],
           "id": "full-body-a"
