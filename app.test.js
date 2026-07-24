@@ -513,6 +513,11 @@ describe('app logic', () => {
             expect(app.normalizeMuscleGroup('rear_shoulders')).toBe('shoulders');
             expect(app.normalizeMuscleGroup('obliques')).toBe('core');
         });
+
+        it('should guess biceps and triceps from exercise names when muscleGroups are missing', () => {
+            expect(app.guessMuscleGroupsFromName('Bicep Curl')).toContain('biceps');
+            expect(app.guessMuscleGroupsFromName('Triceps Pushdown')).toContain('triceps');
+        });
     });
 
     describe('calculateStreak', () => {
