@@ -447,7 +447,8 @@ const app = {
     normalizeMuscleGroup(mg) {
         const key = String(mg || '').toLowerCase().trim();
         const aliases = {
-            biceps: 'arms', triceps: 'arms', forearms: 'arms',
+            biceps: 'biceps', triceps: 'triceps', forearms: 'arms',
+            rear_shoulders: 'shoulders', obliques: 'core',
             quads: 'legs', hamstrings: 'legs', calves: 'legs',
             abs: 'core', lats: 'back', traps: 'back'
         };
@@ -897,6 +898,8 @@ const app = {
             'legs': { name: 'Benen', icon: 'directions_run', color: '#86efac' },
             'glutes': { name: 'Billen', icon: 'sports_gymnastics', color: '#fbcfe8' },
             'shoulders': { name: 'Schouders', icon: 'accessibility_new', color: '#fde047' },
+            'biceps': { name: 'Biceps', icon: 'sports_martial_arts', color: '#c4b5fd' },
+            'triceps': { name: 'Triceps', icon: 'sports_mma', color: '#a78bfa' },
             'arms': { name: 'Armen', icon: 'sports_martial_arts', color: '#c4b5fd' },
             'core': { name: 'Core', icon: 'sports_mma', color: '#fdba74' },
             'overig': { name: 'Overig', icon: 'more_horiz', color: '#d1d5db' }
@@ -930,8 +933,9 @@ const app = {
                     if (!muscles || muscles.length === 0) {
                         muscles = fallbackMap[ex.name] || ['overig'];
                     }
-                    // Normaliseren zodat 'Chest' en 'chest' (en synoniemen) samen tellen
+                    // Normaliseren zodat synoniemen en subgroepen samen tellen
                     muscles = [...new Set(muscles.map(m => this.normalizeMuscleGroup(m)))];
+                    const primaryMuscle = muscles[0];
 
                     muscles.forEach(m => {
                         sessionMuscles.add(m);
@@ -944,7 +948,10 @@ const app = {
                                 
                                 stats[m].reps += reps;
                                 if (reps > stats[m].maxReps) stats[m].maxReps = reps;
-                                if (weight > stats[m].maxWeight) stats[m].maxWeight = weight;
+                                // Max weight alleen toekennen aan de primaire spiergroep van de oefening
+                                if (m === primaryMuscle && weight > stats[m].maxWeight) {
+                                    stats[m].maxWeight = weight;
+                                }
                             });
                         }
                     });

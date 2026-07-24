@@ -506,6 +506,13 @@ describe('app logic', () => {
             store.sanitizeLogPlanIds();
             expect(store.logs[0].planId).toBe('plan_new');
         });
+
+        it('should normalize muscle groups separating biceps/triceps and mapping rear_shoulders/obliques', () => {
+            expect(app.normalizeMuscleGroup('biceps')).toBe('biceps');
+            expect(app.normalizeMuscleGroup('triceps')).toBe('triceps');
+            expect(app.normalizeMuscleGroup('rear_shoulders')).toBe('shoulders');
+            expect(app.normalizeMuscleGroup('obliques')).toBe('core');
+        });
     });
 
     describe('calculateStreak', () => {
