@@ -139,7 +139,19 @@ class DataStore {
     importPlan(planData) {
         DataStore.validatePlanSchema(planData);
 
-        planData.id = 'plan_' + Date.now();
+        // Zoek of dit schema al bestaat (op id, planId, of naam)
+        const existingIndex = this.plans.findIndex(p => 
+            (planData.id && p.id === planData.id) ||
+            (planData.planId && (p.planId === planData.planId || p.id === planData.planId)) ||
+            (p.name && planData.name && p.name.toLowerCase().trim() === planData.name.toLowerCase().trim())
+        );
+
+        if (existingIndex !== -1) {
+            // Behoud het bestaande plan.id zodat de historie/logs 100% gekoppeld blijven!
+            planData.id = this.plans[existingIndex].id;
+        } else if (!planData.id) {
+            planData.id = 'plan_' + Date.now();
+        }
 
         // Normalize top-level rich schema fields
         if (!planData.schemaVersion) planData.schemaVersion = "1.0";
@@ -163,8 +175,14 @@ class DataStore {
                 else if (e.exerciseId) e.id = e.exerciseId;
             });
         });
-        this.plans.push(planData);
-        if (!this.activePlanId) this.activePlanId = planData.id;
+
+        if (existingIndex !== -1) {
+            this.plans[existingIndex] = planData;
+        } else {
+            this.plans.push(planData);
+        }
+
+        this.activePlanId = planData.id;
         this.save();
     }
     saveWorkoutLog(log) {

@@ -278,6 +278,26 @@ describe('DataStore', () => {
             expect(store.activeWorkoutState).toBeNull();
             expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('activeWorkoutState');
         });
+
+        it('should update an existing plan in place when importing a plan with matching id, planId or name', () => {
+            const store = new DataStore();
+            store.plans = [{ id: 'plan_1781938748008', planId: 'my-schema', name: 'Beginner Gym', sessions: [] }];
+            store.activePlanId = 'plan_1781938748008';
+
+            const updatedPlanData = {
+                id: 'plan_1781938748008',
+                planId: 'my-schema',
+                name: 'Beginner Gym',
+                sessions: [{ name: 'Full Body A', exercises: [] }]
+            };
+
+            store.importPlan(updatedPlanData);
+
+            expect(store.plans.length).toBe(1);
+            expect(store.plans[0].id).toBe('plan_1781938748008');
+            expect(store.plans[0].sessions.length).toBe(1);
+            expect(store.activePlanId).toBe('plan_1781938748008');
+        });
     });
 });
 
