@@ -289,7 +289,7 @@ describe('DataStore', () => {
                 id: 'plan_1781938748008',
                 planId: 'my-schema',
                 name: 'Beginner Gym',
-                sessions: [{ name: 'Full Body A', exercises: [] }]
+                sessions: [{ name: 'Full Body A', exercises: [{ name: 'Squat', sets: 3 }] }]
             };
 
             store.importPlan(updatedPlanData);
@@ -1530,4 +1530,3 @@ describe('Hold Timer (Stopwatch)', () => {
         expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('0');
     });
 });
-
