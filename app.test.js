@@ -1444,12 +1444,17 @@ describe('Hold Timer (Stopwatch)', () => {
         store.activePlanId = null;
         store.logs = [];
         app.activeWorkout = null;
+        if (app.holdTimerState && app.holdTimerState.intervalId) {
+            clearInterval(app.holdTimerState.intervalId);
+        }
         app.holdTimerState = null;
-        if (typeof jest !== 'undefined') jest.useFakeTimers();
     });
 
     afterEach(() => {
-        if (typeof jest !== 'undefined') jest.useRealTimers();
+        if (app.holdTimerState && app.holdTimerState.intervalId) {
+            clearInterval(app.holdTimerState.intervalId);
+        }
+        app.holdTimerState = null;
     });
 
     it('should correctly identify hold/isometric exercises', () => {
@@ -1489,8 +1494,8 @@ describe('Hold Timer (Stopwatch)', () => {
         expect(app.holdTimerState).not.toBeNull();
         expect(app.holdTimerState.status).toBe('running');
 
-        // Advance 10 seconds
-        jest.advanceTimersByTime(10000);
+        // Simulate 10 seconds elapsed time deterministically
+        app.holdTimerState.startTime = Date.now() - 10000;
 
         // Stop timer
         app.stopHoldTimer(true);
