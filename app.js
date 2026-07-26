@@ -1386,13 +1386,23 @@ const app = {
 
     // Opent de workout-view voor de actieve workout (zowel starten als hervatten)
     openWorkoutView() {
-        document.getElementById('workout-title').textContent = this.activeWorkout.session.name;
+        const titleEl = document.getElementById('workout-title');
+        if (titleEl && this.activeWorkout && this.activeWorkout.session) {
+            titleEl.textContent = this.activeWorkout.session.name;
+        }
         this.renderWorkoutExercises();
 
-        document.getElementById('btn-finish-workout').onclick = () => this.showFinishModal();
+        const finishBtn = document.getElementById('btn-finish-workout');
+        if (finishBtn) finishBtn.onclick = () => this.showFinishModal();
 
-        document.getElementById('bottom-nav').classList.add('hidden');
-        document.getElementById('view-workout').querySelector('.sticky-footer').style.bottom = '0';
+        const bottomNav = document.getElementById('bottom-nav');
+        if (bottomNav) bottomNav.classList.add('hidden');
+
+        const viewWorkout = document.getElementById('view-workout');
+        if (viewWorkout) {
+            const stickyFooter = viewWorkout.querySelector('.sticky-footer');
+            if (stickyFooter) stickyFooter.style.bottom = '0';
+        }
 
         this.requestWakeLock();
         this.navigate('workout');
@@ -1496,6 +1506,7 @@ const app = {
 
     renderWorkoutExercises() {
         const list = document.getElementById('workout-exercise-list');
+        if (!list) return;
         list.innerHTML = '';
         
         if (this.activeWorkout.session.warmup) {
