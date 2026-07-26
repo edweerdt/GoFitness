@@ -1437,3 +1437,91 @@ describe('PWA manifest', () => {
         expect(maskableIcon).toBeDefined();
     });
 });
+
+describe('Hold Timer (Stopwatch)', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [];
+        app.activeWorkout = null;
+        app.holdTimerState = null;
+        if (typeof jest !== 'undefined') jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+        if (typeof jest !== 'undefined') jest.useRealTimers();
+    });
+
+    it('should correctly identify hold/isometric exercises', () => {
+        expect(app.isHoldExercise({ name: 'Side Plank' })).toBe(true);
+        expect(app.isHoldExercise({ name: 'Plank hold' })).toBe(true);
+        expect(app.isHoldExercise({ name: 'Side Raise' })).toBe(true);
+        expect(app.isHoldExercise({ name: 'Wall Sit' })).toBe(true);
+        expect(app.isHoldExercise({ name: 'Bench Press' })).toBe(false);
+        expect(app.isHoldExercise({ name: 'Custom', exerciseType: 'isometric' })).toBe(true);
+        expect(app.isHoldExercise({ name: 'Custom', trackMetrics: ['duration_seconds'] })).toBe(true);
+    });
+
+    it('should allow setting start delay seconds in DataStore', () => {
+        store.setHoldTimerDelaySeconds(5);
+        expect(store.holdTimerDelaySeconds).toBe(5);
+
+        store.setHoldTimerDelaySeconds(0);
+        expect(store.holdTimerDelaySeconds).toBe(0);
+    });
+
+    it('should calculate gross duration minus 1 second reaction time compensation on stop', () => {
+        const mockSession = {
+            id: 'sess_1',
+            name: 'Test Session',
+            exercises: [
+                { id: 'ex_1', name: 'Side Plank', sets: 2, actualReps: ['', ''], setsCompleted: [false, false] }
+            ]
+        };
+        app.activeWorkout = {
+            session: mockSession,
+            exercises: mockSession.exercises
+        };
+
+        store.holdTimerDelaySeconds = 0; // zero delay for immediate test
+        app.startHoldTimer(0, 0);
+
+        expect(app.holdTimerState).not.toBeNull();
+        expect(app.holdTimerState.status).toBe('running');
+
+        // Advance 10 seconds
+        jest.advanceTimersByTime(10000);
+
+        // Stop timer
+        app.stopHoldTimer(true);
+
+        // Gross 10s minus 1s offset compensation = 9s
+        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('9');
+        expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(true);
+        expect(app.holdTimerState).toBeNull();
+    });
+
+    it('should adjust duration using adjustDuration (+1s, -1s, +5s, -5s)', () => {
+        const mockSession = {
+            id: 'sess_1',
+            name: 'Test Session',
+            exercises: [
+                { id: 'ex_1', name: 'Plank', sets: 1, actualReps: ['20'] }
+            ]
+        };
+        app.activeWorkout = {
+            session: mockSession,
+            exercises: mockSession.exercises
+        };
+
+        app.adjustDuration(0, 0, 5);
+        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('25');
+
+        app.adjustDuration(0, 0, -1);
+        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('24');
+
+        app.adjustDuration(0, 0, -30); // should not go below 0
+        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('0');
+    });
+});
+

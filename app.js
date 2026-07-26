@@ -20,9 +20,15 @@ class DataStore {
         this.logs = this.safeParse('logs', []);
         this.activeWorkoutState = this.safeParse('activeWorkoutState', null);
         this.theme = localStorage.getItem('theme') || 'auto';
+        this.holdTimerDelaySeconds = (typeof localStorage !== 'undefined' && localStorage.getItem('holdTimerDelaySeconds')) ? (parseInt(localStorage.getItem('holdTimerDelaySeconds'), 10) || 3) : 3;
         // Tombstones: ids van verwijderde items, zodat cloud-sync ze niet terugbrengt
         this.deleted = this.safeParse('deleted', { plans: [], logs: [] });
         this.sanitizeLogPlanIds();
+    }
+    setHoldTimerDelaySeconds(val) {
+        const parsed = parseInt(val, 10);
+        this.holdTimerDelaySeconds = (!isNaN(parsed) && parsed >= 0) ? parsed : 3;
+        this.save();
     }
     sanitizeLogPlanIds() {
         if (!this.plans || !this.logs) return;
@@ -60,6 +66,7 @@ class DataStore {
             }
             localStorage.setItem('logs', JSON.stringify(this.logs));
             localStorage.setItem('theme', this.theme);
+            localStorage.setItem('holdTimerDelaySeconds', String(this.holdTimerDelaySeconds || 3));
             localStorage.setItem('deleted', JSON.stringify(this.deleted));
             return true;
         } catch (e) {
@@ -1547,6 +1554,24 @@ const app = {
                 notesHtml += `<div class="text-sm mt-2 progression-hint"><span class="material-icons-round" style="font-size:1rem; vertical-align:-3px;">trending_up</span> ${hintText}</div>`;
             }
 
+            const isHold = app.isHoldExercise(ex);
+
+            let delayBarHtml = '';
+            if (isHold) {
+                const currentDelay = (typeof store !== 'undefined' && typeof store.holdTimerDelaySeconds === 'number') ? store.holdTimerDelaySeconds : 3;
+                delayBarHtml = `
+                    <div class="hold-delay-bar">
+                        <span class="text-sm text-muted" style="font-weight:500;">Startvertraging:</span>
+                        <div class="delay-pills">
+                            <button class="delay-pill ${currentDelay === 1 ? 'active' : ''}" onclick="app.setHoldTimerDelay(1)">1s</button>
+                            <button class="delay-pill ${currentDelay === 2 ? 'active' : ''}" onclick="app.setHoldTimerDelay(2)">2s</button>
+                            <button class="delay-pill ${currentDelay === 3 ? 'active' : ''}" onclick="app.setHoldTimerDelay(3)">3s</button>
+                            <button class="delay-pill ${currentDelay === 5 ? 'active' : ''}" onclick="app.setHoldTimerDelay(5)">5s</button>
+                        </div>
+                    </div>
+                `;
+            }
+
             let setsHtml = '';
             for(let i=0; i<ex.sets; i++) {
                 const checked = ex.setsCompleted[i] ? 'checked' : '';
@@ -1557,21 +1582,52 @@ const app = {
 
                 // TrackMetrics check for dynamic inputs
                 const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
-                const wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : false;
-                const wantsDuration = ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false;
+                let wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : false;
+                let wantsDuration = (ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false) || isHold;
+
+                if (!wantsReps && !wantsDuration) {
+                    if (isHold) wantsDuration = true;
+                    else wantsReps = true;
+                }
                 
                 let inputsHtml = '';
                 if (wantsWeight) {
                     inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(weightPlaceholder))}"
                         value="${app.escapeHTML(String(ex.weights ? ex.weights[i] : ''))}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">`;
                 }
-                if (wantsReps) {
+                if (wantsReps && !isHold) {
                     inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(repsPlaceholder))}" style="width: 55px;"
                         value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
                 }
-                if (wantsDuration && !wantsReps) {
+                if (wantsDuration || isHold) {
                      inputsHtml += `<input type="number" class="weight-input" placeholder="sec" style="width: 55px;"
                         value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+
+                     inputsHtml += `
+                        <div class="step-btn-group">
+                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, -5)" title="-5 sec">-5s</button>
+                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, -1)" title="-1 sec">-1s</button>
+                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, 1)" title="+1 sec">+1s</button>
+                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, 5)" title="+5 sec">+5s</button>
+                        </div>
+                     `;
+
+                     const isTiming = app.holdTimerState && app.holdTimerState.exIndex === exIndex && app.holdTimerState.setIndex === i;
+                     if (isTiming) {
+                         if (app.holdTimerState.status === 'delay') {
+                             const elapsedDelay = (Date.now() - app.holdTimerState.delayStartTime) / 1000;
+                             const remaining = Math.max(0, Math.ceil(app.holdTimerState.delaySeconds - elapsedDelay));
+                             inputsHtml += `<button id="hold-timer-btn-${exIndex}-${i}" class="hold-timer-btn starting" onclick="app.stopHoldTimer(false)"><span class="material-icons-round">hourglass_top</span> Klaar in ${remaining}s...</button>`;
+                         } else {
+                             const elapsedSec = Math.floor((Date.now() - app.holdTimerState.startTime) / 1000);
+                             const mins = Math.floor(elapsedSec / 60);
+                             const secs = elapsedSec % 60;
+                             const timeStr = mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
+                             inputsHtml += `<button id="hold-timer-btn-${exIndex}-${i}" class="hold-timer-btn running" onclick="app.stopHoldTimer(true)"><span class="material-icons-round">stop</span> ⏱️ ${timeStr} Stop</button>`;
+                         }
+                     } else {
+                         inputsHtml += `<button id="hold-timer-btn-${exIndex}-${i}" class="hold-timer-btn" onclick="app.startHoldTimer(${exIndex}, ${i})"><span class="material-icons-round">timer</span> ⏱️ Start</button>`;
+                     }
                 }
 
                 setsHtml += `
@@ -1598,6 +1654,7 @@ const app = {
                         <div style="margin-bottom:4px;">${badgesHtml}</div>
                         <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
                         ${notesHtml}
+                        ${delayBarHtml}
                     </div>
                 </div>
                 <div class="exercise-body">
@@ -1681,6 +1738,162 @@ const app = {
         if (el) el.classList.add('hidden');
     },
 
+    // --- HOLD TIMER LOGIC ---
+
+    holdTimerState: null,
+
+    isHoldExercise(ex) {
+        if (!ex) return false;
+        if (ex.trackMetrics && (ex.trackMetrics.includes('duration_seconds') || ex.trackMetrics.includes('duration'))) return true;
+        if (ex.exerciseType === 'isometric' || ex.exerciseType === 'bodyweight_hold' || ex.exerciseType === 'hold') return true;
+        if (ex.durationSeconds || ex.durationSecondsMin || ex.durationSecondsMax || ex.durationText || ex.duration) return true;
+        
+        const name = String(ex.name || '').toLowerCase();
+        const keywords = ['plank', 'hold', 'side raise', 'wall sit', 'statisch', 'hollow body', 'dead bug', 'isometric', 'l-sit'];
+        if (keywords.some(k => name.includes(k))) return true;
+        return false;
+    },
+
+    setHoldTimerDelay(delaySeconds) {
+        if (typeof store !== 'undefined' && store.setHoldTimerDelaySeconds) {
+            store.setHoldTimerDelaySeconds(delaySeconds);
+        }
+        if (typeof document !== 'undefined' && document.getElementById('workout-exercise-list')) {
+            this.renderWorkoutExercises();
+        }
+    },
+
+    startHoldTimer(exIndex, setIndex) {
+        if (this.holdTimerState) {
+            this.stopHoldTimer(false);
+        }
+
+        const delaySec = (typeof store !== 'undefined' && typeof store.holdTimerDelaySeconds === 'number') ? store.holdTimerDelaySeconds : 3;
+        const now = Date.now();
+
+        this.holdTimerState = {
+            exIndex,
+            setIndex,
+            delaySeconds: delaySec,
+            startTime: delaySec > 0 ? null : now,
+            delayStartTime: now,
+            status: delaySec > 0 ? 'delay' : 'running',
+            intervalId: null
+        };
+
+        this.renderWorkoutExercises();
+
+        const intervalId = setInterval(() => {
+            if (!this.holdTimerState) {
+                clearInterval(intervalId);
+                return;
+            }
+
+            const btnEl = document.getElementById(`hold-timer-btn-${exIndex}-${setIndex}`);
+            const currentNow = Date.now();
+
+            if (this.holdTimerState.status === 'delay') {
+                const elapsedDelay = (currentNow - this.holdTimerState.delayStartTime) / 1000;
+                const remaining = Math.max(0, Math.ceil(this.holdTimerState.delaySeconds - elapsedDelay));
+
+                if (btnEl) {
+                    btnEl.className = 'hold-timer-btn starting';
+                    btnEl.innerHTML = `<span class="material-icons-round">hourglass_top</span> Klaar in ${remaining}s...`;
+                }
+
+                if (elapsedDelay >= this.holdTimerState.delaySeconds) {
+                    this.holdTimerState.status = 'running';
+                    this.holdTimerState.startTime = currentNow;
+                    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([40]);
+                    if (btnEl) {
+                        btnEl.className = 'hold-timer-btn running';
+                        btnEl.innerHTML = `<span class="material-icons-round">stop</span> ⏱️ 0s Stop`;
+                    }
+                }
+            } else if (this.holdTimerState.status === 'running') {
+                const elapsedSec = Math.floor((currentNow - this.holdTimerState.startTime) / 1000);
+                const mins = Math.floor(elapsedSec / 60);
+                const secs = elapsedSec % 60;
+                const timeStr = mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
+
+                if (btnEl) {
+                    btnEl.className = 'hold-timer-btn running';
+                    btnEl.innerHTML = `<span class="material-icons-round">stop</span> ⏱️ ${timeStr} Stop`;
+                }
+            }
+        }, 100);
+
+        this.holdTimerState.intervalId = intervalId;
+    },
+
+    stopHoldTimer(autoCheck = true) {
+        if (!this.holdTimerState) return;
+
+        const { exIndex, setIndex, startTime, status, intervalId } = this.holdTimerState;
+
+        if (intervalId) {
+            clearInterval(intervalId);
+        }
+
+        if (status === 'delay') {
+            this.holdTimerState = null;
+            if (typeof document !== 'undefined' && document.getElementById('workout-exercise-list')) {
+                this.renderWorkoutExercises();
+            }
+            return;
+        }
+
+        if (status === 'running' && startTime) {
+            const grossSeconds = Math.round((Date.now() - startTime) / 1000);
+            // 1 second stop offset compensation (reaction time)
+            const netSeconds = Math.max(1, grossSeconds - 1);
+
+            if (this.activeWorkout && this.activeWorkout.exercises[exIndex]) {
+                const ex = this.activeWorkout.exercises[exIndex];
+                if (!ex.actualReps) ex.actualReps = Array(ex.sets).fill('');
+                ex.actualReps[setIndex] = String(netSeconds);
+
+                if (autoCheck) {
+                    if (!ex.setsCompleted) ex.setsCompleted = Array(ex.sets).fill(false);
+                    ex.setsCompleted[setIndex] = true;
+                    if (ex.restSeconds) {
+                        this.startRestTimer(ex.restSeconds);
+                    }
+                }
+                if (typeof store !== 'undefined') {
+                    store.saveActiveWorkoutState(this.activeWorkout);
+                }
+                if (this.showToast) {
+                    this.showToast(`⏱️ ${netSeconds} sec gelogd voor Set ${setIndex + 1}!`, 'success');
+                }
+            }
+        }
+
+        this.holdTimerState = null;
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([100]);
+        if (typeof document !== 'undefined' && document.getElementById('workout-exercise-list')) {
+            this.renderWorkoutExercises();
+        }
+    },
+
+    adjustDuration(exIndex, setIndex, deltaSeconds) {
+        if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+        if (!ex.actualReps) ex.actualReps = Array(ex.sets).fill('');
+        
+        let currentVal = parseInt(ex.actualReps[setIndex], 10);
+        if (isNaN(currentVal) || currentVal < 0) currentVal = 0;
+        
+        const newVal = Math.max(0, currentVal + deltaSeconds);
+        ex.actualReps[setIndex] = String(newVal);
+        if (typeof store !== 'undefined') {
+            store.saveActiveWorkoutState(this.activeWorkout);
+        }
+        if (typeof document !== 'undefined' && document.getElementById('workout-exercise-list')) {
+            this.renderWorkoutExercises();
+        }
+    },
+
     updateWeight(exIndex, setIndex, val) {
         this.activeWorkout.exercises[exIndex].weights[setIndex] = val;
         store.saveActiveWorkoutState(this.activeWorkout);
@@ -1713,6 +1926,7 @@ const app = {
 
     cancelWorkout() {
         this.hideCancelWorkoutModal();
+        if (this.holdTimerState) this.stopHoldTimer(false);
         this.stopRestTimer();
         this.releaseWakeLock();
 
@@ -1728,6 +1942,7 @@ const app = {
 
     finishWorkout() {
         this.hideFinishModal();
+        if (this.holdTimerState) this.stopHoldTimer(false);
         this.stopRestTimer();
         this.releaseWakeLock();
 
