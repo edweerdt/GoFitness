@@ -39,6 +39,7 @@ describe('DataStore', () => {
         expect(store.logs).toEqual([]);
         expect(store.activeWorkoutState).toBeNull();
         expect(store.theme).toBe('auto');
+        expect(store.holdTimerDelaySeconds).toBe(3);
 
         // Assert load was called (indicated by calling localStorage.getItem)
         expect(mockLocalStorage.getItem).toHaveBeenCalledWith('plans');

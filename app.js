@@ -11,6 +11,7 @@ class DataStore {
             this.logs = [];
             this.activeWorkoutState = null;
             this.theme = 'auto';
+            this.holdTimerDelaySeconds = 3;
             this.deleted = { plans: [], logs: [] };
         }
     }
