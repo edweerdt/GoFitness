@@ -307,7 +307,7 @@
             "biceps"
           ],
           "movementPattern": "bicep_curl",
-          "sets": 2,
+          "sets": 3,
           "repsMin": 10,
           "repsMax": 12,
           "restSeconds": 60,
@@ -529,7 +529,7 @@
             "biceps"
           ],
           "movementPattern": "bicep_curl",
-          "sets": 2,
+          "sets": 3,
           "repsMin": 10,
           "repsMax": 12,
           "restSeconds": 60,
