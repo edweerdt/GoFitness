@@ -1617,29 +1617,10 @@ const app = {
 
                      inputsHtml += `
                         <div class="step-btn-group">
-                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, -5)" title="-5 sec">-5s</button>
-                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, -1)" title="-1 sec">-1s</button>
-                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, 1)" title="+1 sec">+1s</button>
-                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, 5)" title="+5 sec">+5s</button>
+                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, -1)" title="-1 sec">-</button>
+                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, 1)" title="+1 sec">+</button>
                         </div>
                      `;
-
-                     const isTiming = app.holdTimerState && app.holdTimerState.exIndex === exIndex && app.holdTimerState.setIndex === i;
-                     if (isTiming) {
-                         if (app.holdTimerState.status === 'delay') {
-                             const elapsedDelay = (Date.now() - app.holdTimerState.delayStartTime) / 1000;
-                             const remaining = Math.max(0, Math.ceil(app.holdTimerState.delaySeconds - elapsedDelay));
-                             inputsHtml += `<button id="hold-timer-btn-${exIndex}-${i}" class="hold-timer-btn starting" onclick="app.stopHoldTimer(false)"><span class="material-icons-round">hourglass_top</span> Klaar in ${remaining}s...</button>`;
-                         } else {
-                             const elapsedSec = Math.floor((Date.now() - app.holdTimerState.startTime) / 1000);
-                             const mins = Math.floor(elapsedSec / 60);
-                             const secs = elapsedSec % 60;
-                             const timeStr = mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
-                             inputsHtml += `<button id="hold-timer-btn-${exIndex}-${i}" class="hold-timer-btn running" onclick="app.stopHoldTimer(true)"><span class="material-icons-round">stop</span> ⏱️ ${timeStr} Stop</button>`;
-                         }
-                     } else {
-                         inputsHtml += `<button id="hold-timer-btn-${exIndex}-${i}" class="hold-timer-btn" onclick="app.startHoldTimer(${exIndex}, ${i})"><span class="material-icons-round">timer</span> ⏱️ Start</button>`;
-                     }
                 }
 
                 setsHtml += `
@@ -1653,6 +1634,44 @@ const app = {
                         </div>
                     </div>
                 `;
+            }
+
+            let singleHoldTimerHtml = '';
+            if (isHold) {
+                const isTiming = app.holdTimerState && app.holdTimerState.exIndex === exIndex;
+                if (isTiming) {
+                    if (app.holdTimerState.status === 'delay') {
+                        const elapsedDelay = (Date.now() - app.holdTimerState.delayStartTime) / 1000;
+                        const remaining = Math.max(0, Math.ceil(app.holdTimerState.delaySeconds - elapsedDelay));
+                        singleHoldTimerHtml = `
+                            <div class="hold-timer-container">
+                                <button id="hold-timer-btn-${exIndex}" class="hold-timer-btn starting" onclick="app.stopHoldTimer(false)">
+                                    <span class="material-icons-round">hourglass_top</span> Klaar in ${remaining}s...
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        const elapsedSec = Math.floor((Date.now() - app.holdTimerState.startTime) / 1000);
+                        const mins = Math.floor(elapsedSec / 60);
+                        const secs = elapsedSec % 60;
+                        const timeStr = mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
+                        singleHoldTimerHtml = `
+                            <div class="hold-timer-container">
+                                <button id="hold-timer-btn-${exIndex}" class="hold-timer-btn running" onclick="app.stopHoldTimer(true)">
+                                    <span class="material-icons-round">stop</span> ${timeStr} Stop
+                                </button>
+                            </div>
+                        `;
+                    }
+                } else {
+                    singleHoldTimerHtml = `
+                        <div class="hold-timer-container">
+                            <button id="hold-timer-btn-${exIndex}" class="hold-timer-btn" onclick="app.startHoldTimer(${exIndex})">
+                                <span class="material-icons-round">timer</span> Start hold
+                            </button>
+                        </div>
+                    `;
+                }
             }
             
             const card = document.createElement('div');
@@ -1671,6 +1690,7 @@ const app = {
                 </div>
                 <div class="exercise-body">
                     ${setsHtml}
+                    ${singleHoldTimerHtml}
                 </div>
             `;
             list.appendChild(card);
@@ -1780,6 +1800,16 @@ const app = {
             this.stopHoldTimer(false);
         }
 
+        if (typeof setIndex !== 'number') {
+            const ex = (this.activeWorkout && this.activeWorkout.exercises) ? this.activeWorkout.exercises[exIndex] : null;
+            if (ex && ex.setsCompleted) {
+                const firstUncompleted = ex.setsCompleted.findIndex(c => !c);
+                setIndex = firstUncompleted !== -1 ? firstUncompleted : Math.max(0, ex.sets - 1);
+            } else {
+                setIndex = 0;
+            }
+        }
+
         const delaySec = (typeof store !== 'undefined' && typeof store.holdTimerDelaySeconds === 'number') ? store.holdTimerDelaySeconds : 3;
         const now = Date.now();
 
@@ -1801,7 +1831,7 @@ const app = {
                 return;
             }
 
-            const btnEl = document.getElementById(`hold-timer-btn-${exIndex}-${setIndex}`);
+            const btnEl = document.getElementById(`hold-timer-btn-${exIndex}`);
             const currentNow = Date.now();
 
             if (this.holdTimerState.status === 'delay') {
@@ -1819,7 +1849,7 @@ const app = {
                     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([40]);
                     if (btnEl) {
                         btnEl.className = 'hold-timer-btn running';
-                        btnEl.innerHTML = `<span class="material-icons-round">stop</span> ⏱️ 0s Stop`;
+                        btnEl.innerHTML = `<span class="material-icons-round">stop</span> 0s Stop`;
                     }
                 }
             } else if (this.holdTimerState.status === 'running') {
@@ -1830,7 +1860,7 @@ const app = {
 
                 if (btnEl) {
                     btnEl.className = 'hold-timer-btn running';
-                    btnEl.innerHTML = `<span class="material-icons-round">stop</span> ⏱️ ${timeStr} Stop`;
+                    btnEl.innerHTML = `<span class="material-icons-round">stop</span> ${timeStr} Stop`;
                 }
             }
         }, 100);

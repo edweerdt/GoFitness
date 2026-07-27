@@ -1507,7 +1507,7 @@ describe('Hold Timer (Stopwatch)', () => {
         expect(app.holdTimerState).toBeNull();
     });
 
-    it('should adjust duration using adjustDuration (+1s, -1s, +5s, -5s)', () => {
+    it('should adjust duration using adjustDuration (+1s, -1s)', () => {
         const mockSession = {
             id: 'sess_1',
             name: 'Test Session',
@@ -1520,13 +1520,32 @@ describe('Hold Timer (Stopwatch)', () => {
             exercises: mockSession.exercises
         };
 
-        app.adjustDuration(0, 0, 5);
-        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('25');
+        app.adjustDuration(0, 0, 1);
+        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('21');
 
         app.adjustDuration(0, 0, -1);
-        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('24');
+        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('20');
 
         app.adjustDuration(0, 0, -30); // should not go below 0
         expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('0');
+    });
+
+    it('should auto-select the first uncompleted set when starting timer without setIndex', () => {
+        const mockSession = {
+            id: 'sess_1',
+            name: 'Test Session',
+            exercises: [
+                { id: 'ex_1', name: 'Plank', sets: 3, actualReps: ['30', '', ''], setsCompleted: [true, false, false] }
+            ]
+        };
+        app.activeWorkout = {
+            session: mockSession,
+            exercises: mockSession.exercises
+        };
+
+        store.holdTimerDelaySeconds = 0;
+        app.startHoldTimer(0);
+
+        expect(app.holdTimerState.setIndex).toBe(1); // auto-selected set 2 (index 1)
     });
 });
