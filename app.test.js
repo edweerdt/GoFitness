@@ -1573,7 +1573,7 @@ describe('clickable exercise web search', () => {
         app.triggerExerciseSearch('Leg Press', { stopPropagation: jest.fn() }, mockEl);
 
         expect(openSpy).toHaveBeenCalledWith(
-            expect.stringContaining('google.com/search?q=Leg%20Press'),
+            'https://www.google.com/search?q=Leg%20Press',
             '_blank'
         );
 
