@@ -513,6 +513,48 @@ const app = {
         );
     },
 
+    formatClickableExerciseName(nameStr) {
+        if (!nameStr || typeof nameStr !== 'string') return this.escapeHTML(String(nameStr || ''));
+
+        // Splitst op ' of ', ' / ', ' OR ', ',' om individuele oefeningen afzonderlijk klikbaar te maken
+        const parts = nameStr.split(/(\s+of\s+|\s*\/\s*|\s+or\s+|\s*,\s*)/i);
+        return parts.map(part => {
+            const trimmed = part.trim();
+            const lower = trimmed.toLowerCase();
+            if (lower === 'of' || lower === '/' || lower === 'or' || lower === ',') {
+                return `<span class="text-muted" style="font-weight:normal; margin:0 2px;">${this.escapeHTML(part)}</span>`;
+            }
+            if (!trimmed) return '';
+
+            const safeName = this.escapeHTML(trimmed);
+            const escapedAttr = safeName.replace(/'/g, "\\'");
+            return `<span class="exercise-search-target" onclick="app.triggerExerciseSearch('${escapedAttr}', event, this)" title="Zoek uitvoering van ${safeName}">${safeName} <span class="material-icons-round text-muted" style="font-size:0.85rem; vertical-align:middle; opacity:0.6;">search</span></span>`;
+        }).join('');
+    },
+
+    triggerExerciseSearch(term, event, el) {
+        if (event) {
+            event.stopPropagation();
+        }
+
+        // 1. Programmatische tekstselectie voor de native browser/PWA zoekbalk onderin op mobiel
+        if (el && typeof window !== 'undefined' && window.getSelection && document.createRange) {
+            try {
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } catch (e) {}
+        }
+
+        // 2. Open zoekopdracht op Google in browser tab
+        if (typeof window !== 'undefined' && window.open) {
+            const query = encodeURIComponent(`${term} uitvoering krachttraining`);
+            window.open(`https://www.google.com/search?q=${query}`, '_blank');
+        }
+    },
+
     // --- RENDERING ---
 
     formatRichField(value, label = null) {
@@ -705,11 +747,12 @@ const app = {
                             ${p.sessions.map(s => {
                                 const sId = this.escapeHTML(s.id || s.sessionId);
                                 const exCount = (s.exercises || []).length;
+                                const exNames = (s.exercises || []).map(ex => this.formatClickableExerciseName(ex.name)).join(', ');
                                 return `
                                     <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.03); padding:8px 12px; border-radius:8px;">
                                         <div style="min-width:0; flex:1; margin-right:8px;">
                                             <div style="font-weight:500; font-size:0.9rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${this.escapeHTML(s.name)}</div>
-                                            <div class="text-sm text-muted">${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}</div>
+                                            <div class="text-sm text-muted">${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}${exNames ? ': ' + exNames : ''}</div>
                                         </div>
                                         <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;" onclick="app.startWorkoutBySessionId('${this.escapeHTML(p.id)}', '${sId}')" title="Start sessie">
                                             <span class="material-icons-round" style="font-size:1rem;">play_arrow</span> Start
@@ -1549,9 +1592,11 @@ const app = {
             }
 
             if (ex.alternatives && ex.alternatives.length > 0) {
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.alternatives.join(', '))}</div>`;
+                const altLinks = ex.alternatives.map(a => app.formatClickableExerciseName(a)).join(', ');
+                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${altLinks}</div>`;
             } else if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.optionalAlternatives.join(', '))}</div>`;
+                const altLinks = ex.optionalAlternatives.map(a => app.formatClickableExerciseName(a)).join(', ');
+                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${altLinks}</div>`;
             }
 
             // Progressive-overload-advies op basis van de vorige sessie
@@ -1598,41 +1643,33 @@ const app = {
                 let wantsDuration = (ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false) || isHold;
 
                 if (!wantsReps && !wantsDuration) {
-                    if (isHold) wantsDuration = true;
-                    else wantsReps = true;
+                    wantsReps = true;
                 }
                 
                 let inputsHtml = '';
                 if (wantsWeight) {
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(weightPlaceholder))}"
-                        inputmode="decimal" enterkeyhint="next"
-                        data-ex="${exIndex}" data-set="${i}" data-type="weight"
-                        value="${app.escapeHTML(String(ex.weights ? ex.weights[i] : ''))}"
-                        onchange="app.updateWeight(${exIndex}, ${i}, this.value)"
-                        onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'weight');}">`;
-                }
-                if (wantsReps && !isHold) {
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(repsPlaceholder))}" style="width: 55px;"
-                        inputmode="decimal" enterkeyhint="next"
-                        data-ex="${exIndex}" data-set="${i}" data-type="reps"
-                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}"
-                        onchange="app.updateReps(${exIndex}, ${i}, this.value)"
-                        onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'reps');}">`;
-                }
-                if (wantsDuration || isHold) {
-                     inputsHtml += `<input type="number" class="weight-input" placeholder="sec" style="width: 55px;"
-                        inputmode="decimal" enterkeyhint="next"
-                        data-ex="${exIndex}" data-set="${i}" data-type="reps"
-                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}"
-                        onchange="app.updateReps(${exIndex}, ${i}, this.value)"
-                        onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'reps');}">`;
-
-                     inputsHtml += `
+                    const currentWeightVal = ex.weights[i];
+                    inputsHtml += `
                         <div class="step-btn-group">
-                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, -1)" title="-1 sec">-</button>
-                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, 1)" title="+1 sec">+</button>
+                            <button class="step-btn" onclick="app.adjustWeight(${exIndex}, ${i}, -2.5)" title="-2.5kg">-2.5</button>
+                            <button class="step-btn" onclick="app.adjustWeight(${exIndex}, ${i}, -1)" title="-1kg">-1</button>
                         </div>
-                     `;
+                        <input type="number" step="0.5" class="weight-input" placeholder="${weightPlaceholder}" value="${currentWeightVal}" oninput="app.updateWeight(${exIndex}, ${i}, this.value)" aria-label="Gewicht set ${i+1}">
+                        <div class="step-btn-group">
+                            <button class="step-btn" onclick="app.adjustWeight(${exIndex}, ${i}, 1)" title="+1kg">+1</button>
+                            <button class="step-btn" onclick="app.adjustWeight(${exIndex}, ${i}, 2.5)" title="+2.5kg">+2.5</button>
+                        </div>
+                    `;
+                }
+
+                if (wantsReps) {
+                    const currentRepsVal = ex.actualReps[i];
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="${repsPlaceholder}" value="${currentRepsVal}" oninput="app.updateReps(${exIndex}, ${i}, this.value)" aria-label="Reps set ${i+1}">`;
+                }
+
+                if (wantsDuration) {
+                    const currentSecVal = ex.actualReps[i];
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="sec" value="${currentSecVal}" oninput="app.updateReps(${exIndex}, ${i}, this.value)" aria-label="Duur in seconden set ${i+1}">`;
                 }
 
                 setsHtml += `
@@ -1692,7 +1729,7 @@ const app = {
                 <div class="exercise-header">
                     <div>
                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                            <div class="exercise-title" style="margin:0;">${app.escapeHTML(ex.name)}</div>
+                            <div class="exercise-title" style="margin:0;">${app.formatClickableExerciseName(ex.name)}</div>
                         </div>
                         <div style="margin-bottom:4px;">${badgesHtml}</div>
                         <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
