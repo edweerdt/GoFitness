@@ -550,7 +550,7 @@ const app = {
 
         // 2. Open zoekopdracht op Google in browser tab
         if (typeof window !== 'undefined' && window.open) {
-            const query = encodeURIComponent(`${term} uitvoering krachttraining`);
+            const query = encodeURIComponent(term);
             window.open(`https://www.google.com/search?q=${query}`, '_blank');
         }
     },
