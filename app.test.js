@@ -1549,3 +1549,35 @@ describe('Hold Timer (Stopwatch)', () => {
         expect(app.holdTimerState.setIndex).toBe(1); // auto-selected set 2 (index 1)
     });
 });
+
+describe('clickable exercise web search', () => {
+    it('should split compound exercise names into individual clickable search targets', () => {
+        const html = app.formatClickableExerciseName('Leg Press of Squat');
+        expect(html).toContain('exercise-search-target');
+        expect(html).toContain('Leg Press');
+        expect(html).toContain('Squat');
+        expect(html).toContain('app.triggerExerciseSearch');
+    });
+
+    it('should handle single exercise names correctly', () => {
+        const html = app.formatClickableExerciseName('Bench Press');
+        expect(html).toContain('exercise-search-target');
+        expect(html).toContain('Bench Press');
+    });
+
+    it('should select text and open search window on triggerExerciseSearch', () => {
+        const openSpy = jest.spyOn(window, 'open').mockImplementation(() => {});
+        const mockEl = document.createElement('div');
+        mockEl.textContent = 'Leg Press';
+
+        app.triggerExerciseSearch('Leg Press', { stopPropagation: jest.fn() }, mockEl);
+
+        expect(openSpy).toHaveBeenCalledWith(
+            expect.stringContaining('google.com/search?q=Leg%20Press'),
+            '_blank'
+        );
+
+        openSpy.mockRestore();
+    });
+});
+
