@@ -37,7 +37,7 @@ class DataStore {
             this.activeWorkoutState = null;
             this.theme = 'auto';
             this.holdTimerDelaySeconds = 3;
-            this.deleted = { plans: [], logs: [], customExercises: [] };
+            this.deleted = { plans: [], logs: [] };
             this.customExercises = [];
         }
     }
@@ -50,7 +50,7 @@ class DataStore {
         this.holdTimerDelaySeconds = (typeof localStorage !== 'undefined' && localStorage.getItem('holdTimerDelaySeconds')) ? (parseInt(localStorage.getItem('holdTimerDelaySeconds'), 10) || 3) : 3;
         this.customExercises = this.safeParse('customExercises', []);
         // Tombstones: ids van verwijderde items, zodat cloud-sync ze niet terugbrengt
-        this.deleted = this.safeParse('deleted', { plans: [], logs: [], customExercises: [] });
+        this.deleted = this.safeParse('deleted', { plans: [], logs: [] });
         this.sanitizeLogPlanIds();
     }
     setHoldTimerDelaySeconds(val) {
