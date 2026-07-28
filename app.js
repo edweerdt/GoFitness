@@ -941,7 +941,7 @@ const app = {
             const rmHtml = best1RM > 0 ? `<span>Geschat 1RM: ${Math.round(best1RM)} kg</span>` : '';
 
             html += `
-                <div class="glass-panel" style="padding: 12px 16px;">
+                <div class="glass-panel progress-card" style="padding: 16px;">
                     <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
                         <div style="font-weight:600; font-size:0.9rem;">${this.escapeHTML(String(s.name))}</div>
                         <div class="text-sm" style="color:${diffColor}; white-space:nowrap;">${diffText}</div>

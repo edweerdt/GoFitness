@@ -203,11 +203,48 @@ button:disabled {
     font-size: 1.15rem;
 }
 
-/* Stat Boxes */
+/* Stat Boxes & Grids */
 .stats-mini, .stats-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+}
+
+.muscle-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+/* Progressie Grafieken op Desktop: 2x breedte van een Spiergroepen card (minmax(332px, 1fr)) */
+.exercise-progress-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(332px, 1fr));
+    gap: 12px;
+}
+
+.progress-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.progress-card:hover {
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 480px) {
+    .exercise-progress-grid {
+        grid-template-columns: 1fr;
+    }
+    .muscle-stats-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+}
+
+@media (min-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
 
 .stat-box {
