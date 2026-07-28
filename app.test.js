@@ -1594,6 +1594,9 @@ describe('Exercise Library & Custom Vrije Sessie', () => {
             }),
             removeItem: jest.fn(key => {
                 delete mockLocalStorage.store[key];
+            }),
+            clear: jest.fn(() => {
+                mockLocalStorage.store = {};
             })
         };
         Object.defineProperty(global, 'localStorage', {

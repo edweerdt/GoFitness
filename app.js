@@ -2067,6 +2067,10 @@ const app = {
             const exIndex = this.activeWorkout.exercises.findIndex(e => e.id === ex.id);
             const prevDetails = this.getPreviousExerciseDetails(ex.name) || [];
 
+            if (!ex.setsCompleted) ex.setsCompleted = Array(ex.sets || 1).fill(false);
+            if (!ex.weights) ex.weights = Array(ex.sets || 1).fill('');
+            if (!ex.actualReps) ex.actualReps = Array(ex.sets || 1).fill('');
+
             // Build rep/duration string
             let metaString = `${ex.sets} sets`;
             if (ex.repsMin && ex.repsMax) metaString += ` • ${ex.repsMin}-${ex.repsMax} reps`;
