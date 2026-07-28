@@ -1581,3 +1581,118 @@ describe('clickable exercise web search', () => {
     });
 });
 
+describe('Exercise Library & Custom Vrije Sessie', () => {
+    let mockLocalStorage;
+
+    beforeEach(() => {
+        store.customExercises = [];
+        mockLocalStorage = {
+            store: {},
+            getItem: jest.fn(key => mockLocalStorage.store[key] || null),
+            setItem: jest.fn((key, value) => {
+                mockLocalStorage.store[key] = value.toString();
+            }),
+            removeItem: jest.fn(key => {
+                delete mockLocalStorage.store[key];
+            }),
+            clear: jest.fn(() => {
+                mockLocalStorage.store = {};
+            })
+        };
+        Object.defineProperty(global, 'localStorage', {
+            value: mockLocalStorage,
+            configurable: true
+        });
+    });
+
+    it('should retrieve exercise library containing default and custom exercises', () => {
+        const store = new DataStore();
+        const library = store.getExerciseLibrary();
+
+        expect(library.length).toBeGreaterThan(15); // contains built-in exercises
+        expect(library.some(e => e.name === 'Barbell Bench Press')).toBe(true);
+
+        const customEx = store.addCustomExercise({
+            name: 'Bulgarian Split Squat',
+            muscleGroups: ['legs', 'glutes'],
+            exerciseType: 'weight_reps'
+        });
+
+        const updatedLib = store.getExerciseLibrary();
+        expect(updatedLib.some(e => e.name === 'Bulgarian Split Squat')).toBe(true);
+    });
+
+    it('should allow adding, updating and deleting custom exercises', () => {
+        const testStore = new DataStore();
+        testStore.customExercises = [];
+        const created = testStore.addCustomExercise({
+            name: 'Pike Push-Up',
+            muscleGroups: ['shoulders', 'triceps'],
+            exerciseType: 'bodyweight_reps'
+        });
+
+        expect(created.id).toBeDefined();
+        expect(testStore.customExercises.length).toBe(1);
+
+        testStore.updateCustomExercise(created.id, { name: 'Pike Pushup Modified' });
+        expect(testStore.customExercises[0].name).toBe('Pike Pushup Modified');
+
+        testStore.deleteCustomExercise(created.id);
+        expect(testStore.customExercises.length).toBe(0);
+    });
+
+    it('should detect exercise type based on exercise name keywords', () => {
+        expect(app.detectExerciseType('Plank Hold').exerciseType).toBe('duration');
+        expect(app.detectExerciseType('Hardlopen').exerciseType).toBe('duration');
+        expect(app.detectExerciseType('Pull-Up').exerciseType).toBe('bodyweight_reps');
+        expect(app.detectExerciseType('Dumbbell Bicep Curl').exerciseType).toBe('weight_reps');
+    });
+
+    it('should start a Vrije Sessie workout correctly', () => {
+        const navigateSpy = jest.spyOn(app, 'navigate').mockImplementation(() => {});
+
+        app.startCustomWorkout();
+
+        expect(app.activeWorkout).toBeDefined();
+        expect(app.activeWorkout.session.name).toBe('Vrije Sessie');
+        expect(app.activeWorkout.exercises).toEqual([]);
+
+        navigateSpy.mockRestore();
+    });
+
+    it('should add exercise to active workout and match previous exercise history', () => {
+        const navigateSpy = jest.spyOn(app, 'navigate').mockImplementation(() => {});
+
+        // Pre-populate previous log
+        store.logs = [
+            {
+                id: 'log_1',
+                date: new Date().toISOString(),
+                exercises: [
+                    {
+                        name: 'Barbell Bench Press',
+                        details: [{ setNumber: 1, weight: '80', reps: '10' }]
+                    }
+                ]
+            }
+        ];
+
+        app.startCustomWorkout();
+        app.addExerciseToActiveWorkout({
+            name: 'Barbell Bench Press',
+            muscleGroups: ['chest'],
+            exerciseType: 'weight_reps'
+        }, 3, '10');
+
+        expect(app.activeWorkout.exercises.length).toBe(1);
+        expect(app.activeWorkout.exercises[0].name).toBe('Barbell Bench Press');
+
+        const prevDetails = app.getPreviousExerciseDetails('Barbell Bench Press');
+        expect(prevDetails).toBeDefined();
+        expect(prevDetails[0].weight).toBe('80');
+
+        navigateSpy.mockRestore();
+    });
+});
+
+

@@ -1,5 +1,30 @@
 // app.js
 
+const DEFAULT_EXERCISES = [
+    { id: 'def_bench_press', name: 'Barbell Bench Press', muscleGroups: ['chest', 'triceps', 'shoulders'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_incline_db_press', name: 'Incline Dumbbell Press', muscleGroups: ['chest', 'shoulders', 'triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_chest_fly', name: 'Dumbbell Chest Fly', muscleGroups: ['chest'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_pushup', name: 'Push-Up', muscleGroups: ['chest', 'triceps', 'core'], exerciseType: 'bodyweight_reps', trackMetrics: ['reps'], category: 'bodyweight' },
+    { id: 'def_dip', name: 'Chest / Tricep Dips', muscleGroups: ['chest', 'triceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight' },
+    { id: 'def_overhead_press', name: 'Overhead Press (OHP)', muscleGroups: ['shoulders', 'triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_lateral_raise', name: 'Dumbbell Lateral Raise', muscleGroups: ['shoulders'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_barbell_squat', name: 'Barbell Back Squat', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_goblet_squat', name: 'Goblet Squat', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_leg_press', name: 'Leg Press', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_romanian_deadlift', name: 'Romanian Deadlift (RDL)', muscleGroups: ['legs', 'glutes', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_bulgarian_split_squat', name: 'Bulgarian Split Squat', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_leg_extension', name: 'Leg Extension', muscleGroups: ['legs'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_leg_curl', name: 'Lying Leg Curl', muscleGroups: ['legs'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_deadlift', name: 'Conventional Deadlift', muscleGroups: ['back', 'legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_barbell_row', name: 'Barbell Bent Over Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_lat_pulldown', name: 'Lat Pulldown', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_pullup', name: 'Pull-Up / Chin-Up', muscleGroups: ['back', 'biceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight' },
+    { id: 'def_bicep_curl', name: 'Dumbbell Bicep Curl', muscleGroups: ['biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_tricep_pushdown', name: 'Tricep Cable Pushdown', muscleGroups: ['triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_plank', name: 'Plank Hold', muscleGroups: ['core'], exerciseType: 'duration', trackMetrics: ['duration_seconds'], category: 'isometric' },
+    { id: 'def_running', name: 'Hardlopen', muscleGroups: ['legs'], exerciseType: 'duration', trackMetrics: ['duration_seconds'], category: 'cardio' }
+];
+
 class DataStore {
     constructor() {
         // Only load if localStorage is defined (useful for testing environments)
@@ -13,6 +38,7 @@ class DataStore {
             this.theme = 'auto';
             this.holdTimerDelaySeconds = 3;
             this.deleted = { plans: [], logs: [] };
+            this.customExercises = [];
         }
     }
     load() {
@@ -22,6 +48,7 @@ class DataStore {
         this.activeWorkoutState = this.safeParse('activeWorkoutState', null);
         this.theme = localStorage.getItem('theme') || 'auto';
         this.holdTimerDelaySeconds = (typeof localStorage !== 'undefined' && localStorage.getItem('holdTimerDelaySeconds')) ? (parseInt(localStorage.getItem('holdTimerDelaySeconds'), 10) || 3) : 3;
+        this.customExercises = this.safeParse('customExercises', []);
         // Tombstones: ids van verwijderde items, zodat cloud-sync ze niet terugbrengt
         this.deleted = this.safeParse('deleted', { plans: [], logs: [] });
         this.sanitizeLogPlanIds();
@@ -68,6 +95,7 @@ class DataStore {
             localStorage.setItem('logs', JSON.stringify(this.logs));
             localStorage.setItem('theme', this.theme);
             localStorage.setItem('holdTimerDelaySeconds', String(this.holdTimerDelaySeconds || 3));
+            localStorage.setItem('customExercises', JSON.stringify(this.customExercises || []));
             localStorage.setItem('deleted', JSON.stringify(this.deleted));
             return true;
         } catch (e) {
@@ -102,6 +130,86 @@ class DataStore {
     }
     getActivePlan() {
         return this.plans.find(p => p.id === this.activePlanId) || null;
+    }
+    getExerciseLibrary() {
+        const list = [...DEFAULT_EXERCISES];
+
+        // Oefeningen uit geïmporteerde schema's toevoegen indien nog niet in de lijst
+        if (this.plans) {
+            this.plans.forEach(p => {
+                if (p.sessions) {
+                    p.sessions.forEach(s => {
+                        if (s.exercises) {
+                            s.exercises.forEach(e => {
+                                if (e.name && !list.some(item => item.name.toLowerCase().trim() === e.name.toLowerCase().trim())) {
+                                    list.push({
+                                        id: e.id || ('plan_ex_' + Math.random().toString(36).slice(2, 9)),
+                                        name: e.name,
+                                        muscleGroups: e.muscleGroups || [],
+                                        exerciseType: e.exerciseType || (e.durationSeconds ? 'duration' : 'weight_reps'),
+                                        trackMetrics: e.trackMetrics || (e.durationSeconds ? ['duration_seconds'] : ['weight', 'reps']),
+                                        category: e.category || 'compound',
+                                        fromPlan: true
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        // Custom oefeningen van de gebruiker toevoegen / overschrijven
+        if (this.customExercises) {
+            this.customExercises.forEach(c => {
+                const idx = list.findIndex(item => item.name.toLowerCase().trim() === c.name.toLowerCase().trim());
+                if (idx !== -1) {
+                    list[idx] = { ...list[idx], ...c };
+                } else {
+                    list.push(c);
+                }
+            });
+        }
+
+        return list;
+    }
+    addCustomExercise(exData) {
+        if (!exData.name || !exData.name.trim()) throw new Error("Oefeningnaam is verplicht.");
+        const id = 'custom_ex_' + Date.now();
+        const newEx = {
+            id,
+            name: exData.name.trim(),
+            muscleGroups: exData.muscleGroups || [],
+            exerciseType: exData.exerciseType || 'weight_reps',
+            trackMetrics: exData.trackMetrics || (exData.exerciseType === 'duration' ? ['duration_seconds'] : (exData.exerciseType === 'bodyweight_reps' ? ['reps'] : ['weight', 'reps'])),
+            category: exData.category || 'custom',
+            isCustom: true
+        };
+        if (!this.customExercises) this.customExercises = [];
+        this.customExercises.push(newEx);
+        this.save();
+        return newEx;
+    }
+    updateCustomExercise(id, exData) {
+        if (!this.customExercises) this.customExercises = [];
+        const idx = this.customExercises.findIndex(c => c.id === id);
+        if (idx === -1) throw new Error("Oefening niet gevonden.");
+        this.customExercises[idx] = {
+            ...this.customExercises[idx],
+            name: exData.name ? exData.name.trim() : this.customExercises[idx].name,
+            muscleGroups: exData.muscleGroups || this.customExercises[idx].muscleGroups,
+            exerciseType: exData.exerciseType || this.customExercises[idx].exerciseType,
+            trackMetrics: exData.trackMetrics || this.customExercises[idx].trackMetrics,
+            category: exData.category || this.customExercises[idx].category
+        };
+        this.save();
+        return this.customExercises[idx];
+    }
+    deleteCustomExercise(id) {
+        if (!this.customExercises) this.customExercises = [];
+        this.recordDeletion('customExercises', id);
+        this.customExercises = this.customExercises.filter(c => c.id !== id);
+        this.save();
     }
     static validatePlanSchema(data) {
         if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -627,45 +735,53 @@ const app = {
             const activePlan = store.getActivePlan();
             const recSession = this.getRecommendedSession();
 
-            if (recSession && activePlan && activePlan.sessions && activePlan.sessions.length > 0) {
-                if (pickerWrapper && sessionSelect && activePlan.sessions.length > 1) {
-                    sessionSelect.innerHTML = activePlan.sessions.map(s => {
+            if (pickerWrapper && sessionSelect) {
+                pickerWrapper.classList.remove('hidden');
+
+                let optionsHtml = '';
+                if (activePlan && activePlan.sessions && activePlan.sessions.length > 0) {
+                    optionsHtml += activePlan.sessions.map(s => {
                         const sId = s.id || s.sessionId;
-                        const isRec = sId === (recSession.session.id || recSession.session.sessionId);
+                        const isRec = recSession && sId === (recSession.session.id || recSession.session.sessionId);
                         const label = isRec ? `${this.escapeHTML(s.name)} (Aanbevolen)` : this.escapeHTML(s.name);
                         return `<option value="${this.escapeHTML(sId)}"${isRec ? ' selected' : ''}>${label}</option>`;
                     }).join('');
+                }
+                optionsHtml += `<option value="custom_session"${(!activePlan || !activePlan.sessions || activePlan.sessions.length === 0) ? ' selected' : ''}>➕ Vrije Sessie</option>`;
 
-                    pickerWrapper.classList.remove('hidden');
+                sessionSelect.innerHTML = optionsHtml;
 
-                    sessionSelect.onchange = () => {
-                        const chosenId = sessionSelect.value;
-                        const chosenSession = activePlan.sessions.find(s => (s.id || s.sessionId) === chosenId);
+                const updateCardForSelectedSession = () => {
+                    const chosenVal = sessionSelect.value;
+                    if (chosenVal === 'custom_session') {
+                        document.getElementById('recommended-card-title').textContent = "Vrije Sessie";
+                        document.getElementById('recommended-session-name').textContent = "Vrije Sessie";
+                        document.getElementById('recommended-reason').textContent = "Start een blanco training zonder vaste oefeningen. Voeg tijdens het trainen oefeningen toe.";
+                        btnStart.textContent = "Start Vrije Sessie";
+                        btnStart.disabled = false;
+                        btnStart.onclick = () => this.startCustomWorkout();
+                    } else if (activePlan) {
+                        const chosenSession = activePlan.sessions.find(s => (s.id || s.sessionId) === chosenVal);
                         if (!chosenSession) return;
-
-                        const isRecChoice = (chosenSession.id || chosenSession.sessionId) === (recSession.session.id || recSession.session.sessionId);
+                        const isRecChoice = recSession && (chosenSession.id || chosenSession.sessionId) === (recSession.session.id || recSession.session.sessionId);
                         document.getElementById('recommended-card-title').textContent = isRecChoice ? "Aanbevolen Sessie" : "Gekozen Sessie";
                         document.getElementById('recommended-session-name').textContent = chosenSession.name;
                         document.getElementById('recommended-reason').textContent = isRecChoice ? recSession.reason : `Handmatig gekozen uit schema (${activePlan.name}).`;
+                        btnStart.textContent = "Start Nu";
+                        btnStart.disabled = false;
                         btnStart.onclick = () => this.startWorkout(chosenSession, activePlan);
-                    };
-                } else if (pickerWrapper) {
-                    pickerWrapper.classList.add('hidden');
-                }
+                    }
+                };
 
-                document.getElementById('recommended-card-title').textContent = "Aanbevolen Sessie";
-                document.getElementById('recommended-session-name').textContent = recSession.session.name;
-                document.getElementById('recommended-reason').textContent = recSession.reason;
-                btnStart.textContent = "Start Nu";
-                btnStart.disabled = false;
-                btnStart.onclick = () => this.startWorkout(recSession.session, activePlan);
+                sessionSelect.onchange = updateCardForSelectedSession;
+                updateCardForSelectedSession();
             } else {
-                if (pickerWrapper) pickerWrapper.classList.add('hidden');
-                document.getElementById('recommended-card-title').textContent = "Aanbevolen Sessie";
-                document.getElementById('recommended-session-name').textContent = "Geen schema actief";
-                document.getElementById('recommended-reason').textContent = "Importeer eerst een trainingsschema via Schema's.";
-                btnStart.textContent = "Start Nu";
-                btnStart.disabled = true;
+                document.getElementById('recommended-card-title').textContent = "Vrije Sessie";
+                document.getElementById('recommended-session-name').textContent = "Vrije Sessie";
+                document.getElementById('recommended-reason').textContent = "Start een blanco training zonder vaste oefeningen.";
+                btnStart.textContent = "Start Vrije Sessie";
+                btnStart.disabled = false;
+                btnStart.onclick = () => this.startCustomWorkout();
             }
         }
 
@@ -703,109 +819,128 @@ const app = {
     renderPlans() {
         const list = document.getElementById('plans-list');
         list.innerHTML = '';
+
+        // Vrije Sessie kaart altijd bovenaan tonen in Schema's view
+        const customCard = document.createElement('div');
+        customCard.className = 'glass-panel flex-col gap-2';
+        customCard.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0;">➕ Vrije Sessie</h3>
+                    <p class="text-sm text-muted mt-1">Start een blanco training zonder vaste oefeningen. Voeg losse oefeningen toe tijdens het trainen.</p>
+                </div>
+                <button class="btn-primary" style="padding:6px 14px; font-size:0.85rem; flex-shrink:0; margin-left:12px;" onclick="app.startCustomWorkout()">Start</button>
+            </div>
+        `;
+        list.appendChild(customCard);
+
         if(store.plans.length === 0) {
-            list.innerHTML = '<p class="text-muted">Nog geen schema\'s. Importeer er een!</p>';
-            return;
-        }
-        store.plans.forEach(p => {
-            const el = document.createElement('div');
-            el.className = 'glass-panel flex-col gap-3';
-            const isActive = store.activePlanId === p.id;
-            
-            const sched = p.schedule || {};
-            const targetSessions = sched.targetSessionsPerWeek || p.targetSessionsPerWeek || '?';
-            let descriptionText = p.description || '';
-            descriptionText = descriptionText.split(/Herstelregels/i)[0];
-            descriptionText = descriptionText.split(/Voltooiingsregels/i)[0];
-            descriptionText = descriptionText.split(/Mijlpalen/i)[0];
-            descriptionText = descriptionText.trim();
-            const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${this.escapeHTML(descriptionText)}</p>` : '';
-            const recPattern = sched.recommendedPattern || p.recommendedPattern ?
-                `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${this.escapeHTML(String(sched.recommendedPattern || p.recommendedPattern))}</div>` : '';
-            const recovery = sched.minRecoveryHours || p.minRecoveryHours ?
-                `<div class="text-sm text-muted"><strong>Herstel:</strong> Minimaal ${this.escapeHTML(String(sched.minRecoveryHours || p.minRecoveryHours))} uur</div>` : '';
-            const weeklyMins = p.estimatedWeeklyMinutes ?
-                `<div class="text-sm text-muted"><strong>Geschatte tijd per week:</strong> ${this.escapeHTML(String(p.estimatedWeeklyMinutes))} min</div>` : '';
-            const sessionOrder = p.defaultSessionOrder ?
-                `<div class="text-sm text-muted mt-1"><strong>Sessie volgorde:</strong> ${this.escapeHTML(p.defaultSessionOrder.join(', '))}</div>` :
-                (p.sessions ? `<div class="text-sm text-muted mt-1"><strong>Sessies:</strong> ${this.escapeHTML(p.sessions.map(s=>s.name).join(', '))}</div>` : '');
+            const emptyNote = document.createElement('p');
+            emptyNote.className = 'text-muted mt-2';
+            emptyNote.textContent = 'Nog geen vaste schema\'s geïmporteerd. Importeer een schema of start een Vrije Sessie!';
+            list.appendChild(emptyNote);
+        } else {
+            store.plans.forEach(p => {
+                const el = document.createElement('div');
+                el.className = 'glass-panel flex-col gap-3';
+                const isActive = store.activePlanId === p.id;
+                
+                const sched = p.schedule || {};
+                const targetSessions = sched.targetSessionsPerWeek || p.targetSessionsPerWeek || '?';
+                let descriptionText = p.description || '';
+                descriptionText = descriptionText.split(/Herstelregels/i)[0];
+                descriptionText = descriptionText.split(/Voltooiingsregels/i)[0];
+                descriptionText = descriptionText.split(/Mijlpalen/i)[0];
+                descriptionText = descriptionText.trim();
+                const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${this.escapeHTML(descriptionText)}</p>` : '';
+                const recPattern = sched.recommendedPattern || p.recommendedPattern ?
+                    `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${this.escapeHTML(String(sched.recommendedPattern || p.recommendedPattern))}</div>` : '';
+                const recovery = sched.minRecoveryHours || p.minRecoveryHours ?
+                    `<div class="text-sm text-muted"><strong>Herstel:</strong> Minimaal ${this.escapeHTML(String(sched.minRecoveryHours || p.minRecoveryHours))} uur</div>` : '';
+                const weeklyMins = p.estimatedWeeklyMinutes ?
+                    `<div class="text-sm text-muted"><strong>Geschatte tijd per week:</strong> ${this.escapeHTML(String(p.estimatedWeeklyMinutes))} min</div>` : '';
+                const sessionOrder = p.defaultSessionOrder ?
+                    `<div class="text-sm text-muted mt-1"><strong>Sessie volgorde:</strong> ${this.escapeHTML(p.defaultSessionOrder.join(', '))}</div>` :
+                    (p.sessions ? `<div class="text-sm text-muted mt-1"><strong>Sessies:</strong> ${this.escapeHTML(p.sessions.map(s=>s.name).join(', '))}</div>` : '');
 
-            const level = p.level ? `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${this.escapeHTML(String(p.level))}</span>` : '';
-            const goal = p.goal ? `<div class="text-sm text-muted"><strong>Doel:</strong> ${this.escapeHTML(String(p.goal))}</div>` : '';
-            const equipment = p.equipment && p.equipment.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${this.escapeHTML(p.equipment.join(', '))}</div>` : '';
+                const level = p.level ? `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${this.escapeHTML(String(p.level))}</span>` : '';
+                const goal = p.goal ? `<div class="text-sm text-muted"><strong>Doel:</strong> ${this.escapeHTML(String(p.goal))}</div>` : '';
+                const equipment = p.equipment && p.equipment.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${this.escapeHTML(p.equipment.join(', '))}</div>` : '';
 
-            const scheduleInfo = this.formatRichField(p.schedule, 'Schema Regels');
-            const progressionRules = this.formatRichField(p.progressionRules, 'Progressieregels');
+                const scheduleInfo = this.formatRichField(p.schedule, 'Schema Regels');
+                const progressionRules = this.formatRichField(p.progressionRules, 'Progressieregels');
 
-
-            let sessionsListHtml = '';
-            if (p.sessions && p.sessions.length > 0) {
-                sessionsListHtml = `
-                    <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
-                        <div style="font-weight:600; font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:6px;">Sessies in dit schema</div>
-                        <div class="flex-col gap-2">
-                            ${p.sessions.map(s => {
-                                const sId = this.escapeHTML(s.id || s.sessionId);
-                                const exCount = (s.exercises || []).length;
-                                const exNames = (s.exercises || []).map(ex => this.formatClickableExerciseName(ex.name)).join(', ');
-                                return `
-                                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.03); padding:8px 12px; border-radius:8px;">
-                                        <div style="min-width:0; flex:1; margin-right:8px;">
-                                            <div style="font-weight:500; font-size:0.9rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${this.escapeHTML(s.name)}</div>
-                                            <div class="text-sm text-muted">${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}${exNames ? ': ' + exNames : ''}</div>
+                let sessionsListHtml = '';
+                if (p.sessions && p.sessions.length > 0) {
+                    sessionsListHtml = `
+                        <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+                            <div style="font-weight:600; font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:6px;">Sessies in dit schema</div>
+                            <div class="flex-col gap-2">
+                                ${p.sessions.map(s => {
+                                    const sId = this.escapeHTML(s.id || s.sessionId);
+                                    const exCount = (s.exercises || []).length;
+                                    const exNames = (s.exercises || []).map(ex => this.formatClickableExerciseName(ex.name)).join(', ');
+                                    return `
+                                        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.03); padding:8px 12px; border-radius:8px;">
+                                            <div style="min-width:0; flex:1; margin-right:8px;">
+                                                <div style="font-weight:500; font-size:0.9rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${this.escapeHTML(s.name)}</div>
+                                                <div class="text-sm text-muted">${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}${exNames ? ': ' + exNames : ''}</div>
+                                            </div>
+                                            <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;" onclick="app.startWorkoutBySessionId('${this.escapeHTML(p.id)}', '${sId}')" title="Start sessie">
+                                                <span class="material-icons-round" style="font-size:1rem;">play_arrow</span> Start
+                                            </button>
                                         </div>
-                                        <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;" onclick="app.startWorkoutBySessionId('${this.escapeHTML(p.id)}', '${sId}')" title="Start sessie">
-                                            <span class="material-icons-round" style="font-size:1rem;">play_arrow</span> Start
-                                        </button>
-                                    </div>
-                                `;
-                            }).join('')}
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                el.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0; overflow-wrap:anywhere;">${this.escapeHTML(p.name)}</h3>
+                                ${level}
+                            </div>
+                            ${desc}
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-left:12px; flex-shrink:0;">
+                            ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${this.escapeHTML(p.id)}')" title="Schema delen">ios_share</span>
+                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${this.escapeHTML(p.id)}')">delete_outline</span>
                         </div>
                     </div>
+                    
+                    <div style="background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; margin-top: 8px; cursor: pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="font-weight:600; font-size:0.85rem; color:var(--accent-color);">DETAILS</div>
+                            <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
+                        </div>
+                        <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${this.escapeHTML(String(targetSessions))}x per week (${p.sessions.length} unieke sessies)</div>
+                        ${goal}
+                    </div>
+
+                    <div class="hidden" style="background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.05);">
+                        ${equipment}
+                        ${weeklyMins}
+                        ${recovery}
+                        ${scheduleInfo}
+                        ${progressionRules}
+                        ${recPattern}
+                        ${sessionOrder}
+                    </div>
+
+                    ${sessionsListHtml}
+                    
+                    ${!isActive ? `<button class="btn-secondary mt-3 w-full" onclick="app.setActivePlan('${p.id}')">Maak Actief</button>` : ''}
                 `;
-            }
+                list.appendChild(el);
+            });
+        }
 
-            el.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <div style="flex:1; min-width:0;">
-                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                            <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0; overflow-wrap:anywhere;">${this.escapeHTML(p.name)}</h3>
-                            ${level}
-                        </div>
-                        ${desc}
-                    </div>
-                    <div style="display:flex; align-items:center; gap:8px; margin-left:12px; flex-shrink:0;">
-                        ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
-                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${this.escapeHTML(p.id)}')" title="Schema delen">ios_share</span>
-                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${this.escapeHTML(p.id)}')">delete_outline</span>
-                    </div>
-                </div>
-                
-                <div style="background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; margin-top: 8px; cursor: pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div style="font-weight:600; font-size:0.85rem; color:var(--accent-color);">DETAILS</div>
-                        <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
-                    </div>
-                    <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${this.escapeHTML(String(targetSessions))}x per week (${p.sessions.length} unieke sessies)</div>
-                    ${goal}
-                </div>
-
-                <div class="hidden" style="background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.05);">
-                    ${equipment}
-                    ${weeklyMins}
-                    ${recovery}
-                    ${scheduleInfo}
-                    ${progressionRules}
-                    ${recPattern}
-                    ${sessionOrder}
-                </div>
-
-                ${sessionsListHtml}
-                
-                ${!isActive ? `<button class="btn-secondary mt-3 w-full" onclick="app.setActivePlan('${p.id}')">Maak Actief</button>` : ''}
-            `;
-            list.appendChild(el);
-        });
+        this.renderExerciseLibrary();
     },
 
     renderProgress() {
@@ -1360,7 +1495,355 @@ const app = {
             this.hideDeleteModal('log');
             this.renderProgress();
             this.renderHome();
+        } else if (type === 'exercise') {
+            store.deleteCustomExercise(this.itemToDelete.id);
+            this.hideDeleteModal('exercise');
+            this.renderExerciseLibrary();
+            this.showToast('Oefening verwijderd.', 'success');
         }
+    },
+
+    // --- CUSTOM EXERCISES & VRIJE SESSIE LOGIC ---
+
+    startCustomWorkout() {
+        const customSession = {
+            id: 'custom_session_' + Date.now(),
+            name: 'Vrije Sessie',
+            exercises: []
+        };
+        const customPlan = {
+            id: 'custom_plan',
+            name: 'Vrije Sessie'
+        };
+        this.startWorkout(customSession, customPlan);
+    },
+
+    detectExerciseType(name) {
+        const n = String(name || '').toLowerCase().trim();
+        if (!n) return { exerciseType: 'weight_reps', category: 'compound' };
+
+        if (n.includes('plank') || n.includes('hold') || n.includes('wall sit') || n.includes('statisch') || n.includes('l-sit') || n.includes('hollow body') || n.includes('dead bug')) {
+            return { exerciseType: 'duration', category: 'isometric' };
+        }
+        if (n.includes('hardlopen') || n.includes('running') || n.includes('fietsen') || n.includes('roeien') || n.includes('treadmill') || n.includes('crosstrainer') || n.includes('wandelen')) {
+            return { exerciseType: 'duration', category: 'cardio' };
+        }
+        if (n.includes('pull-up') || n.includes('chin-up') || n.includes('push-up') || n.includes('dip') || n.includes('crunch') || n.includes('leg raise') || n.includes('bodyweight')) {
+            return { exerciseType: 'bodyweight_reps', category: 'bodyweight' };
+        }
+        if (n.includes('curl') || n.includes('raise') || n.includes('fly') || n.includes('extension') || n.includes('kickback') || n.includes('pushdown')) {
+            return { exerciseType: 'weight_reps', category: 'isolation' };
+        }
+        return { exerciseType: 'weight_reps', category: 'compound' };
+    },
+
+    handleExerciseNameInput(val) {
+        if (this.isTypeManuallySelected) return;
+
+        const detected = this.detectExerciseType(val);
+        const typeSelect = document.getElementById('new-ex-type');
+        const catSelect = document.getElementById('new-ex-category');
+        const hintEl = document.getElementById('new-ex-type-hint');
+
+        if (typeSelect && detected.exerciseType) {
+            typeSelect.value = detected.exerciseType;
+        }
+        if (catSelect && detected.category) {
+            catSelect.value = detected.category;
+        }
+        if (hintEl && val.trim()) {
+            const selectedText = typeSelect.options[typeSelect.selectedIndex] ? typeSelect.options[typeSelect.selectedIndex].text.split(' (')[0] : '';
+            hintEl.textContent = `💡 Automatisch herkend als: ${selectedText}`;
+        } else if (hintEl) {
+            hintEl.textContent = '';
+        }
+    },
+
+    markTypeManuallySelected() {
+        this.isTypeManuallySelected = true;
+        const hintEl = document.getElementById('new-ex-type-hint');
+        if (hintEl) hintEl.textContent = '✏️ Handmatig ingesteld';
+    },
+
+    renderExerciseLibrary() {
+        const list = document.getElementById('exercise-library-list');
+        if (!list) return;
+
+        const searchInput = document.getElementById('library-search');
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+        const allExercises = store.getExerciseLibrary();
+        const filtered = allExercises.filter(ex => {
+            if (!query) return true;
+            const nameMatch = ex.name.toLowerCase().includes(query);
+            const muscleMatch = (ex.muscleGroups || []).some(m => m.toLowerCase().includes(query));
+            const typeMatch = (ex.exerciseType || '').toLowerCase().includes(query) || (ex.category || '').toLowerCase().includes(query);
+            return nameMatch || muscleMatch || typeMatch;
+        });
+
+        if (filtered.length === 0) {
+            list.innerHTML = '<p class="text-muted text-sm py-2">Geen oefeningen gevonden.</p>';
+            return;
+        }
+
+        list.innerHTML = filtered.map(ex => {
+            const safeName = this.escapeHTML(ex.name);
+            const safeId = this.escapeHTML(ex.id);
+            const musclesStr = (ex.muscleGroups || []).map(m => this.escapeHTML(m)).join(', ') || 'Algemeen';
+            const typeBadge = ex.exerciseType === 'duration' ? 'Tijd / Sec' : (ex.exerciseType === 'bodyweight_reps' ? 'Lichaamsgewicht' : 'Gewicht & Reps');
+            
+            let actions = '';
+            if (ex.isCustom) {
+                actions = `
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:var(--text-muted);" onclick="app.showAddExerciseModal('${safeId}')" title="Bewerken">edit</span>
+                        <span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('exercise', '${safeId}')" title="Verwijderen">delete_outline</span>
+                    </div>
+                `;
+            } else {
+                actions = `<span class="status-badge" style="padding:2px 6px; font-size:0.65rem; background:rgba(255,255,255,0.06); color:var(--text-muted);">Ingebouwd</span>`;
+            }
+
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.03); padding:8px 12px; border-radius:8px;">
+                    <div style="min-width:0; flex:1; margin-right:8px;">
+                        <div style="font-weight:500; font-size:0.9rem; color:var(--text-primary);">${safeName}</div>
+                        <div class="text-sm text-muted">${typeBadge} • ${musclesStr}</div>
+                    </div>
+                    ${actions}
+                </div>
+            `;
+        }).join('');
+    },
+
+    showAddExerciseModal(editId = null) {
+        this.editingExerciseId = editId;
+        this.isTypeManuallySelected = false;
+
+        const titleEl = document.getElementById('modal-add-exercise-title');
+        const nameInput = document.getElementById('new-ex-name');
+        const typeSelect = document.getElementById('new-ex-type');
+        const catSelect = document.getElementById('new-ex-category');
+        const idInput = document.getElementById('ex-edit-id');
+        const hintEl = document.getElementById('new-ex-type-hint');
+
+        if (idInput) idInput.value = editId || '';
+        if (hintEl) hintEl.textContent = '';
+
+        document.querySelectorAll('#new-ex-muscles input[type="checkbox"]').forEach(cb => cb.checked = false);
+
+        if (editId) {
+            if (titleEl) titleEl.textContent = "Oefening Bewerken";
+            const all = store.getExerciseLibrary();
+            const ex = all.find(e => e.id === editId);
+            if (ex) {
+                if (nameInput) nameInput.value = ex.name;
+                if (typeSelect) typeSelect.value = ex.exerciseType || 'weight_reps';
+                if (catSelect) catSelect.value = ex.category || 'compound';
+                (ex.muscleGroups || []).forEach(m => {
+                    const cb = document.querySelector(`#new-ex-muscles input[value="${m}"]`);
+                    if (cb) cb.checked = true;
+                });
+                this.isTypeManuallySelected = true;
+            }
+        } else {
+            if (titleEl) titleEl.textContent = "Oefening Toevoegen";
+            if (nameInput) nameInput.value = '';
+            if (typeSelect) typeSelect.value = 'weight_reps';
+            if (catSelect) catSelect.value = 'compound';
+        }
+
+        const modal = document.getElementById('modal-add-exercise');
+        if (modal) modal.classList.remove('hidden');
+    },
+
+    hideAddExerciseModal() {
+        const modal = document.getElementById('modal-add-exercise');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    saveCustomExercise() {
+        const nameInput = document.getElementById('new-ex-name');
+        const typeSelect = document.getElementById('new-ex-type');
+        const catSelect = document.getElementById('new-ex-category');
+        const editId = document.getElementById('ex-edit-id') ? document.getElementById('ex-edit-id').value : null;
+
+        const name = nameInput ? nameInput.value.trim() : '';
+        if (!name) {
+            this.showToast('Vul een naam in voor de oefening.', 'error');
+            return;
+        }
+
+        const selectedMuscles = Array.from(document.querySelectorAll('#new-ex-muscles input[type="checkbox"]:checked')).map(cb => cb.value);
+        const exerciseType = typeSelect ? typeSelect.value : 'weight_reps';
+        const category = catSelect ? catSelect.value : 'compound';
+
+        const trackMetrics = (exerciseType === 'duration' || category === 'isometric')
+            ? ['duration_seconds']
+            : (exerciseType === 'bodyweight_reps' ? ['reps'] : ['weight', 'reps']);
+
+        const exData = {
+            name,
+            muscleGroups: selectedMuscles,
+            exerciseType,
+            trackMetrics,
+            category
+        };
+
+        if (editId) {
+            store.updateCustomExercise(editId, exData);
+            this.showToast('Oefening bijgewerkt!', 'success');
+        } else {
+            store.addCustomExercise(exData);
+            this.showToast('Oefening opgeslagen in je bibliotheek!', 'success');
+        }
+
+        this.hideAddExerciseModal();
+        this.renderExerciseLibrary();
+
+        if (document.getElementById('modal-select-exercise-for-workout') && !document.getElementById('modal-select-exercise-for-workout').classList.contains('hidden')) {
+            this.renderWorkoutExerciseSelectList();
+        }
+    },
+
+    showSelectExerciseForWorkoutModal() {
+        this.selectedWorkoutEx = null;
+        const configPanel = document.getElementById('workout-ex-configure');
+        if (configPanel) configPanel.classList.add('hidden');
+        
+        const searchInput = document.getElementById('workout-ex-search');
+        if (searchInput) searchInput.value = '';
+
+        this.renderWorkoutExerciseSelectList();
+
+        const modal = document.getElementById('modal-select-exercise-for-workout');
+        if (modal) modal.classList.remove('hidden');
+    },
+
+    hideSelectExerciseForWorkoutModal() {
+        const modal = document.getElementById('modal-select-exercise-for-workout');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    showAddExerciseModalFromWorkout() {
+        this.showAddExerciseModal();
+    },
+
+    renderWorkoutExerciseSelectList() {
+        const container = document.getElementById('workout-ex-select-list');
+        if (!container) return;
+
+        const searchInput = document.getElementById('workout-ex-search');
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+        const allExercises = store.getExerciseLibrary();
+        const filtered = allExercises.filter(ex => {
+            if (!query) return true;
+            const nameMatch = ex.name.toLowerCase().includes(query);
+            const muscleMatch = (ex.muscleGroups || []).some(m => m.toLowerCase().includes(query));
+            return nameMatch || muscleMatch;
+        });
+
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div class="text-muted text-sm text-center py-3">
+                    Geen oefening gevonden.<br>
+                    <button class="btn-secondary mt-2" onclick="app.showAddExerciseModalFromWorkout()">+ Maak '${app.escapeHTML(query)}' aan</button>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = filtered.map(ex => {
+            const safeName = this.escapeHTML(ex.name);
+            const safeId = this.escapeHTML(ex.id);
+            const musclesStr = (ex.muscleGroups || []).map(m => this.escapeHTML(m)).join(', ') || 'Algemeen';
+            const typeBadge = ex.exerciseType === 'duration' ? 'Tijd' : (ex.exerciseType === 'bodyweight_reps' ? 'Bodyweight' : 'Kracht');
+            const isSelected = this.selectedWorkoutEx && this.selectedWorkoutEx.id === ex.id;
+            const borderStyle = isSelected ? 'border: 2px solid var(--accent-color);' : '';
+
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.05); padding:10px 12px; border-radius:10px; cursor:pointer; ${borderStyle}" onclick="app.selectExerciseForWorkout('${safeId}')">
+                    <div style="min-width:0; flex:1;">
+                        <div style="font-weight:600; font-size:0.9rem;">${safeName}</div>
+                        <div class="text-sm text-muted">${typeBadge} • ${musclesStr}</div>
+                    </div>
+                    <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; pointer-events:none;">Kies</button>
+                </div>
+            `;
+        }).join('');
+    },
+
+    selectExerciseForWorkout(exId) {
+        const all = store.getExerciseLibrary();
+        const ex = all.find(e => e.id === exId);
+        if (!ex) return;
+
+        this.selectedWorkoutEx = ex;
+
+        const displayEl = document.getElementById('selected-ex-name-display');
+        const repsLabel = document.getElementById('workout-ex-reps-label');
+        const repsInput = document.getElementById('workout-ex-reps');
+        const configPanel = document.getElementById('workout-ex-configure');
+
+        if (displayEl) displayEl.textContent = ex.name;
+
+        if (ex.exerciseType === 'duration') {
+            if (repsLabel) repsLabel.textContent = "Standaard Duur (sec)";
+            if (repsInput) repsInput.value = "30";
+        } else {
+            if (repsLabel) repsLabel.textContent = "Standaard Reps";
+            if (repsInput) repsInput.value = "10";
+        }
+
+        if (configPanel) configPanel.classList.remove('hidden');
+
+        this.renderWorkoutExerciseSelectList();
+    },
+
+    confirmAddExerciseToWorkout() {
+        if (!this.selectedWorkoutEx || !this.activeWorkout) return;
+
+        const setsInput = document.getElementById('workout-ex-sets');
+        const repsInput = document.getElementById('workout-ex-reps');
+
+        const setsCount = Math.max(1, parseInt(setsInput ? setsInput.value : '3', 10) || 3);
+        const defaultReps = repsInput ? repsInput.value.trim() : '10';
+
+        this.addExerciseToActiveWorkout(this.selectedWorkoutEx, setsCount, defaultReps);
+
+        this.hideSelectExerciseForWorkoutModal();
+    },
+
+    addExerciseToActiveWorkout(exerciseData, setsCount = 3, defaultReps = '10') {
+        if (!this.activeWorkout) return;
+        if (!this.activeWorkout.exercises) this.activeWorkout.exercises = [];
+
+        let trackMetrics = exerciseData.trackMetrics;
+        if (!trackMetrics) {
+            if (exerciseData.exerciseType === 'duration') trackMetrics = ['duration_seconds'];
+            else if (exerciseData.exerciseType === 'bodyweight_reps') trackMetrics = ['reps'];
+            else trackMetrics = ['weight', 'reps'];
+        }
+
+        const exObj = {
+            id: 'ex_' + Math.random().toString(36).slice(2, 11),
+            name: exerciseData.name,
+            muscleGroups: exerciseData.muscleGroups || [],
+            exerciseType: exerciseData.exerciseType || 'weight_reps',
+            trackMetrics: trackMetrics,
+            category: exerciseData.category || 'custom',
+            sets: setsCount,
+            reps: defaultReps,
+            setsCompleted: Array(setsCount).fill(false),
+            weights: Array(setsCount).fill(''),
+            actualReps: Array(setsCount).fill('')
+        };
+
+        this.activeWorkout.exercises.push(exObj);
+        store.saveActiveWorkoutState(this.activeWorkout);
+        this.renderWorkoutExercises();
+        this.showToast(`${exerciseData.name} toegevoegd aan sessie!`, 'success');
     },
 
     // Geeft de timestamp van maandag 00:00 van de week waarin `date` valt
@@ -1552,7 +2035,7 @@ const app = {
         if (!list) return;
         list.innerHTML = '';
         
-        if (this.activeWorkout.session.warmup) {
+        if (this.activeWorkout.session && this.activeWorkout.session.warmup) {
             const warmupEl = document.createElement('div');
             warmupEl.className = 'glass-panel';
             warmupEl.style.padding = '12px 16px';
@@ -1560,11 +2043,33 @@ const app = {
             list.appendChild(warmupEl);
         }
 
-        const sortedExercises = [...this.activeWorkout.exercises].sort((a, b) => (a.order || 99) - (b.order || 99));
+        const sortedExercises = [...(this.activeWorkout.exercises || [])].sort((a, b) => (a.order || 99) - (b.order || 99));
+
+        if (sortedExercises.length === 0) {
+            const emptyCard = document.createElement('div');
+            emptyCard.className = 'glass-panel text-center';
+            emptyCard.style.padding = '32px 16px';
+            emptyCard.innerHTML = `
+                <div class="stat-icon-wrapper" style="margin: 0 auto 12px auto; width: 56px; height: 56px; background: rgba(59, 130, 246, 0.1); color: var(--accent-color);">
+                    <span class="material-icons-round" style="font-size: 28px; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">fitness_center</span>
+                </div>
+                <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem;">Vrije Sessie Gestart</h3>
+                <p class="text-sm text-muted mt-1">Voeg je eerste oefening toe om te beginnen met trainen.</p>
+                <button class="btn-primary mt-4" style="padding:10px 20px; font-size:0.9rem;" onclick="app.showSelectExerciseForWorkoutModal()">
+                    <span class="material-icons-round" style="vertical-align:-3px;">add</span> Oefening Toevoegen
+                </button>
+            `;
+            list.appendChild(emptyCard);
+            return;
+        }
 
         sortedExercises.forEach((ex) => {
             const exIndex = this.activeWorkout.exercises.findIndex(e => e.id === ex.id);
             const prevDetails = this.getPreviousExerciseDetails(ex.name) || [];
+
+            if (!ex.setsCompleted) ex.setsCompleted = Array(ex.sets || 1).fill(false);
+            if (!ex.weights) ex.weights = Array(ex.sets || 1).fill('');
+            if (!ex.actualReps) ex.actualReps = Array(ex.sets || 1).fill('');
 
             // Build rep/duration string
             let metaString = `${ex.sets} sets`;
@@ -1751,6 +2256,16 @@ const app = {
             `;
             list.appendChild(card);
         });
+
+        // Appending Add Exercise button at the bottom of the active exercise list
+        const addBtnContainer = document.createElement('div');
+        addBtnContainer.className = 'mt-3';
+        addBtnContainer.innerHTML = `
+            <button class="btn-primary w-full" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:12px; font-size:0.95rem;" onclick="app.showSelectExerciseForWorkoutModal()">
+                <span class="material-icons-round">add_circle_outline</span> Oefening Toevoegen
+            </button>
+        `;
+        list.appendChild(addBtnContainer);
     },
 
     toggleSet(exIndex, setIndex) {
@@ -2506,8 +3021,14 @@ const app = {
 
         try {
             if (typeof navigator !== 'undefined' && navigator.share) {
-                const file = new File([json], fileName, { type: 'application/json' });
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                let file = null;
+                try {
+                    if (typeof File !== 'undefined') {
+                        file = new File([json], fileName, { type: 'application/json' });
+                    }
+                } catch (fileErr) {}
+
+                if (file && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
                     await navigator.share({ files: [file], title: plan.name });
                 } else {
                     await navigator.share({ title: plan.name, text: json });

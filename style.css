@@ -705,4 +705,31 @@ button:disabled {
     text-decoration: underline solid var(--accent-color);
 }
 
+/* Chip Checkbox */
+.chip-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+    transition: var(--transition);
+}
+
+.chip-checkbox input[type="checkbox"] {
+    accent-color: var(--accent-color);
+}
+
+.chip-checkbox:has(input:checked) {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: var(--accent-color);
+    color: var(--text-primary);
+}
+
+
 
