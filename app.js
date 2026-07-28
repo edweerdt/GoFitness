@@ -2020,10 +2020,7 @@ const app = {
         if (!ex.weights) ex.weights = Array(ex.sets).fill('');
         ex.weights[setIndex] = val;
         if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
-<<<<<<< HEAD
         this.checkAutoCompleteSet(exIndex, setIndex);
-=======
->>>>>>> origin/main
     },
 
     updateReps(exIndex, setIndex, val) {
