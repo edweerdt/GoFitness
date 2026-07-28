@@ -1648,28 +1648,35 @@ const app = {
                 
                 let inputsHtml = '';
                 if (wantsWeight) {
-                    const currentWeightVal = ex.weights[i];
-                    inputsHtml += `
-                        <div class="step-btn-group">
-                            <button class="step-btn" onclick="app.adjustWeight(${exIndex}, ${i}, -2.5)" title="-2.5kg">-2.5</button>
-                            <button class="step-btn" onclick="app.adjustWeight(${exIndex}, ${i}, -1)" title="-1kg">-1</button>
-                        </div>
-                        <input type="number" step="0.5" class="weight-input" placeholder="${weightPlaceholder}" value="${currentWeightVal}" oninput="app.updateWeight(${exIndex}, ${i}, this.value)" aria-label="Gewicht set ${i+1}">
-                        <div class="step-btn-group">
-                            <button class="step-btn" onclick="app.adjustWeight(${exIndex}, ${i}, 1)" title="+1kg">+1</button>
-                            <button class="step-btn" onclick="app.adjustWeight(${exIndex}, ${i}, 2.5)" title="+2.5kg">+2.5</button>
-                        </div>
-                    `;
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(weightPlaceholder))}"
+                        inputmode="decimal" enterkeyhint="next"
+                        data-ex="${exIndex}" data-set="${i}" data-type="weight"
+                        value="${app.escapeHTML(String(ex.weights ? ex.weights[i] : ''))}"
+                        onchange="app.updateWeight(${exIndex}, ${i}, this.value)"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'weight');}">`;
                 }
-
-                if (wantsReps) {
-                    const currentRepsVal = ex.actualReps[i];
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="${repsPlaceholder}" value="${currentRepsVal}" oninput="app.updateReps(${exIndex}, ${i}, this.value)" aria-label="Reps set ${i+1}">`;
+                if (wantsReps && !isHold) {
+                    inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(repsPlaceholder))}" style="width: 55px;"
+                        inputmode="decimal" enterkeyhint="next"
+                        data-ex="${exIndex}" data-set="${i}" data-type="reps"
+                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}"
+                        onchange="app.updateReps(${exIndex}, ${i}, this.value)"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'reps');}">`;
                 }
+                if (wantsDuration || isHold) {
+                     inputsHtml += `<input type="number" class="weight-input" placeholder="sec" style="width: 55px;"
+                        inputmode="decimal" enterkeyhint="next"
+                        data-ex="${exIndex}" data-set="${i}" data-type="reps"
+                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}"
+                        onchange="app.updateReps(${exIndex}, ${i}, this.value)"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'reps');}">`;
 
-                if (wantsDuration) {
-                    const currentSecVal = ex.actualReps[i];
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="sec" value="${currentSecVal}" oninput="app.updateReps(${exIndex}, ${i}, this.value)" aria-label="Duur in seconden set ${i+1}">`;
+                     inputsHtml += `
+                        <div class="step-btn-group">
+                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, -1)" title="-1 sec">-</button>
+                            <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, 1)" title="+1 sec">+</button>
+                        </div>
+                     `;
                 }
 
                 setsHtml += `
@@ -1985,12 +1992,35 @@ const app = {
         }
     },
 
+    checkAutoCompleteSet(exIndex, setIndex) {
+        if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+        const isHold = this.isHoldExercise(ex);
+        if (isHold) return; // hold exercises use manual check or stopwatch stop
+
+        const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
+        const wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : true;
+        
+        const hasWeight = !wantsWeight || (ex.weights && String(ex.weights[setIndex] || '').trim() !== '');
+        const hasReps = !wantsReps || (ex.actualReps && String(ex.actualReps[setIndex] || '').trim() !== '');
+
+        if (hasWeight && hasReps && ex.setsCompleted && !ex.setsCompleted[setIndex]) {
+            ex.setsCompleted[setIndex] = true;
+            if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+            if (ex.restSeconds) this.startRestTimer(ex.restSeconds);
+            if (typeof document !== 'undefined' && document.getElementById('workout-exercise-list')) {
+                this.renderWorkoutExercises();
+            }
+        }
+    },
+
     updateWeight(exIndex, setIndex, val) {
         if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
         const ex = this.activeWorkout.exercises[exIndex];
         if (!ex.weights) ex.weights = Array(ex.sets).fill('');
         ex.weights[setIndex] = val;
         if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+        this.checkAutoCompleteSet(exIndex, setIndex);
     },
 
     updateReps(exIndex, setIndex, val) {
@@ -1999,6 +2029,7 @@ const app = {
         if (!ex.actualReps) ex.actualReps = Array(ex.sets).fill('');
         ex.actualReps[setIndex] = val;
         if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+        this.checkAutoCompleteSet(exIndex, setIndex);
     },
 
     handleInputEnter(event, exIndex, setIndex, inputType) {
@@ -2015,7 +2046,7 @@ const app = {
         if (!ex) return;
 
         // Check if there is a reps input in the same set row that needs focus next
-        const setRow = inputEl.closest('.set-row');
+        const setRow = inputEl ? inputEl.closest('.set-row') : null;
         const repsInSameSet = setRow ? setRow.querySelector('input[data-type="reps"]') : null;
 
         if (inputType === 'weight' && repsInSameSet && repsInSameSet !== inputEl) {
