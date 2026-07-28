@@ -1605,15 +1605,27 @@ const app = {
                 let inputsHtml = '';
                 if (wantsWeight) {
                     inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(weightPlaceholder))}"
-                        value="${app.escapeHTML(String(ex.weights ? ex.weights[i] : ''))}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">`;
+                        inputmode="decimal" enterkeyhint="next"
+                        data-ex="${exIndex}" data-set="${i}" data-type="weight"
+                        value="${app.escapeHTML(String(ex.weights ? ex.weights[i] : ''))}"
+                        onchange="app.updateWeight(${exIndex}, ${i}, this.value)"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'weight');}">`;
                 }
                 if (wantsReps && !isHold) {
                     inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(repsPlaceholder))}" style="width: 55px;"
-                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+                        inputmode="decimal" enterkeyhint="next"
+                        data-ex="${exIndex}" data-set="${i}" data-type="reps"
+                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}"
+                        onchange="app.updateReps(${exIndex}, ${i}, this.value)"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'reps');}">`;
                 }
                 if (wantsDuration || isHold) {
                      inputsHtml += `<input type="number" class="weight-input" placeholder="sec" style="width: 55px;"
-                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+                        inputmode="decimal" enterkeyhint="next"
+                        data-ex="${exIndex}" data-set="${i}" data-type="reps"
+                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}"
+                        onchange="app.updateReps(${exIndex}, ${i}, this.value)"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'reps');}">`;
 
                      inputsHtml += `
                         <div class="step-btn-group">
@@ -1936,14 +1948,117 @@ const app = {
         }
     },
 
+    checkAutoCompleteSet(exIndex, setIndex) {
+        if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+        const isHold = this.isHoldExercise(ex);
+        if (isHold) return; // hold exercises use manual check or stopwatch stop
+
+        const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
+        const wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : true;
+        
+        const hasWeight = !wantsWeight || (ex.weights && String(ex.weights[setIndex] || '').trim() !== '');
+        const hasReps = !wantsReps || (ex.actualReps && String(ex.actualReps[setIndex] || '').trim() !== '');
+
+        if (hasWeight && hasReps && ex.setsCompleted && !ex.setsCompleted[setIndex]) {
+            ex.setsCompleted[setIndex] = true;
+            if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+            if (ex.restSeconds) this.startRestTimer(ex.restSeconds);
+            if (typeof document !== 'undefined' && document.getElementById('workout-exercise-list')) {
+                this.renderWorkoutExercises();
+            }
+        }
+    },
+
     updateWeight(exIndex, setIndex, val) {
-        this.activeWorkout.exercises[exIndex].weights[setIndex] = val;
-        store.saveActiveWorkoutState(this.activeWorkout);
+        if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+        if (!ex.weights) ex.weights = Array(ex.sets).fill('');
+        ex.weights[setIndex] = val;
+        if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+        this.checkAutoCompleteSet(exIndex, setIndex);
     },
 
     updateReps(exIndex, setIndex, val) {
-        this.activeWorkout.exercises[exIndex].actualReps[setIndex] = val;
-        store.saveActiveWorkoutState(this.activeWorkout);
+        if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+        if (!ex.actualReps) ex.actualReps = Array(ex.sets).fill('');
+        ex.actualReps[setIndex] = val;
+        if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+        this.checkAutoCompleteSet(exIndex, setIndex);
+    },
+
+    handleInputEnter(event, exIndex, setIndex, inputType) {
+        const inputEl = event.target;
+        const val = inputEl ? inputEl.value : '';
+
+        if (inputType === 'weight') {
+            this.updateWeight(exIndex, setIndex, val);
+        } else if (inputType === 'reps') {
+            this.updateReps(exIndex, setIndex, val);
+        }
+
+        const ex = (this.activeWorkout && this.activeWorkout.exercises) ? this.activeWorkout.exercises[exIndex] : null;
+        if (!ex) return;
+
+        // Check if there is a reps input in the same set row that needs focus next
+        const setRow = inputEl ? inputEl.closest('.set-row') : null;
+        const repsInSameSet = setRow ? setRow.querySelector('input[data-type="reps"]') : null;
+
+        if (inputType === 'weight' && repsInSameSet && repsInSameSet !== inputEl) {
+            repsInSameSet.focus();
+            if (typeof repsInSameSet.select === 'function') repsInSameSet.select();
+            return;
+        }
+
+        // If completing reps (or weight in a weight-only exercise), mark set completed!
+        const wasCompleted = ex.setsCompleted ? ex.setsCompleted[setIndex] : false;
+        if (!wasCompleted) {
+            if (!ex.setsCompleted) ex.setsCompleted = Array(ex.sets).fill(false);
+            ex.setsCompleted[setIndex] = true;
+            if (typeof store !== 'undefined') {
+                store.saveActiveWorkoutState(this.activeWorkout);
+            }
+            if (ex.restSeconds) {
+                this.startRestTimer(ex.restSeconds);
+            }
+        }
+
+        // Find next target input in DOM before re-rendering
+        const allInputs = Array.from(document.querySelectorAll('#workout-exercise-list input.weight-input'));
+        const currentIndex = allInputs.indexOf(inputEl);
+        let nextTarget = null;
+        if (currentIndex !== -1 && currentIndex + 1 < allInputs.length) {
+            const nextEl = allInputs[currentIndex + 1];
+            if (nextEl && nextEl.dataset) {
+                nextTarget = {
+                    ex: nextEl.dataset.ex,
+                    set: nextEl.dataset.set,
+                    type: nextEl.dataset.type
+                };
+            }
+        }
+
+        // Re-render workout exercises to display updated checked status and rest timers
+        this.renderWorkoutExercises();
+
+        // Restore focus to the target input in the newly rendered DOM
+        if (nextTarget) {
+            const selector = `#workout-exercise-list input.weight-input[data-ex="${nextTarget.ex}"][data-set="${nextTarget.set}"][data-type="${nextTarget.type}"]`;
+            const focusNext = () => {
+                const nextInputEl = document.querySelector(selector);
+                if (nextInputEl) {
+                    nextInputEl.focus();
+                    if (typeof nextInputEl.select === 'function') nextInputEl.select();
+                }
+            };
+            focusNext();
+            setTimeout(focusNext, 50);
+        } else {
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+        }
     },
 
     showFinishModal() {
