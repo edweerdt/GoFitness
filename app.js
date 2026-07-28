@@ -3021,8 +3021,14 @@ const app = {
 
         try {
             if (typeof navigator !== 'undefined' && navigator.share) {
-                const file = new File([json], fileName, { type: 'application/json' });
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                let file = null;
+                try {
+                    if (typeof File !== 'undefined') {
+                        file = new File([json], fileName, { type: 'application/json' });
+                    }
+                } catch (fileErr) {}
+
+                if (file && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
                     await navigator.share({ files: [file], title: plan.name });
                 } else {
                     await navigator.share({ title: plan.name, text: json });
