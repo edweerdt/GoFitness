@@ -22,7 +22,27 @@ const DEFAULT_EXERCISES = [
     { id: 'def_bicep_curl', name: 'Dumbbell Bicep Curl', muscleGroups: ['biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_tricep_pushdown', name: 'Tricep Cable Pushdown', muscleGroups: ['triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_plank', name: 'Plank Hold', muscleGroups: ['core'], exerciseType: 'duration', trackMetrics: ['duration_seconds'], category: 'isometric' },
-    { id: 'def_running', name: 'Hardlopen', muscleGroups: ['legs'], exerciseType: 'duration', trackMetrics: ['duration_seconds'], category: 'cardio' }
+    { id: 'def_running', name: 'Hardlopen', muscleGroups: ['legs'], exerciseType: 'duration', trackMetrics: ['duration_seconds'], category: 'cardio' },
+    // Geëxtraheerd uit Thijs training log (Google Drive)
+    { id: 'def_cable_crunch', name: 'Cable Crunch', muscleGroups: ['core'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_knee_raise_db', name: 'Dumbbell Hanging Knee Raise', muscleGroups: ['core'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_ab_wheel_rollout', name: 'Ab Wheel Rollout', muscleGroups: ['core'], exerciseType: 'bodyweight_reps', trackMetrics: ['reps'], category: 'bodyweight' },
+    { id: 'def_hollow_body_hold', name: 'Hollow Body Hold', muscleGroups: ['core'], exerciseType: 'duration', trackMetrics: ['duration_seconds'], category: 'isometric' },
+    { id: 'def_toes_to_bar', name: 'Toes-to-Bar', muscleGroups: ['core'], exerciseType: 'bodyweight_reps', trackMetrics: ['reps'], category: 'bodyweight' },
+    { id: 'def_pec_deck_fly', name: 'Pec Deck Fly Machine', muscleGroups: ['chest'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_cable_chest_fly', name: 'Cable Chest Fly', muscleGroups: ['chest'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_dumbbell_bench_press', name: 'Dumbbell Bench Press', muscleGroups: ['chest', 'triceps', 'shoulders'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_single_arm_db_press', name: 'Single-Arm Dumbbell Bench Press', muscleGroups: ['chest', 'triceps', 'core'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_hip_thrust', name: 'Barbell Hip Thrust', muscleGroups: ['glutes', 'legs'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_single_leg_press', name: 'Single-Leg Press Machine', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_hip_abductor', name: 'Hip Abductor Machine', muscleGroups: ['glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_hammer_pullup', name: 'Neutral Grip Pull-Up (Hammer Grip)', muscleGroups: ['back', 'biceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight' },
+    { id: 'def_seated_row_machine', name: 'Seated Cable Row / Row Machine', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_single_arm_db_row', name: 'Single-Arm Dumbbell Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_kb_wrist_flip', name: 'Kettlebell Wrist Flip', muscleGroups: ['arms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_hand_gripper', name: 'Hand Gripper (Handknijper)', muscleGroups: ['arms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_bent_over_tricep_ext', name: 'Bent-Over Triceps Extension', muscleGroups: ['triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
+    { id: 'def_squat_clean', name: 'Barbell Squat Clean', muscleGroups: ['legs', 'glutes', 'shoulders', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' }
 ];
 
 class DataStore {
