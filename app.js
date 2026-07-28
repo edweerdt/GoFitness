@@ -513,6 +513,48 @@ const app = {
         );
     },
 
+    formatClickableExerciseName(nameStr) {
+        if (!nameStr || typeof nameStr !== 'string') return this.escapeHTML(String(nameStr || ''));
+
+        // Splitst op ' of ', ' / ', ' OR ', ',' om individuele oefeningen afzonderlijk klikbaar te maken
+        const parts = nameStr.split(/(\s+of\s+|\s*\/\s*|\s+or\s+|\s*,\s*)/i);
+        return parts.map(part => {
+            const trimmed = part.trim();
+            const lower = trimmed.toLowerCase();
+            if (lower === 'of' || lower === '/' || lower === 'or' || lower === ',') {
+                return `<span class="text-muted" style="font-weight:normal; margin:0 2px;">${this.escapeHTML(part)}</span>`;
+            }
+            if (!trimmed) return '';
+
+            const safeName = this.escapeHTML(trimmed);
+            const escapedAttr = safeName.replace(/'/g, "\\'");
+            return `<span class="exercise-search-target" onclick="app.triggerExerciseSearch('${escapedAttr}', event, this)" title="Zoek uitvoering van ${safeName}">${safeName} <span class="material-icons-round text-muted" style="font-size:0.85rem; vertical-align:middle; opacity:0.6;">search</span></span>`;
+        }).join('');
+    },
+
+    triggerExerciseSearch(term, event, el) {
+        if (event) {
+            event.stopPropagation();
+        }
+
+        // 1. Programmatische tekstselectie voor de native browser/PWA zoekbalk onderin op mobiel
+        if (el && typeof window !== 'undefined' && window.getSelection && document.createRange) {
+            try {
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } catch (e) {}
+        }
+
+        // 2. Open zoekopdracht op Google in browser tab
+        if (typeof window !== 'undefined' && window.open) {
+            const query = encodeURIComponent(term);
+            window.open(`https://www.google.com/search?q=${query}`, '_blank');
+        }
+    },
+
     // --- RENDERING ---
 
     formatRichField(value, label = null) {
@@ -705,11 +747,12 @@ const app = {
                             ${p.sessions.map(s => {
                                 const sId = this.escapeHTML(s.id || s.sessionId);
                                 const exCount = (s.exercises || []).length;
+                                const exNames = (s.exercises || []).map(ex => this.formatClickableExerciseName(ex.name)).join(', ');
                                 return `
                                     <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.03); padding:8px 12px; border-radius:8px;">
                                         <div style="min-width:0; flex:1; margin-right:8px;">
                                             <div style="font-weight:500; font-size:0.9rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${this.escapeHTML(s.name)}</div>
-                                            <div class="text-sm text-muted">${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}</div>
+                                            <div class="text-sm text-muted">${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}${exNames ? ': ' + exNames : ''}</div>
                                         </div>
                                         <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;" onclick="app.startWorkoutBySessionId('${this.escapeHTML(p.id)}', '${sId}')" title="Start sessie">
                                             <span class="material-icons-round" style="font-size:1rem;">play_arrow</span> Start
@@ -1549,9 +1592,11 @@ const app = {
             }
 
             if (ex.alternatives && ex.alternatives.length > 0) {
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.alternatives.join(', '))}</div>`;
+                const altLinks = ex.alternatives.map(a => app.formatClickableExerciseName(a)).join(', ');
+                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${altLinks}</div>`;
             } else if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.optionalAlternatives.join(', '))}</div>`;
+                const altLinks = ex.optionalAlternatives.map(a => app.formatClickableExerciseName(a)).join(', ');
+                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${altLinks}</div>`;
             }
 
             // Progressive-overload-advies op basis van de vorige sessie
@@ -1598,8 +1643,7 @@ const app = {
                 let wantsDuration = (ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false) || isHold;
 
                 if (!wantsReps && !wantsDuration) {
-                    if (isHold) wantsDuration = true;
-                    else wantsReps = true;
+                    wantsReps = true;
                 }
                 
                 let inputsHtml = '';
@@ -1692,7 +1736,7 @@ const app = {
                 <div class="exercise-header">
                     <div>
                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                            <div class="exercise-title" style="margin:0;">${app.escapeHTML(ex.name)}</div>
+                            <div class="exercise-title" style="margin:0;">${app.formatClickableExerciseName(ex.name)}</div>
                         </div>
                         <div style="margin-bottom:4px;">${badgesHtml}</div>
                         <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
@@ -1976,7 +2020,10 @@ const app = {
         if (!ex.weights) ex.weights = Array(ex.sets).fill('');
         ex.weights[setIndex] = val;
         if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+<<<<<<< HEAD
         this.checkAutoCompleteSet(exIndex, setIndex);
+=======
+>>>>>>> origin/main
     },
 
     updateReps(exIndex, setIndex, val) {

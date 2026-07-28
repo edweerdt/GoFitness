@@ -645,3 +645,27 @@ button:disabled {
     transform: scale(0.94);
 }
 
+/* Clickable exercise names for web search */
+.exercise-search-target {
+    cursor: pointer;
+    text-decoration: underline dotted rgba(255, 255, 255, 0.35);
+    text-underline-offset: 3px;
+    transition: var(--transition);
+    user-select: text;
+}
+
+.exercise-search-target:hover {
+    color: var(--accent-color);
+    text-decoration: underline solid var(--accent-color);
+}
+
+.theme-light .exercise-search-target {
+    text-decoration: underline dotted rgba(0, 0, 0, 0.35);
+}
+
+.theme-light .exercise-search-target:hover {
+    color: var(--accent-color);
+    text-decoration: underline solid var(--accent-color);
+}
+
+
