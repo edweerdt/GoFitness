@@ -1084,17 +1084,20 @@ describe('sharePlan', () => {
         store.activePlanId = 'p1';
         store.logs = [];
         document.body.innerHTML = '<div id="toast-container"></div>';
+        try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
+        try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
+        try { delete global.navigator.clipboard; } catch(e) { global.navigator.clipboard = undefined; }
     });
 
     afterEach(() => {
-        delete global.navigator.share;
-        delete global.navigator.canShare;
-        delete global.navigator.clipboard;
+        try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
+        try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
+        try { delete global.navigator.clipboard; } catch(e) { global.navigator.clipboard = undefined; }
     });
 
     it('should share the plan JSON without the internal id via the Web Share API', async () => {
         const share = jest.fn().mockResolvedValue();
-        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true });
+        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
 
         await app.sharePlan('p1');
 
@@ -1106,8 +1109,10 @@ describe('sharePlan', () => {
     });
 
     it('should copy the JSON to the clipboard when Web Share is unavailable', async () => {
+        try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
+        try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
         const writeText = jest.fn().mockResolvedValue();
-        Object.defineProperty(global.navigator, 'clipboard', { value: { writeText }, configurable: true });
+        Object.defineProperty(global.navigator, 'clipboard', { value: { writeText }, configurable: true, writable: true });
 
         await app.sharePlan('p1');
 
@@ -1692,6 +1697,48 @@ describe('Exercise Library & Custom Vrije Sessie', () => {
         expect(prevDetails[0].weight).toBe('80');
 
         navigateSpy.mockRestore();
+    });
+
+    it('should split Seated Cable Row and Row Machine with duration and stand input', () => {
+        const lib = store.getExerciseLibrary();
+        const seatedRow = lib.find(e => e.name === 'Seated Cable Row');
+        const rowMachine = lib.find(e => e.name === 'Row Machine (Roeimachine)');
+
+        expect(seatedRow).toBeDefined();
+        expect(seatedRow.exerciseType).toBe('weight_reps');
+
+        expect(rowMachine).toBeDefined();
+        expect(rowMachine.exerciseType).toBe('duration');
+        expect(rowMachine.trackMetrics).toContain('level');
+
+        // Test exercise type detection
+        const detectedSeated = app.detectExerciseType('Seated Cable Row');
+        expect(detectedSeated.exerciseType).toBe('weight_reps');
+
+        const detectedMachine = app.detectExerciseType('Row Machine (Roeimachine)');
+        expect(detectedMachine.exerciseType).toBe('duration');
+
+        // Test hold timer check
+        expect(app.isHoldExercise(rowMachine)).toBe(true);
+
+        // Test updating level input and finishing workout
+        app.startCustomWorkout();
+        app.addExerciseToActiveWorkout(rowMachine, 2, '300');
+
+        const exIndex = 0;
+        app.updateLevel(exIndex, 0, 'Stand 6');
+        app.updateReps(exIndex, 0, '300');
+        app.activeWorkout.exercises[exIndex].setsCompleted[0] = true;
+
+        expect(app.activeWorkout.exercises[exIndex].levels[0]).toBe('Stand 6');
+
+        app.finishWorkout();
+
+        const latestLog = store.logs[store.logs.length - 1];
+        expect(latestLog).toBeDefined();
+        const loggedEx = latestLog.exercises.find(e => e.name === 'Row Machine (Roeimachine)');
+        expect(loggedEx).toBeDefined();
+        expect(loggedEx.details[0].level).toBe('Stand 6');
     });
 });
 

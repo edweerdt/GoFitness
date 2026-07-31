@@ -37,7 +37,8 @@ const DEFAULT_EXERCISES = [
     { id: 'def_single_leg_press', name: 'Single-Leg Press Machine', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_hip_abductor', name: 'Hip Abductor Machine', muscleGroups: ['glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_hammer_pullup', name: 'Neutral Grip Pull-Up (Hammer Grip)', muscleGroups: ['back', 'biceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight' },
-    { id: 'def_seated_row_machine', name: 'Seated Cable Row / Row Machine', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_seated_cable_row', name: 'Seated Cable Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_row_machine', name: 'Row Machine (Roeimachine)', muscleGroups: ['back', 'biceps', 'legs', 'cardio'], exerciseType: 'duration', trackMetrics: ['duration_seconds', 'level'], category: 'cardio' },
     { id: 'def_single_arm_db_row', name: 'Single-Arm Dumbbell Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_kb_wrist_flip', name: 'Kettlebell Wrist Flip', muscleGroups: ['arms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_hand_gripper', name: 'Hand Gripper (Handknijper)', muscleGroups: ['arms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
@@ -404,23 +405,28 @@ const app = {
     },
 
     applyTheme() {
+        if (typeof document === 'undefined' || !document.documentElement) return;
         const btns = document.querySelectorAll('.theme-toggle-btn');
         
-        document.documentElement.classList.remove('theme-light', 'theme-dark');
+        if (document.documentElement.classList) {
+            document.documentElement.classList.remove('theme-light', 'theme-dark');
+        }
         
         let iconName = 'brightness_auto';
         if (store.theme === 'light') {
-            document.documentElement.classList.add('theme-light');
+            if (document.documentElement.classList) document.documentElement.classList.add('theme-light');
             iconName = 'light_mode';
         } else if (store.theme === 'dark') {
-            document.documentElement.classList.add('theme-dark');
+            if (document.documentElement.classList) document.documentElement.classList.add('theme-dark');
             iconName = 'dark_mode';
         }
 
-        btns.forEach(btn => {
-            const icon = btn.querySelector('.material-icons-round');
-            if (icon) icon.textContent = iconName;
-        });
+        if (btns) {
+            btns.forEach(btn => {
+                const icon = btn ? btn.querySelector('.material-icons-round') : null;
+                if (icon) icon.textContent = iconName;
+            });
+        }
     },
 
     navigate(viewId) {
@@ -726,31 +732,49 @@ const app = {
     },
 
     renderHome() {
-        const dateOpt = { weekday: 'long', day: 'numeric', month: 'long' };
-        document.getElementById('home-date').textContent = new Date().toLocaleDateString('nl-NL', dateOpt);
+        const homeDateEl = document.getElementById('home-date');
+        if (homeDateEl) {
+            const dateOpt = { weekday: 'long', day: 'numeric', month: 'long' };
+            homeDateEl.textContent = new Date().toLocaleDateString('nl-NL', dateOpt);
+        }
 
         const recStatus = this.getRecoveryStatus();
         const badge = document.getElementById('recovery-status');
-        badge.className = `status-badge ${recStatus.status}`;
-        document.getElementById('recovery-text').textContent = recStatus.text;
+        if (badge) {
+            badge.className = `status-badge ${recStatus.status}`;
+            const iconEl = badge.querySelector('.material-icons-round');
+            if (iconEl) {
+                let icon = 'battery_charging_full';
+                if (recStatus.status === 'orange') icon = 'battery_50';
+                if (recStatus.status === 'red') icon = 'battery_alert';
+                iconEl.textContent = icon;
+            }
+        }
         
-        let icon = 'battery_charging_full';
-        if(recStatus.status === 'orange') icon = 'battery_50';
-        if(recStatus.status === 'red') icon = 'battery_alert';
-        badge.querySelector('.material-icons-round').textContent = icon;
+        const recTextEl = document.getElementById('recovery-text');
+        if (recTextEl) recTextEl.textContent = recStatus.text;
 
         const btnStart = document.getElementById('btn-start-session');
         const pickerWrapper = document.getElementById('session-picker-wrapper');
         const sessionSelect = document.getElementById('home-session-select');
-        
+
+        const setCardText = (title, name, reason) => {
+            const titleEl = document.getElementById('recommended-card-title');
+            if (titleEl) titleEl.textContent = title;
+            const nameEl = document.getElementById('recommended-session-name');
+            if (nameEl) nameEl.textContent = name;
+            const reasonEl = document.getElementById('recommended-reason');
+            if (reasonEl) reasonEl.textContent = reason;
+        };
+
         if (this.activeWorkout) {
             if (pickerWrapper) pickerWrapper.classList.add('hidden');
-            document.getElementById('recommended-card-title').textContent = "Sessie in uitvoering";
-            document.getElementById('recommended-session-name').textContent = this.activeWorkout.session.name;
-            document.getElementById('recommended-reason').textContent = "Je was al bezig met deze sessie. Pak hem weer op!";
-            btnStart.textContent = "Hervat Nu";
-            btnStart.disabled = false;
-            btnStart.onclick = () => this.openWorkoutView();
+            setCardText("Sessie in uitvoering", this.activeWorkout.session.name, "Je was al bezig met deze sessie. Pak hem weer op!");
+            if (btnStart) {
+                btnStart.textContent = "Hervat Nu";
+                btnStart.disabled = false;
+                btnStart.onclick = () => this.openWorkoutView();
+            }
         } else {
             const activePlan = store.getActivePlan();
             const recSession = this.getRecommendedSession();
@@ -774,40 +798,46 @@ const app = {
                 const updateCardForSelectedSession = () => {
                     const chosenVal = sessionSelect.value;
                     if (chosenVal === 'custom_session') {
-                        document.getElementById('recommended-card-title').textContent = "Vrije Sessie";
-                        document.getElementById('recommended-session-name').textContent = "Vrije Sessie";
-                        document.getElementById('recommended-reason').textContent = "Start een blanco training zonder vaste oefeningen. Voeg tijdens het trainen oefeningen toe.";
-                        btnStart.textContent = "Start Vrije Sessie";
-                        btnStart.disabled = false;
-                        btnStart.onclick = () => this.startCustomWorkout();
+                        setCardText("Vrije Sessie", "Vrije Sessie", "Start een blanco training zonder vaste oefeningen. Voeg tijdens het trainen oefeningen toe.");
+                        if (btnStart) {
+                            btnStart.textContent = "Start Vrije Sessie";
+                            btnStart.disabled = false;
+                            btnStart.onclick = () => this.startCustomWorkout();
+                        }
                     } else if (activePlan) {
                         const chosenSession = activePlan.sessions.find(s => (s.id || s.sessionId) === chosenVal);
                         if (!chosenSession) return;
                         const isRecChoice = recSession && (chosenSession.id || chosenSession.sessionId) === (recSession.session.id || recSession.session.sessionId);
-                        document.getElementById('recommended-card-title').textContent = isRecChoice ? "Aanbevolen Sessie" : "Gekozen Sessie";
-                        document.getElementById('recommended-session-name').textContent = chosenSession.name;
-                        document.getElementById('recommended-reason').textContent = isRecChoice ? recSession.reason : `Handmatig gekozen uit schema (${activePlan.name}).`;
-                        btnStart.textContent = "Start Nu";
-                        btnStart.disabled = false;
-                        btnStart.onclick = () => this.startWorkout(chosenSession, activePlan);
+                        setCardText(
+                            isRecChoice ? "Aanbevolen Sessie" : "Gekozen Sessie",
+                            chosenSession.name,
+                            isRecChoice ? recSession.reason : `Handmatig gekozen uit schema (${activePlan.name}).`
+                        );
+                        if (btnStart) {
+                            btnStart.textContent = "Start Nu";
+                            btnStart.disabled = false;
+                            btnStart.onclick = () => this.startWorkout(chosenSession, activePlan);
+                        }
                     }
                 };
 
                 sessionSelect.onchange = updateCardForSelectedSession;
                 updateCardForSelectedSession();
             } else {
-                document.getElementById('recommended-card-title').textContent = "Vrije Sessie";
-                document.getElementById('recommended-session-name').textContent = "Vrije Sessie";
-                document.getElementById('recommended-reason').textContent = "Start een blanco training zonder vaste oefeningen.";
-                btnStart.textContent = "Start Vrije Sessie";
-                btnStart.disabled = false;
-                btnStart.onclick = () => this.startCustomWorkout();
+                setCardText("Vrije Sessie", "Vrije Sessie", "Start een blanco training zonder vaste oefeningen.");
+                if (btnStart) {
+                    btnStart.textContent = "Start Vrije Sessie";
+                    btnStart.disabled = false;
+                    btnStart.onclick = () => this.startCustomWorkout();
+                }
             }
         }
 
         // Stats
-        document.getElementById('stat-completed').textContent = store.logs.length;
-        document.getElementById('stat-streak').textContent = this.calculateStreak();
+        const statCompletedEl = document.getElementById('stat-completed');
+        if (statCompletedEl) statCompletedEl.textContent = store.logs.length;
+        const statStreakEl = document.getElementById('stat-streak');
+        if (statStreakEl) statStreakEl.textContent = this.calculateStreak();
 
         // Target sessions per week progress
         const plan = store.getActivePlan();
@@ -823,13 +853,15 @@ const app = {
 
             // Add or update progress text under the streak stats
             const statsMini = document.querySelector('.stats-mini');
-            if (!existingProgress) {
-                existingProgress = document.createElement('div');
-                existingProgress.id = 'home-weekly-progress';
-                existingProgress.style.gridColumn = '1 / -1';
-                statsMini.appendChild(existingProgress);
+            if (statsMini) {
+                if (!existingProgress) {
+                    existingProgress = document.createElement('div');
+                    existingProgress.id = 'home-weekly-progress';
+                    existingProgress.style.gridColumn = '1 / -1';
+                    statsMini.appendChild(existingProgress);
+                }
+                existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${this.escapeHTML(progressText)}</div>`;
             }
-            existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${this.escapeHTML(progressText)}</div>`;
         } else if (existingProgress) {
             // Geen (plan met) weekdoel meer -> oude voortgangsbalk opruimen
             existingProgress.remove();
@@ -973,12 +1005,15 @@ const app = {
             totalExercises += (l.exercisesCompleted || 0);
         }
         
-        document.getElementById('full-stats-grid').innerHTML = `
-            <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalWorkouts}</span><span class="stat-label">Trainingen</span></div></div>
-            <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${this.calculateStreak()}</span><span class="stat-label">Weken Streak</span></div></div>
-            <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalMinutes}</span><span class="stat-label">Minuten</span></div></div>
-            <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalExercises}</span><span class="stat-label">Oefeningen</span></div></div>
-        `;
+        const statsGrid = document.getElementById('full-stats-grid');
+        if (statsGrid) {
+            statsGrid.innerHTML = `
+                <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalWorkouts}</span><span class="stat-label">Trainingen</span></div></div>
+                <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${this.calculateStreak()}</span><span class="stat-label">Weken Streak</span></div></div>
+                <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalMinutes}</span><span class="stat-label">Minuten</span></div></div>
+                <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalExercises}</span><span class="stat-label">Oefeningen</span></div></div>
+            `;
+        }
         this.renderExerciseProgress();
         this.renderMuscleStats();
         this.renderHistory();
@@ -1359,7 +1394,11 @@ const app = {
         sortedAchievements.forEach(ach => {
             const el = document.createElement('div');
             el.className = `glass-panel achievement ${ach.unlocked ? 'unlocked' : 'locked'}`;
-            el.dataset.achievementId = ach.id;
+            if (el.dataset) {
+                el.dataset.achievementId = ach.id;
+            } else {
+                el.setAttribute('data-achievement-id', ach.id);
+            }
             el.style.textAlign = 'center';
             el.style.padding = '16px';
             el.style.display = 'flex';
@@ -1424,6 +1463,7 @@ const app = {
                                 let text = `Set ${d.setNumber}:`;
                                 if (d.weight) text += ` ${d.weight}kg`;
                                 if (d.reps) text += ` x ${d.reps}`;
+                                if (d.level) text += ` • Stand ${d.level}`;
                                 exDetails.push(app.escapeHTML(text));
                             });
                         }
@@ -1542,6 +1582,12 @@ const app = {
         const n = String(name || '').toLowerCase().trim();
         if (!n) return { exerciseType: 'weight_reps', category: 'compound' };
 
+        if (n.includes('seated row') || n.includes('seated cable row')) {
+            return { exerciseType: 'weight_reps', category: 'compound' };
+        }
+        if (n.includes('row machine') || n.includes('roeimachine') || n.includes('rower') || n.includes('concept2')) {
+            return { exerciseType: 'duration', category: 'cardio' };
+        }
         if (n.includes('plank') || n.includes('hold') || n.includes('wall sit') || n.includes('statisch') || n.includes('l-sit') || n.includes('hollow body') || n.includes('dead bug')) {
             return { exerciseType: 'duration', category: 'isometric' };
         }
@@ -2166,6 +2212,7 @@ const app = {
                 const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
                 let wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : false;
                 let wantsDuration = (ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false) || isHold;
+                const wantsLevel = (ex.trackMetrics ? (ex.trackMetrics.includes('level') || ex.trackMetrics.includes('stand')) : false) || ex.name.toLowerCase().includes('row machine') || ex.name.toLowerCase().includes('roeimachine');
 
                 if (!wantsReps && !wantsDuration) {
                     wantsReps = true;
@@ -2202,6 +2249,15 @@ const app = {
                             <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, 1)" title="+1 sec">+</button>
                         </div>
                      `;
+                }
+                if (wantsLevel) {
+                    const levelPlaceholder = prevSet.level || 'stand';
+                    inputsHtml += `<input type="text" class="weight-input" placeholder="${app.escapeHTML(String(levelPlaceholder))}" style="width: 65px;"
+                        inputmode="text" enterkeyhint="next"
+                        data-ex="${exIndex}" data-set="${i}" data-type="level"
+                        value="${app.escapeHTML(String(ex.levels ? ex.levels[i] : ''))}"
+                        onchange="app.updateLevel(${exIndex}, ${i}, this.value)"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'level');}">`;
                 }
 
                 setsHtml += `
@@ -2372,7 +2428,7 @@ const app = {
         if (ex.durationSeconds || ex.durationSecondsMin || ex.durationSecondsMax || ex.durationText || ex.duration) return true;
         
         const name = String(ex.name || '').toLowerCase();
-        const keywords = ['plank', 'hold', 'side raise', 'wall sit', 'statisch', 'hollow body', 'dead bug', 'isometric', 'l-sit'];
+        const keywords = ['plank', 'hold', 'side raise', 'wall sit', 'statisch', 'hollow body', 'dead bug', 'isometric', 'l-sit', 'row machine', 'roeimachine'];
         if (keywords.some(k => name.includes(k))) return true;
         return false;
     },
@@ -2567,6 +2623,15 @@ const app = {
         this.checkAutoCompleteSet(exIndex, setIndex);
     },
 
+    updateLevel(exIndex, setIndex, val) {
+        if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+        if (!ex.levels) ex.levels = Array(ex.sets).fill('');
+        ex.levels[setIndex] = val;
+        if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+        this.checkAutoCompleteSet(exIndex, setIndex);
+    },
+
     handleInputEnter(event, exIndex, setIndex, inputType) {
         const inputEl = event.target;
         const val = inputEl ? inputEl.value : '';
@@ -2575,6 +2640,8 @@ const app = {
             this.updateWeight(exIndex, setIndex, val);
         } else if (inputType === 'reps') {
             this.updateReps(exIndex, setIndex, val);
+        } else if (inputType === 'level') {
+            this.updateLevel(exIndex, setIndex, val);
         }
 
         const ex = (this.activeWorkout && this.activeWorkout.exercises) ? this.activeWorkout.exercises[exIndex] : null;
@@ -2705,11 +2772,15 @@ const app = {
                 const setDetails = [];
                 for(let i=0; i<ex.sets; i++) {
                     if (ex.setsCompleted[i]) {
-                        setDetails.push({
+                        const detail = {
                             setNumber: i + 1,
-                            weight: ex.weights[i] || '',
-                            reps: ex.actualReps[i] || ''
-                        });
+                            weight: ex.weights ? ex.weights[i] || '' : '',
+                            reps: ex.actualReps ? ex.actualReps[i] || '' : ''
+                        };
+                        if (ex.levels && ex.levels[i] !== undefined && String(ex.levels[i]).trim() !== '') {
+                            detail.level = ex.levels[i];
+                        }
+                        setDetails.push(detail);
                     }
                 }
                 
@@ -2816,6 +2887,12 @@ const app = {
         if (detail) detail.reps = val;
     },
 
+    updateEditLogLevel(exIndex, setIndex, val) {
+        if (!this.logToEdit || !this.logToEdit.exercises[exIndex]) return;
+        const detail = this.logToEdit.exercises[exIndex].details.find(d => d.setNumber === setIndex + 1);
+        if (detail) detail.level = val;
+    },
+
     renderEditLogModal() {
         const container = document.getElementById('edit-log-container');
         container.innerHTML = '';
@@ -2848,14 +2925,21 @@ const app = {
             if (ex.details && ex.details.length > 0) {
                 ex.details.forEach(d => {
                     const setIndex = d.setNumber - 1;
+                    const isRow = ex.name.toLowerCase().includes('row machine') || ex.name.toLowerCase().includes('roeimachine');
+                    const hasLevel = d.level !== undefined || isRow;
+                    const levelInput = hasLevel ? `
+                        <input type="text" class="input-field" placeholder="stand" style="width:70px; text-align:center;"
+                            value="${app.escapeHTML(String(d.level || ''))}" onchange="app.updateEditLogLevel(${exIndex}, ${setIndex}, this.value)">
+                    ` : '';
                     setsHtml += `
                         <div class="set-row" style="margin-top: 8px; justify-content: space-between;">
                             <div class="set-info text-muted">Set ${d.setNumber}</div>
                             <div style="display:flex; gap:8px;">
                                 <input type="number" class="input-field" placeholder="kg" style="width:70px; text-align:center;"
                                     value="${app.escapeHTML(String(d.weight || ''))}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
-                                <input type="number" class="input-field" placeholder="reps" style="width:70px; text-align:center;"
-                                    value="${app.escapeHTML(String(d.reps || ''))}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
+                                <input type="number" class="input-field" placeholder="reps/sec" style="width:70px; text-align:center;"
+                                    value="${app.escapeHTML(String(d.reps || d.durationSeconds || ''))}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
+                                ${levelInput}
                             </div>
                         </div>
                     `;
@@ -3111,13 +3195,21 @@ const app = {
 };
 
 // Ensure we don't crash when running in a Node/test environment
-if (typeof document !== 'undefined' && document.getElementById('import-file')) {
-    document.getElementById('import-file').addEventListener('change', (e) => app.handleFileSelect(e));
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && !(typeof process !== 'undefined' && process.env && process.env.JEST_WORKER_ID)) {
+    const importInput = document.getElementById('import-file');
+    if (importInput && importInput.addEventListener) {
+        importInput.addEventListener('change', (e) => app.handleFileSelect(e));
+    }
     const restoreInput = document.getElementById('restore-file');
-    if (restoreInput) restoreInput.addEventListener('change', (e) => app.handleRestoreFileSelect(e));
+    if (restoreInput && restoreInput.addEventListener) {
+        restoreInput.addEventListener('change', (e) => app.handleRestoreFileSelect(e));
+    }
 
-    // Start app
-    app.init();
+    if (document.readyState === 'loading' && document.addEventListener) {
+        document.addEventListener('DOMContentLoaded', () => app.init());
+    } else {
+        app.init();
+    }
 }
 
 // Export for testing
