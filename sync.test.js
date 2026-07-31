@@ -77,8 +77,14 @@ describe('CloudSync.syncNow', () => {
     let fakeStore;
 
     beforeEach(() => {
-        localStorage.clear();
-        localStorage.setItem('sync_enabled', '1');
+        if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.clear();
+            window.localStorage.setItem('sync_enabled', '1');
+        }
+        try {
+            localStorage.clear();
+            localStorage.setItem('sync_enabled', '1');
+        } catch (e) {}
 
         fakeStore = {
             plans: [{ id: 'p_local', name: 'Lokaal Plan' }],
@@ -175,18 +181,16 @@ describe('CloudSync.syncNow', () => {
         if (typeof window !== 'undefined' && window.localStorage) {
             window.localStorage.removeItem('sync_enabled');
         }
-        if (typeof localStorage !== 'undefined') {
-            localStorage.removeItem('sync_enabled');
-        }
+        try { localStorage.removeItem('sync_enabled'); } catch(e) {}
+
         await CloudSync.syncNow();
 
         if (typeof window !== 'undefined' && window.localStorage) {
             window.localStorage.setItem('sync_enabled', '1');
         }
-        if (typeof localStorage !== 'undefined') {
-            localStorage.setItem('sync_enabled', '1');
-        }
+        try { localStorage.setItem('sync_enabled', '1'); } catch(e) {}
         CloudSync.clientId = '';
+
         await CloudSync.syncNow();
 
         expect(global.fetch).not.toHaveBeenCalled();
