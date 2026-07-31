@@ -39,9 +39,17 @@ describe('DataStore', () => {
     afterEach(() => {
         // Clean up
         jest.restoreAllMocks();
-        try {
-            delete global.localStorage;
-        } catch (e) {}
+        if (typeof window !== 'undefined' && window.localStorage) {
+            try {
+                Object.defineProperty(global, 'localStorage', {
+                    value: window.localStorage,
+                    configurable: true,
+                    writable: true
+                });
+            } catch (e) {
+                global.localStorage = window.localStorage;
+            }
+        }
     });
 
     it('should initialize with default empty state when localStorage is empty', () => {
