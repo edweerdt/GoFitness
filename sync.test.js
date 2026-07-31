@@ -77,6 +77,7 @@ describe('CloudSync.syncNow', () => {
     let fakeStore;
 
     beforeEach(() => {
+        clearTimeout(CloudSync.pushTimer);
         if (typeof window !== 'undefined' && window.localStorage) {
             window.localStorage.clear();
             window.localStorage.setItem('sync_enabled', '1');
@@ -104,8 +105,12 @@ describe('CloudSync.syncNow', () => {
     });
 
     afterEach(() => {
+        clearTimeout(CloudSync.pushTimer);
         delete global.fetch;
-        localStorage.clear();
+        if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.clear();
+        }
+        try { localStorage.clear(); } catch(e) {}
         CloudSync.clientId = '';
         CloudSync.accessToken = null;
     });
