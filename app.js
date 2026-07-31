@@ -38,7 +38,7 @@ const DEFAULT_EXERCISES = [
     { id: 'def_hip_abductor', name: 'Hip Abductor Machine', muscleGroups: ['glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_hammer_pullup', name: 'Neutral Grip Pull-Up (Hammer Grip)', muscleGroups: ['back', 'biceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight' },
     { id: 'def_seated_cable_row', name: 'Seated Cable Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
-    { id: 'def_row_machine', name: 'Row Machine (Roeimachine)', muscleGroups: ['back', 'biceps', 'legs', 'cardio'], exerciseType: 'duration', trackMetrics: ['duration_seconds', 'level'], category: 'cardio' },
+    { id: 'def_row_machine', name: 'Row Machine (Roeimachine)', muscleGroups: ['back', 'biceps', 'legs', 'cardio'], exerciseType: 'duration', trackMetrics: ['duration_seconds', 'level'], category: 'cardio', defaultSets: 1 },
     { id: 'def_single_arm_db_row', name: 'Single-Arm Dumbbell Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_kb_wrist_flip', name: 'Kettlebell Wrist Flip', muscleGroups: ['arms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_hand_gripper', name: 'Hand Gripper (Handknijper)', muscleGroups: ['arms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
@@ -1854,9 +1854,13 @@ const app = {
 
         if (displayEl) displayEl.textContent = ex.name;
 
+        const defaultSets = (ex.defaultSets !== undefined && ex.defaultSets !== null) ? ex.defaultSets : (ex.name && ex.name.toLowerCase().includes('row machine') ? 1 : 3);
+        const setsInput = document.getElementById('workout-ex-sets');
+        if (setsInput) setsInput.value = String(defaultSets);
+
         if (ex.exerciseType === 'duration') {
             if (repsLabel) repsLabel.textContent = "Standaard Duur (sec)";
-            if (repsInput) repsInput.value = "30";
+            if (repsInput) repsInput.value = "300";
         } else {
             if (repsLabel) repsLabel.textContent = "Standaard Reps";
             if (repsInput) repsInput.value = "10";
@@ -1873,7 +1877,8 @@ const app = {
         const setsInput = document.getElementById('workout-ex-sets');
         const repsInput = document.getElementById('workout-ex-reps');
 
-        const setsCount = Math.max(1, parseInt(setsInput ? setsInput.value : '3', 10) || 3);
+        const defaultSets = (this.selectedWorkoutEx.defaultSets !== undefined && this.selectedWorkoutEx.defaultSets !== null) ? this.selectedWorkoutEx.defaultSets : (this.selectedWorkoutEx.name && this.selectedWorkoutEx.name.toLowerCase().includes('row machine') ? 1 : 3);
+        const setsCount = Math.max(1, parseInt(setsInput ? setsInput.value : String(defaultSets), 10) || defaultSets);
         const defaultReps = repsInput ? repsInput.value.trim() : '10';
 
         this.addExerciseToActiveWorkout(this.selectedWorkoutEx, setsCount, defaultReps);
@@ -1881,9 +1886,15 @@ const app = {
         this.hideSelectExerciseForWorkoutModal();
     },
 
-    addExerciseToActiveWorkout(exerciseData, setsCount = 3, defaultReps = '10') {
+    addExerciseToActiveWorkout(exerciseData, setsCount = null, defaultReps = '10') {
         if (!this.activeWorkout) return;
         if (!this.activeWorkout.exercises) this.activeWorkout.exercises = [];
+
+        const determinedSets = (setsCount !== null && setsCount !== undefined)
+            ? setsCount
+            : ((exerciseData && exerciseData.defaultSets !== undefined && exerciseData.defaultSets !== null)
+                ? exerciseData.defaultSets
+                : ((exerciseData && exerciseData.name && exerciseData.name.toLowerCase().includes('row machine')) ? 1 : 3));
 
         let trackMetrics = exerciseData.trackMetrics;
         if (!trackMetrics) {
@@ -1899,11 +1910,12 @@ const app = {
             exerciseType: exerciseData.exerciseType || 'weight_reps',
             trackMetrics: trackMetrics,
             category: exerciseData.category || 'custom',
-            sets: setsCount,
+            sets: determinedSets,
             reps: defaultReps,
-            setsCompleted: Array(setsCount).fill(false),
-            weights: Array(setsCount).fill(''),
-            actualReps: Array(setsCount).fill('')
+            setsCompleted: Array(determinedSets).fill(false),
+            weights: Array(determinedSets).fill(''),
+            actualReps: Array(determinedSets).fill(''),
+            levels: Array(determinedSets).fill('')
         };
 
         this.activeWorkout.exercises.push(exObj);
@@ -2260,9 +2272,18 @@ const app = {
                         onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'level');}">`;
                 }
 
+                const removeSetBtn = ex.sets > 1 ? `
+                    <button class="btn-icon" style="background:none; border:none; padding:2px 4px; cursor:pointer; color:var(--text-muted); opacity:0.6;" onclick="app.removeSetFromExercise(${exIndex}, ${i})" title="Set ${i+1} verwijderen">
+                        <span class="material-icons-round" style="font-size:1.1rem; vertical-align:middle;">remove_circle_outline</span>
+                    </button>
+                ` : '';
+
                 setsHtml += `
                     <div class="set-row">
-                        <div class="set-info text-muted">Set ${i+1}</div>
+                        <div class="set-info text-muted" style="display:flex; align-items:center; gap:4px;">
+                            ${removeSetBtn}
+                            <span>Set ${i+1}</span>
+                        </div>
                         <div class="set-actions">
                             ${inputsHtml}
                             <button class="check-btn ${checked}" onclick="app.toggleSet(${exIndex}, ${i})">
@@ -2272,6 +2293,14 @@ const app = {
                     </div>
                 `;
             }
+
+            const addSetControlsHtml = `
+                <div style="display:flex; justify-content:flex-start; margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.1);">
+                    <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:flex; align-items:center; gap:4px;" onclick="app.addSetToExercise(${exIndex})">
+                        <span class="material-icons-round" style="font-size:1rem;">add</span> Set Toevoegen
+                    </button>
+                </div>
+            `;
 
             let singleHoldTimerHtml = '';
             if (isHold) {
@@ -2327,6 +2356,7 @@ const app = {
                 </div>
                 <div class="exercise-body">
                     ${setsHtml}
+                    ${addSetControlsHtml}
                     ${singleHoldTimerHtml}
                 </div>
             `;
@@ -2342,6 +2372,49 @@ const app = {
             </button>
         `;
         list.appendChild(addBtnContainer);
+    },
+
+    addSetToExercise(exIndex) {
+        if (!this.activeWorkout || !this.activeWorkout.exercises || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+
+        ex.sets = (parseInt(ex.sets, 10) || 0) + 1;
+
+        if (!Array.isArray(ex.setsCompleted)) ex.setsCompleted = [];
+        if (!Array.isArray(ex.weights)) ex.weights = [];
+        if (!Array.isArray(ex.actualReps)) ex.actualReps = [];
+        if (!Array.isArray(ex.levels)) ex.levels = [];
+
+        const lastWeight = ex.weights.length > 0 ? ex.weights[ex.weights.length - 1] : '';
+        const lastReps = ex.actualReps.length > 0 ? ex.actualReps[ex.actualReps.length - 1] : '';
+        const lastLevel = ex.levels.length > 0 ? ex.levels[ex.levels.length - 1] : '';
+
+        ex.setsCompleted.push(false);
+        ex.weights.push(lastWeight);
+        ex.actualReps.push(lastReps);
+        ex.levels.push(lastLevel);
+
+        store.saveActiveWorkoutState(this.activeWorkout);
+        this.renderWorkoutExercises();
+    },
+
+    removeSetFromExercise(exIndex, setIndex) {
+        if (!this.activeWorkout || !this.activeWorkout.exercises || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+
+        if (!ex.sets || ex.sets <= 1) {
+            this.showToast('Een oefening moet minstens 1 set bevatten.', 'error');
+            return;
+        }
+
+        ex.sets = ex.sets - 1;
+        if (Array.isArray(ex.setsCompleted)) ex.setsCompleted.splice(setIndex, 1);
+        if (Array.isArray(ex.weights)) ex.weights.splice(setIndex, 1);
+        if (Array.isArray(ex.actualReps)) ex.actualReps.splice(setIndex, 1);
+        if (Array.isArray(ex.levels)) ex.levels.splice(setIndex, 1);
+
+        store.saveActiveWorkoutState(this.activeWorkout);
+        this.renderWorkoutExercises();
     },
 
     toggleSet(exIndex, setIndex) {
@@ -2861,12 +2934,18 @@ const app = {
         }
 
         this.renderEditLogModal();
-        document.getElementById('modal-edit-log').classList.remove('hidden');
+        const modal = document.getElementById('modal-edit-log');
+        if (modal && modal.classList) {
+            modal.classList.remove('hidden');
+        }
     },
 
     hideEditLogModal() {
         this.logToEdit = null;
-        document.getElementById('modal-edit-log').classList.add('hidden');
+        const modal = document.getElementById('modal-edit-log');
+        if (modal && modal.classList) {
+            modal.classList.add('hidden');
+        }
     },
 
     formatDateTimeLocal(dateInput) {
@@ -2915,6 +2994,7 @@ const app = {
 
     renderEditLogModal() {
         const container = document.getElementById('edit-log-container');
+        if (!container) return;
         container.innerHTML = '';
 
         const dateTimeVal = this.formatDateTimeLocal(this.logToEdit.date);
