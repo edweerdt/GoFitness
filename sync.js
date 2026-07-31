@@ -58,9 +58,16 @@ const CloudSync = {
     _syncing: false,
     _saveWithoutSync: null,
 
-    get enabled() { return localStorage.getItem('sync_enabled') === '1'; },
-    get email() { return localStorage.getItem('sync_email') || ''; },
-    get lastSyncedAt() { return localStorage.getItem('sync_lastSyncedAt') || null; },
+    get enabled() {
+        const val = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('sync_enabled') : (typeof localStorage !== 'undefined' ? localStorage.getItem('sync_enabled') : null);
+        return val === '1';
+    },
+    get email() {
+        return typeof window !== 'undefined' && window.localStorage ? (window.localStorage.getItem('sync_email') || '') : (typeof localStorage !== 'undefined' ? (localStorage.getItem('sync_email') || '') : '');
+    },
+    get lastSyncedAt() {
+        return typeof window !== 'undefined' && window.localStorage ? (window.localStorage.getItem('sync_lastSyncedAt') || null) : (typeof localStorage !== 'undefined' ? (localStorage.getItem('sync_lastSyncedAt') || null) : null);
+    },
 
     init(deps) {
         this.store = deps.store;
