@@ -172,10 +172,20 @@ describe('CloudSync.syncNow', () => {
     it('should do nothing when sync is disabled or not configured', async () => {
         global.fetch = jest.fn();
 
-        localStorage.removeItem('sync_enabled');
+        if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.removeItem('sync_enabled');
+        }
+        if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem('sync_enabled');
+        }
         await CloudSync.syncNow();
 
-        localStorage.setItem('sync_enabled', '1');
+        if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.setItem('sync_enabled', '1');
+        }
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('sync_enabled', '1');
+        }
         CloudSync.clientId = '';
         await CloudSync.syncNow();
 

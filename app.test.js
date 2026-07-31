@@ -39,6 +39,9 @@ describe('DataStore', () => {
     afterEach(() => {
         // Clean up
         jest.restoreAllMocks();
+        try {
+            delete global.localStorage;
+        } catch (e) {}
     });
 
     it('should initialize with default empty state when localStorage is empty', () => {
