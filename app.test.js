@@ -1791,6 +1791,9 @@ describe('editing logged session date & time', () => {
     });
 
     it('should save edited session date and time to store.logs', () => {
+        const renderHomeSpy = jest.spyOn(app, 'renderHome').mockImplementation(() => {});
+        const renderProgressSpy = jest.spyOn(app, 'renderProgress').mockImplementation(() => {});
+
         const originalLog = {
             id: 'log_100',
             sessionName: 'Push A',
@@ -1812,19 +1815,6 @@ describe('editing logged session date & time', () => {
             <div id="edit-log-container"></div>
             <div id="toast-container"></div>
             <div id="history-list"></div>
-            <div id="full-stats-grid"></div>
-            <div id="exercise-progress-list"></div>
-            <div id="muscle-stats-grid"></div>
-            <div id="home-date"></div>
-            <div id="recovery-status" class="status-badge"><span class="material-icons-round"></span></div>
-            <div id="recovery-text"></div>
-            <div id="recommended-card-title"></div>
-            <div id="recommended-session-name"></div>
-            <div id="recommended-reason"></div>
-            <button id="btn-start-session"></button>
-            <div id="stat-completed"></div>
-            <div id="stat-streak"></div>
-            <div class="stats-mini"></div>
         `;
 
         app.showEditLogModal('log_100');
@@ -1836,8 +1826,69 @@ describe('editing logged session date & time', () => {
         expect(store.logs[0].date).toBeDefined();
         expect(isNaN(new Date(store.logs[0].date).getTime())).toBe(false);
         expect(store.logs[0].updatedAt).toBeDefined();
+
+        renderHomeSpy.mockRestore();
+        renderProgressSpy.mockRestore();
     });
 });
+
+describe('add and remove sets during workout', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.logs = [];
+        app.activeWorkout = null;
+        document.body.innerHTML = '<div id="workout-exercise-list"></div><div id="toast-container"></div>';
+    });
+
+    it('should default Row Machine to 1 set when added to active workout', () => {
+        const rowMachine = store.getExerciseLibrary().find(e => e.name === 'Row Machine (Roeimachine)');
+        expect(rowMachine).toBeDefined();
+        expect(rowMachine.defaultSets).toBe(1);
+
+        app.startCustomWorkout();
+        app.addExerciseToActiveWorkout(rowMachine);
+
+        expect(app.activeWorkout.exercises[0].sets).toBe(1);
+        expect(app.activeWorkout.exercises[0].setsCompleted.length).toBe(1);
+    });
+
+    it('should allow adding a set to an exercise during workout and inherit last set values', () => {
+        app.startCustomWorkout();
+        app.addExerciseToActiveWorkout({ name: 'Bench Press', exerciseType: 'weight_reps' }, 2);
+
+        app.activeWorkout.exercises[0].weights = ['80', '85'];
+        app.activeWorkout.exercises[0].actualReps = ['10', '8'];
+
+        app.addSetToExercise(0);
+
+        expect(app.activeWorkout.exercises[0].sets).toBe(3);
+        expect(app.activeWorkout.exercises[0].setsCompleted.length).toBe(3);
+        expect(app.activeWorkout.exercises[0].setsCompleted[2]).toBe(false);
+        expect(app.activeWorkout.exercises[0].weights[2]).toBe('85');
+        expect(app.activeWorkout.exercises[0].actualReps[2]).toBe('8');
+    });
+
+    it('should allow removing a set from an exercise during workout', () => {
+        app.startCustomWorkout();
+        app.addExerciseToActiveWorkout({ name: 'Squat', exerciseType: 'weight_reps' }, 3);
+        app.activeWorkout.exercises[0].weights = ['100', '110', '120'];
+
+        app.removeSetFromExercise(0, 1);
+
+        expect(app.activeWorkout.exercises[0].sets).toBe(2);
+        expect(app.activeWorkout.exercises[0].weights).toEqual(['100', '120']);
+    });
+
+    it('should prevent reducing sets below 1', () => {
+        app.startCustomWorkout();
+        app.addExerciseToActiveWorkout({ name: 'Deadlift', exerciseType: 'weight_reps' }, 1);
+
+        app.removeSetFromExercise(0, 0);
+
+        expect(app.activeWorkout.exercises[0].sets).toBe(1);
+    });
+});
+
 
 
 
