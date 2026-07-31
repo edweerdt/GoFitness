@@ -1084,17 +1084,20 @@ describe('sharePlan', () => {
         store.activePlanId = 'p1';
         store.logs = [];
         document.body.innerHTML = '<div id="toast-container"></div>';
+        try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
+        try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
+        try { delete global.navigator.clipboard; } catch(e) { global.navigator.clipboard = undefined; }
     });
 
     afterEach(() => {
-        delete global.navigator.share;
-        delete global.navigator.canShare;
-        delete global.navigator.clipboard;
+        try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
+        try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
+        try { delete global.navigator.clipboard; } catch(e) { global.navigator.clipboard = undefined; }
     });
 
     it('should share the plan JSON without the internal id via the Web Share API', async () => {
         const share = jest.fn().mockResolvedValue();
-        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true });
+        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
 
         await app.sharePlan('p1');
 
@@ -1106,8 +1109,10 @@ describe('sharePlan', () => {
     });
 
     it('should copy the JSON to the clipboard when Web Share is unavailable', async () => {
+        try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
+        try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
         const writeText = jest.fn().mockResolvedValue();
-        Object.defineProperty(global.navigator, 'clipboard', { value: { writeText }, configurable: true });
+        Object.defineProperty(global.navigator, 'clipboard', { value: { writeText }, configurable: true, writable: true });
 
         await app.sharePlan('p1');
 
