@@ -727,31 +727,49 @@ const app = {
     },
 
     renderHome() {
-        const dateOpt = { weekday: 'long', day: 'numeric', month: 'long' };
-        document.getElementById('home-date').textContent = new Date().toLocaleDateString('nl-NL', dateOpt);
+        const homeDateEl = document.getElementById('home-date');
+        if (homeDateEl) {
+            const dateOpt = { weekday: 'long', day: 'numeric', month: 'long' };
+            homeDateEl.textContent = new Date().toLocaleDateString('nl-NL', dateOpt);
+        }
 
         const recStatus = this.getRecoveryStatus();
         const badge = document.getElementById('recovery-status');
-        badge.className = `status-badge ${recStatus.status}`;
-        document.getElementById('recovery-text').textContent = recStatus.text;
+        if (badge) {
+            badge.className = `status-badge ${recStatus.status}`;
+            const iconEl = badge.querySelector('.material-icons-round');
+            if (iconEl) {
+                let icon = 'battery_charging_full';
+                if (recStatus.status === 'orange') icon = 'battery_50';
+                if (recStatus.status === 'red') icon = 'battery_alert';
+                iconEl.textContent = icon;
+            }
+        }
         
-        let icon = 'battery_charging_full';
-        if(recStatus.status === 'orange') icon = 'battery_50';
-        if(recStatus.status === 'red') icon = 'battery_alert';
-        badge.querySelector('.material-icons-round').textContent = icon;
+        const recTextEl = document.getElementById('recovery-text');
+        if (recTextEl) recTextEl.textContent = recStatus.text;
 
         const btnStart = document.getElementById('btn-start-session');
         const pickerWrapper = document.getElementById('session-picker-wrapper');
         const sessionSelect = document.getElementById('home-session-select');
-        
+
+        const setCardText = (title, name, reason) => {
+            const titleEl = document.getElementById('recommended-card-title');
+            if (titleEl) titleEl.textContent = title;
+            const nameEl = document.getElementById('recommended-session-name');
+            if (nameEl) nameEl.textContent = name;
+            const reasonEl = document.getElementById('recommended-reason');
+            if (reasonEl) reasonEl.textContent = reason;
+        };
+
         if (this.activeWorkout) {
             if (pickerWrapper) pickerWrapper.classList.add('hidden');
-            document.getElementById('recommended-card-title').textContent = "Sessie in uitvoering";
-            document.getElementById('recommended-session-name').textContent = this.activeWorkout.session.name;
-            document.getElementById('recommended-reason').textContent = "Je was al bezig met deze sessie. Pak hem weer op!";
-            btnStart.textContent = "Hervat Nu";
-            btnStart.disabled = false;
-            btnStart.onclick = () => this.openWorkoutView();
+            setCardText("Sessie in uitvoering", this.activeWorkout.session.name, "Je was al bezig met deze sessie. Pak hem weer op!");
+            if (btnStart) {
+                btnStart.textContent = "Hervat Nu";
+                btnStart.disabled = false;
+                btnStart.onclick = () => this.openWorkoutView();
+            }
         } else {
             const activePlan = store.getActivePlan();
             const recSession = this.getRecommendedSession();
@@ -775,40 +793,46 @@ const app = {
                 const updateCardForSelectedSession = () => {
                     const chosenVal = sessionSelect.value;
                     if (chosenVal === 'custom_session') {
-                        document.getElementById('recommended-card-title').textContent = "Vrije Sessie";
-                        document.getElementById('recommended-session-name').textContent = "Vrije Sessie";
-                        document.getElementById('recommended-reason').textContent = "Start een blanco training zonder vaste oefeningen. Voeg tijdens het trainen oefeningen toe.";
-                        btnStart.textContent = "Start Vrije Sessie";
-                        btnStart.disabled = false;
-                        btnStart.onclick = () => this.startCustomWorkout();
+                        setCardText("Vrije Sessie", "Vrije Sessie", "Start een blanco training zonder vaste oefeningen. Voeg tijdens het trainen oefeningen toe.");
+                        if (btnStart) {
+                            btnStart.textContent = "Start Vrije Sessie";
+                            btnStart.disabled = false;
+                            btnStart.onclick = () => this.startCustomWorkout();
+                        }
                     } else if (activePlan) {
                         const chosenSession = activePlan.sessions.find(s => (s.id || s.sessionId) === chosenVal);
                         if (!chosenSession) return;
                         const isRecChoice = recSession && (chosenSession.id || chosenSession.sessionId) === (recSession.session.id || recSession.session.sessionId);
-                        document.getElementById('recommended-card-title').textContent = isRecChoice ? "Aanbevolen Sessie" : "Gekozen Sessie";
-                        document.getElementById('recommended-session-name').textContent = chosenSession.name;
-                        document.getElementById('recommended-reason').textContent = isRecChoice ? recSession.reason : `Handmatig gekozen uit schema (${activePlan.name}).`;
-                        btnStart.textContent = "Start Nu";
-                        btnStart.disabled = false;
-                        btnStart.onclick = () => this.startWorkout(chosenSession, activePlan);
+                        setCardText(
+                            isRecChoice ? "Aanbevolen Sessie" : "Gekozen Sessie",
+                            chosenSession.name,
+                            isRecChoice ? recSession.reason : `Handmatig gekozen uit schema (${activePlan.name}).`
+                        );
+                        if (btnStart) {
+                            btnStart.textContent = "Start Nu";
+                            btnStart.disabled = false;
+                            btnStart.onclick = () => this.startWorkout(chosenSession, activePlan);
+                        }
                     }
                 };
 
                 sessionSelect.onchange = updateCardForSelectedSession;
                 updateCardForSelectedSession();
             } else {
-                document.getElementById('recommended-card-title').textContent = "Vrije Sessie";
-                document.getElementById('recommended-session-name').textContent = "Vrije Sessie";
-                document.getElementById('recommended-reason').textContent = "Start een blanco training zonder vaste oefeningen.";
-                btnStart.textContent = "Start Vrije Sessie";
-                btnStart.disabled = false;
-                btnStart.onclick = () => this.startCustomWorkout();
+                setCardText("Vrije Sessie", "Vrije Sessie", "Start een blanco training zonder vaste oefeningen.");
+                if (btnStart) {
+                    btnStart.textContent = "Start Vrije Sessie";
+                    btnStart.disabled = false;
+                    btnStart.onclick = () => this.startCustomWorkout();
+                }
             }
         }
 
         // Stats
-        document.getElementById('stat-completed').textContent = store.logs.length;
-        document.getElementById('stat-streak').textContent = this.calculateStreak();
+        const statCompletedEl = document.getElementById('stat-completed');
+        if (statCompletedEl) statCompletedEl.textContent = store.logs.length;
+        const statStreakEl = document.getElementById('stat-streak');
+        if (statStreakEl) statStreakEl.textContent = this.calculateStreak();
 
         // Target sessions per week progress
         const plan = store.getActivePlan();
@@ -824,13 +848,15 @@ const app = {
 
             // Add or update progress text under the streak stats
             const statsMini = document.querySelector('.stats-mini');
-            if (!existingProgress) {
-                existingProgress = document.createElement('div');
-                existingProgress.id = 'home-weekly-progress';
-                existingProgress.style.gridColumn = '1 / -1';
-                statsMini.appendChild(existingProgress);
+            if (statsMini) {
+                if (!existingProgress) {
+                    existingProgress = document.createElement('div');
+                    existingProgress.id = 'home-weekly-progress';
+                    existingProgress.style.gridColumn = '1 / -1';
+                    statsMini.appendChild(existingProgress);
+                }
+                existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${this.escapeHTML(progressText)}</div>`;
             }
-            existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${this.escapeHTML(progressText)}</div>`;
         } else if (existingProgress) {
             // Geen (plan met) weekdoel meer -> oude voortgangsbalk opruimen
             existingProgress.remove();
@@ -974,12 +1000,15 @@ const app = {
             totalExercises += (l.exercisesCompleted || 0);
         }
         
-        document.getElementById('full-stats-grid').innerHTML = `
-            <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalWorkouts}</span><span class="stat-label">Trainingen</span></div></div>
-            <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${this.calculateStreak()}</span><span class="stat-label">Weken Streak</span></div></div>
-            <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalMinutes}</span><span class="stat-label">Minuten</span></div></div>
-            <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalExercises}</span><span class="stat-label">Oefeningen</span></div></div>
-        `;
+        const statsGrid = document.getElementById('full-stats-grid');
+        if (statsGrid) {
+            statsGrid.innerHTML = `
+                <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalWorkouts}</span><span class="stat-label">Trainingen</span></div></div>
+                <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${this.calculateStreak()}</span><span class="stat-label">Weken Streak</span></div></div>
+                <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalMinutes}</span><span class="stat-label">Minuten</span></div></div>
+                <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalExercises}</span><span class="stat-label">Oefeningen</span></div></div>
+            `;
+        }
         this.renderExerciseProgress();
         this.renderMuscleStats();
         this.renderHistory();
