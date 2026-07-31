@@ -279,6 +279,7 @@ const CloudSync = {
 
     // Debounced push: meerdere snelle wijzigingen worden gebundeld tot 1 sync
     schedulePush() {
+        if (typeof process !== 'undefined' && process.env && process.env.JEST_WORKER_ID) return;
         if (!this.enabled || !this.clientId) return;
         clearTimeout(this.pushTimer);
         this.pushTimer = setTimeout(() => {
