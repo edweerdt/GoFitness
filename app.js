@@ -405,23 +405,28 @@ const app = {
     },
 
     applyTheme() {
+        if (typeof document === 'undefined' || !document.documentElement) return;
         const btns = document.querySelectorAll('.theme-toggle-btn');
         
-        document.documentElement.classList.remove('theme-light', 'theme-dark');
+        if (document.documentElement.classList) {
+            document.documentElement.classList.remove('theme-light', 'theme-dark');
+        }
         
         let iconName = 'brightness_auto';
         if (store.theme === 'light') {
-            document.documentElement.classList.add('theme-light');
+            if (document.documentElement.classList) document.documentElement.classList.add('theme-light');
             iconName = 'light_mode';
         } else if (store.theme === 'dark') {
-            document.documentElement.classList.add('theme-dark');
+            if (document.documentElement.classList) document.documentElement.classList.add('theme-dark');
             iconName = 'dark_mode';
         }
 
-        btns.forEach(btn => {
-            const icon = btn.querySelector('.material-icons-round');
-            if (icon) icon.textContent = iconName;
-        });
+        if (btns) {
+            btns.forEach(btn => {
+                const icon = btn ? btn.querySelector('.material-icons-round') : null;
+                if (icon) icon.textContent = iconName;
+            });
+        }
     },
 
     navigate(viewId) {
@@ -1389,7 +1394,11 @@ const app = {
         sortedAchievements.forEach(ach => {
             const el = document.createElement('div');
             el.className = `glass-panel achievement ${ach.unlocked ? 'unlocked' : 'locked'}`;
-            el.dataset.achievementId = ach.id;
+            if (el.dataset) {
+                el.dataset.achievementId = ach.id;
+            } else {
+                el.setAttribute('data-achievement-id', ach.id);
+            }
             el.style.textAlign = 'center';
             el.style.padding = '16px';
             el.style.display = 'flex';
@@ -3186,13 +3195,21 @@ const app = {
 };
 
 // Ensure we don't crash when running in a Node/test environment
-if (typeof document !== 'undefined' && document.getElementById('import-file')) {
-    document.getElementById('import-file').addEventListener('change', (e) => app.handleFileSelect(e));
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && !(typeof process !== 'undefined' && process.env && process.env.JEST_WORKER_ID)) {
+    const importInput = document.getElementById('import-file');
+    if (importInput && importInput.addEventListener) {
+        importInput.addEventListener('change', (e) => app.handleFileSelect(e));
+    }
     const restoreInput = document.getElementById('restore-file');
-    if (restoreInput) restoreInput.addEventListener('change', (e) => app.handleRestoreFileSelect(e));
+    if (restoreInput && restoreInput.addEventListener) {
+        restoreInput.addEventListener('change', (e) => app.handleRestoreFileSelect(e));
+    }
 
-    // Start app
-    app.init();
+    if (document.readyState === 'loading' && document.addEventListener) {
+        document.addEventListener('DOMContentLoaded', () => app.init());
+    } else {
+        app.init();
+    }
 }
 
 // Export for testing
