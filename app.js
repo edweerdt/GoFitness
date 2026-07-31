@@ -37,7 +37,8 @@ const DEFAULT_EXERCISES = [
     { id: 'def_single_leg_press', name: 'Single-Leg Press Machine', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_hip_abductor', name: 'Hip Abductor Machine', muscleGroups: ['glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_hammer_pullup', name: 'Neutral Grip Pull-Up (Hammer Grip)', muscleGroups: ['back', 'biceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight' },
-    { id: 'def_seated_row_machine', name: 'Seated Cable Row / Row Machine', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_seated_cable_row', name: 'Seated Cable Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_row_machine', name: 'Row Machine (Roeimachine)', muscleGroups: ['back', 'biceps', 'legs', 'cardio'], exerciseType: 'duration', trackMetrics: ['duration_seconds', 'level'], category: 'cardio' },
     { id: 'def_single_arm_db_row', name: 'Single-Arm Dumbbell Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_kb_wrist_flip', name: 'Kettlebell Wrist Flip', muscleGroups: ['arms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_hand_gripper', name: 'Hand Gripper (Handknijper)', muscleGroups: ['arms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
@@ -1424,6 +1425,7 @@ const app = {
                                 let text = `Set ${d.setNumber}:`;
                                 if (d.weight) text += ` ${d.weight}kg`;
                                 if (d.reps) text += ` x ${d.reps}`;
+                                if (d.level) text += ` • Stand ${d.level}`;
                                 exDetails.push(app.escapeHTML(text));
                             });
                         }
@@ -1542,6 +1544,12 @@ const app = {
         const n = String(name || '').toLowerCase().trim();
         if (!n) return { exerciseType: 'weight_reps', category: 'compound' };
 
+        if (n.includes('seated row') || n.includes('seated cable row')) {
+            return { exerciseType: 'weight_reps', category: 'compound' };
+        }
+        if (n.includes('row machine') || n.includes('roeimachine') || n.includes('rower') || n.includes('concept2')) {
+            return { exerciseType: 'duration', category: 'cardio' };
+        }
         if (n.includes('plank') || n.includes('hold') || n.includes('wall sit') || n.includes('statisch') || n.includes('l-sit') || n.includes('hollow body') || n.includes('dead bug')) {
             return { exerciseType: 'duration', category: 'isometric' };
         }
@@ -2166,6 +2174,7 @@ const app = {
                 const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
                 let wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : false;
                 let wantsDuration = (ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false) || isHold;
+                const wantsLevel = (ex.trackMetrics ? (ex.trackMetrics.includes('level') || ex.trackMetrics.includes('stand')) : false) || ex.name.toLowerCase().includes('row machine') || ex.name.toLowerCase().includes('roeimachine');
 
                 if (!wantsReps && !wantsDuration) {
                     wantsReps = true;
@@ -2202,6 +2211,15 @@ const app = {
                             <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, 1)" title="+1 sec">+</button>
                         </div>
                      `;
+                }
+                if (wantsLevel) {
+                    const levelPlaceholder = prevSet.level || 'stand';
+                    inputsHtml += `<input type="text" class="weight-input" placeholder="${app.escapeHTML(String(levelPlaceholder))}" style="width: 65px;"
+                        inputmode="text" enterkeyhint="next"
+                        data-ex="${exIndex}" data-set="${i}" data-type="level"
+                        value="${app.escapeHTML(String(ex.levels ? ex.levels[i] : ''))}"
+                        onchange="app.updateLevel(${exIndex}, ${i}, this.value)"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'level');}">`;
                 }
 
                 setsHtml += `
@@ -2372,7 +2390,7 @@ const app = {
         if (ex.durationSeconds || ex.durationSecondsMin || ex.durationSecondsMax || ex.durationText || ex.duration) return true;
         
         const name = String(ex.name || '').toLowerCase();
-        const keywords = ['plank', 'hold', 'side raise', 'wall sit', 'statisch', 'hollow body', 'dead bug', 'isometric', 'l-sit'];
+        const keywords = ['plank', 'hold', 'side raise', 'wall sit', 'statisch', 'hollow body', 'dead bug', 'isometric', 'l-sit', 'row machine', 'roeimachine'];
         if (keywords.some(k => name.includes(k))) return true;
         return false;
     },
@@ -2567,6 +2585,15 @@ const app = {
         this.checkAutoCompleteSet(exIndex, setIndex);
     },
 
+    updateLevel(exIndex, setIndex, val) {
+        if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+        if (!ex.levels) ex.levels = Array(ex.sets).fill('');
+        ex.levels[setIndex] = val;
+        if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+        this.checkAutoCompleteSet(exIndex, setIndex);
+    },
+
     handleInputEnter(event, exIndex, setIndex, inputType) {
         const inputEl = event.target;
         const val = inputEl ? inputEl.value : '';
@@ -2575,6 +2602,8 @@ const app = {
             this.updateWeight(exIndex, setIndex, val);
         } else if (inputType === 'reps') {
             this.updateReps(exIndex, setIndex, val);
+        } else if (inputType === 'level') {
+            this.updateLevel(exIndex, setIndex, val);
         }
 
         const ex = (this.activeWorkout && this.activeWorkout.exercises) ? this.activeWorkout.exercises[exIndex] : null;
@@ -2705,11 +2734,15 @@ const app = {
                 const setDetails = [];
                 for(let i=0; i<ex.sets; i++) {
                     if (ex.setsCompleted[i]) {
-                        setDetails.push({
+                        const detail = {
                             setNumber: i + 1,
-                            weight: ex.weights[i] || '',
-                            reps: ex.actualReps[i] || ''
-                        });
+                            weight: ex.weights ? ex.weights[i] || '' : '',
+                            reps: ex.actualReps ? ex.actualReps[i] || '' : ''
+                        };
+                        if (ex.levels && ex.levels[i] !== undefined && String(ex.levels[i]).trim() !== '') {
+                            detail.level = ex.levels[i];
+                        }
+                        setDetails.push(detail);
                     }
                 }
                 
@@ -2816,6 +2849,12 @@ const app = {
         if (detail) detail.reps = val;
     },
 
+    updateEditLogLevel(exIndex, setIndex, val) {
+        if (!this.logToEdit || !this.logToEdit.exercises[exIndex]) return;
+        const detail = this.logToEdit.exercises[exIndex].details.find(d => d.setNumber === setIndex + 1);
+        if (detail) detail.level = val;
+    },
+
     renderEditLogModal() {
         const container = document.getElementById('edit-log-container');
         container.innerHTML = '';
@@ -2848,14 +2887,21 @@ const app = {
             if (ex.details && ex.details.length > 0) {
                 ex.details.forEach(d => {
                     const setIndex = d.setNumber - 1;
+                    const isRow = ex.name.toLowerCase().includes('row machine') || ex.name.toLowerCase().includes('roeimachine');
+                    const hasLevel = d.level !== undefined || isRow;
+                    const levelInput = hasLevel ? `
+                        <input type="text" class="input-field" placeholder="stand" style="width:70px; text-align:center;"
+                            value="${app.escapeHTML(String(d.level || ''))}" onchange="app.updateEditLogLevel(${exIndex}, ${setIndex}, this.value)">
+                    ` : '';
                     setsHtml += `
                         <div class="set-row" style="margin-top: 8px; justify-content: space-between;">
                             <div class="set-info text-muted">Set ${d.setNumber}</div>
                             <div style="display:flex; gap:8px;">
                                 <input type="number" class="input-field" placeholder="kg" style="width:70px; text-align:center;"
                                     value="${app.escapeHTML(String(d.weight || ''))}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
-                                <input type="number" class="input-field" placeholder="reps" style="width:70px; text-align:center;"
-                                    value="${app.escapeHTML(String(d.reps || ''))}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
+                                <input type="number" class="input-field" placeholder="reps/sec" style="width:70px; text-align:center;"
+                                    value="${app.escapeHTML(String(d.reps || d.durationSeconds || ''))}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
+                                ${levelInput}
                             </div>
                         </div>
                     `;
