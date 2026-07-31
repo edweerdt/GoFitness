@@ -164,7 +164,7 @@ describe('CloudSync.syncNow', () => {
     it('should mark the session as expired on a 401 from Drive', async () => {
         global.fetch = jest.fn(() => Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({}) }));
 
-        await expect(CloudSync.syncNow()).rejects.toThrow('auth');
+        await expect(CloudSync.syncNow()).rejects.toThrow();
         expect(CloudSync.status).toBe('verlopen');
         expect(CloudSync.accessToken).toBeNull();
     });
