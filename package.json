@@ -5,7 +5,7 @@
   "description": "Slimme, rustige PWA voor krachttraining: schema-import, slim herstel, voortgang en achievements.",
   "main": "app.js",
   "scripts": {
-    "test": "jest --env=jsdom"
+    "test": "jest --env=jsdom --runInBand --passWithNoTests"
   },
   "repository": {
     "type": "git",
@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/edweerdt/GoFitness#readme",
   "devDependencies": {
-    "jest": "^30.4.2",
-    "jest-environment-jsdom": "^30.4.1"
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
   }
 }

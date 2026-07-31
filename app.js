@@ -2869,6 +2869,26 @@ const app = {
         document.getElementById('modal-edit-log').classList.add('hidden');
     },
 
+    formatDateTimeLocal(dateInput) {
+        const d = dateInput ? new Date(dateInput) : new Date();
+        if (isNaN(d.getTime())) return '';
+        const pad = n => String(n).padStart(2, '0');
+        const year = d.getFullYear();
+        const month = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const hours = pad(d.getHours());
+        const minutes = pad(d.getMinutes());
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    },
+
+    updateEditLogDate(val) {
+        if (!this.logToEdit || !val) return;
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) {
+            this.logToEdit.date = d.toISOString();
+        }
+    },
+
     updateEditLogDuration(val) {
         const parsed = parseInt(val, 10);
         // Alleen een geldige, niet-negatieve waarde overnemen; anders de vorige behouden
@@ -2897,19 +2917,27 @@ const app = {
         const container = document.getElementById('edit-log-container');
         container.innerHTML = '';
 
-        // Duur-veld: altijd bewerkbaar, ook bij oude sessies zonder oefening-details
-        const durationCard = document.createElement('div');
-        durationCard.className = 'glass-panel';
-        durationCard.style.padding = '12px';
-        durationCard.innerHTML = `
+        const dateTimeVal = this.formatDateTimeLocal(this.logToEdit.date);
+
+        // Datum, Tijd en Duur in een overzichtelijke bewerkbare kaart
+        const metaCard = document.createElement('div');
+        metaCard.className = 'glass-panel flex-col gap-2';
+        metaCard.style.padding = '12px';
+        metaCard.innerHTML = `
             <div class="set-row" style="justify-content: space-between; align-items:center;">
+                <div style="font-weight:600;">Datum & Tijd</div>
+                <input type="datetime-local" class="input-field" style="width:auto; max-width:210px; text-align:center;"
+                    value="${app.escapeHTML(dateTimeVal)}"
+                    onchange="app.updateEditLogDate(this.value)">
+            </div>
+            <div class="set-row" style="justify-content: space-between; align-items:center; margin-top:8px;">
                 <div style="font-weight:600;">Duur (minuten)</div>
                 <input type="number" min="0" class="input-field" style="width:90px; text-align:center;"
                     value="${app.escapeHTML(String(this.logToEdit.duration != null ? this.logToEdit.duration : ''))}"
                     onchange="app.updateEditLogDuration(this.value)">
             </div>
         `;
-        container.appendChild(durationCard);
+        container.appendChild(metaCard);
 
         if (!this.logToEdit.exercises || this.logToEdit.exercises.length === 0) {
             const note = document.createElement('p');
@@ -2982,6 +3010,8 @@ const app = {
         }
         this.hideEditLogModal();
         this.renderProgress();
+        this.renderHome();
+        this.showToast('Sessie gewijzigd.', 'success');
     },
 
     // --- IMPORT / EXPORT ---

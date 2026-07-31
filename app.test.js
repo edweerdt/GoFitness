@@ -19,16 +19,37 @@ describe('DataStore', () => {
             })
         };
 
-        // Assign mock to global context
-        Object.defineProperty(global, 'localStorage', {
-            value: mockLocalStorage,
-            configurable: true
-        });
+        // Assign mock to global context safely across Node versions
+        try {
+            Object.defineProperty(global, 'localStorage', {
+                value: mockLocalStorage,
+                configurable: true,
+                writable: true
+            });
+        } catch (e) {
+            if (global.localStorage) {
+                global.localStorage.getItem = mockLocalStorage.getItem;
+                global.localStorage.setItem = mockLocalStorage.setItem;
+                global.localStorage.removeItem = mockLocalStorage.removeItem;
+                global.localStorage.clear = mockLocalStorage.clear;
+            }
+        }
     });
 
     afterEach(() => {
         // Clean up
         jest.restoreAllMocks();
+        if (typeof window !== 'undefined' && window.localStorage) {
+            try {
+                Object.defineProperty(global, 'localStorage', {
+                    value: window.localStorage,
+                    configurable: true,
+                    writable: true
+                });
+            } catch (e) {
+                global.localStorage = window.localStorage;
+            }
+        }
     });
 
     it('should initialize with default empty state when localStorage is empty', () => {
@@ -1741,5 +1762,82 @@ describe('Exercise Library & Custom Vrije Sessie', () => {
         expect(loggedEx.details[0].level).toBe('Stand 6');
     });
 });
+
+describe('editing logged session date & time', () => {
+    beforeEach(() => {
+        store.logs = [];
+        store.plans = [];
+    });
+
+    it('should format ISO dates into datetime-local string format', () => {
+        const iso = '2026-07-20T14:30:00.000Z';
+        const formatted = app.formatDateTimeLocal(iso);
+        expect(formatted).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    });
+
+    it('should update log date when updateEditLogDate is called', () => {
+        app.logToEdit = {
+            id: 'log_1',
+            date: '2026-07-01T10:00:00.000Z',
+            duration: 45,
+            exercises: []
+        };
+
+        app.updateEditLogDate('2026-07-15T18:45');
+
+        const newDate = new Date(app.logToEdit.date);
+        expect(newDate).toBeDefined();
+        expect(isNaN(newDate.getTime())).toBe(false);
+    });
+
+    it('should save edited session date and time to store.logs', () => {
+        const originalLog = {
+            id: 'log_100',
+            sessionName: 'Push A',
+            date: '2026-07-01T10:00:00.000Z',
+            duration: 45,
+            exercisesCompleted: 1,
+            exercises: [
+                {
+                    name: 'Bench Press',
+                    setsCompleted: 1,
+                    details: [{ setNumber: 1, weight: '60', reps: '10' }]
+                }
+            ]
+        };
+        store.logs = [originalLog];
+
+        document.body.innerHTML = `
+            <div id="modal-edit-log" class="modal-overlay hidden"></div>
+            <div id="edit-log-container"></div>
+            <div id="toast-container"></div>
+            <div id="history-list"></div>
+            <div id="full-stats-grid"></div>
+            <div id="exercise-progress-list"></div>
+            <div id="muscle-stats-grid"></div>
+            <div id="home-date"></div>
+            <div id="recovery-status" class="status-badge"><span class="material-icons-round"></span></div>
+            <div id="recovery-text"></div>
+            <div id="recommended-card-title"></div>
+            <div id="recommended-session-name"></div>
+            <div id="recommended-reason"></div>
+            <button id="btn-start-session"></button>
+            <div id="stat-completed"></div>
+            <div id="stat-streak"></div>
+            <div class="stats-mini"></div>
+        `;
+
+        app.showEditLogModal('log_100');
+        expect(app.logToEdit).toBeDefined();
+
+        app.updateEditLogDate('2026-07-25T14:30');
+        app.saveEditLog();
+
+        expect(store.logs[0].date).toBeDefined();
+        expect(isNaN(new Date(store.logs[0].date).getTime())).toBe(false);
+        expect(store.logs[0].updatedAt).toBeDefined();
+    });
+});
+
 
 
