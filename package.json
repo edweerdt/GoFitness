@@ -5,7 +5,7 @@
   "description": "Slimme, rustige PWA voor krachttraining: schema-import, slim herstel, voortgang en achievements.",
   "main": "app.js",
   "scripts": {
-    "test": "jest --env=jsdom"
+    "test": "jest --env=jsdom --runInBand"
   },
   "repository": {
     "type": "git",

@@ -19,11 +19,21 @@ describe('DataStore', () => {
             })
         };
 
-        // Assign mock to global context
-        Object.defineProperty(global, 'localStorage', {
-            value: mockLocalStorage,
-            configurable: true
-        });
+        // Assign mock to global context safely across Node versions
+        try {
+            Object.defineProperty(global, 'localStorage', {
+                value: mockLocalStorage,
+                configurable: true,
+                writable: true
+            });
+        } catch (e) {
+            if (global.localStorage) {
+                global.localStorage.getItem = mockLocalStorage.getItem;
+                global.localStorage.setItem = mockLocalStorage.setItem;
+                global.localStorage.removeItem = mockLocalStorage.removeItem;
+                global.localStorage.clear = mockLocalStorage.clear;
+            }
+        }
     });
 
     afterEach(() => {
