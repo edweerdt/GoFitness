@@ -2259,6 +2259,9 @@ const app = {
                         <div class="step-btn-group">
                             <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, -1)" title="-1 sec">-</button>
                             <button class="step-btn" onclick="app.adjustDuration(${exIndex}, ${i}, 1)" title="+1 sec">+</button>
+                            <button class="step-btn" onclick="app.startHoldTimer(${exIndex}, ${i})" title="Start timer voor Set ${i+1}">
+                                <span class="material-icons-round" style="font-size:0.9rem;">timer</span>
+                            </button>
                         </div>
                      `;
                 }
@@ -2305,6 +2308,12 @@ const app = {
             let singleHoldTimerHtml = '';
             if (isHold) {
                 const isTiming = app.holdTimerState && app.holdTimerState.exIndex === exIndex;
+                let activeSetIdx = app.holdTimerState ? app.holdTimerState.setIndex : null;
+                if (activeSetIdx === null || typeof activeSetIdx !== 'number') {
+                    const firstUncompleted = (ex.setsCompleted && Array.isArray(ex.setsCompleted)) ? ex.setsCompleted.findIndex(c => !c) : -1;
+                    activeSetIdx = firstUncompleted !== -1 ? firstUncompleted : Math.max(0, (ex.sets || 1) - 1);
+                }
+
                 if (isTiming) {
                     if (app.holdTimerState.status === 'delay') {
                         const elapsedDelay = (Date.now() - app.holdTimerState.delayStartTime) / 1000;
@@ -2312,7 +2321,7 @@ const app = {
                         singleHoldTimerHtml = `
                             <div class="hold-timer-container">
                                 <button id="hold-timer-btn-${exIndex}" class="hold-timer-btn starting" onclick="app.stopHoldTimer(false)">
-                                    <span class="material-icons-round">hourglass_top</span> Klaar in ${remaining}s...
+                                    <span class="material-icons-round">hourglass_top</span> Klaar in ${remaining}s... (Set ${activeSetIdx + 1})
                                 </button>
                             </div>
                         `;
@@ -2324,7 +2333,7 @@ const app = {
                         singleHoldTimerHtml = `
                             <div class="hold-timer-container">
                                 <button id="hold-timer-btn-${exIndex}" class="hold-timer-btn running" onclick="app.stopHoldTimer(true)">
-                                    <span class="material-icons-round">stop</span> ${timeStr} Stop
+                                    <span class="material-icons-round">stop</span> ${timeStr} Stop (Set ${activeSetIdx + 1})
                                 </button>
                             </div>
                         `;
@@ -2332,8 +2341,8 @@ const app = {
                 } else {
                     singleHoldTimerHtml = `
                         <div class="hold-timer-container">
-                            <button id="hold-timer-btn-${exIndex}" class="hold-timer-btn" onclick="app.startHoldTimer(${exIndex})">
-                                <span class="material-icons-round">timer</span> Start hold
+                            <button id="hold-timer-btn-${exIndex}" class="hold-timer-btn" onclick="app.startHoldTimer(${exIndex}, ${activeSetIdx})">
+                                <span class="material-icons-round">timer</span> Start hold (Set ${activeSetIdx + 1})
                             </button>
                         </div>
                     `;
@@ -2516,6 +2525,10 @@ const app = {
     },
 
     startHoldTimer(exIndex, setIndex) {
+        if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+
         if (this.holdTimerState) {
             this.stopHoldTimer(false);
         }
@@ -2524,7 +2537,7 @@ const app = {
             const ex = (this.activeWorkout && this.activeWorkout.exercises) ? this.activeWorkout.exercises[exIndex] : null;
             if (ex && ex.setsCompleted) {
                 const firstUncompleted = ex.setsCompleted.findIndex(c => !c);
-                setIndex = firstUncompleted !== -1 ? firstUncompleted : Math.max(0, ex.sets - 1);
+                setIndex = firstUncompleted !== -1 ? firstUncompleted : Math.max(0, (ex.sets || 1) - 1);
             } else {
                 setIndex = 0;
             }
@@ -2560,7 +2573,7 @@ const app = {
 
                 if (btnEl) {
                     btnEl.className = 'hold-timer-btn starting';
-                    btnEl.innerHTML = `<span class="material-icons-round">hourglass_top</span> Klaar in ${remaining}s...`;
+                    btnEl.innerHTML = `<span class="material-icons-round">hourglass_top</span> Klaar in ${remaining}s... (Set ${setIndex + 1})`;
                 }
 
                 if (elapsedDelay >= this.holdTimerState.delaySeconds) {
@@ -2569,7 +2582,7 @@ const app = {
                     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([40]);
                     if (btnEl) {
                         btnEl.className = 'hold-timer-btn running';
-                        btnEl.innerHTML = `<span class="material-icons-round">stop</span> 0s Stop`;
+                        btnEl.innerHTML = `<span class="material-icons-round">stop</span> 0s Stop (Set ${setIndex + 1})`;
                     }
                 }
             } else if (this.holdTimerState.status === 'running') {
@@ -2580,7 +2593,7 @@ const app = {
 
                 if (btnEl) {
                     btnEl.className = 'hold-timer-btn running';
-                    btnEl.innerHTML = `<span class="material-icons-round">stop</span> ${timeStr} Stop`;
+                    btnEl.innerHTML = `<span class="material-icons-round">stop</span> ${timeStr} Stop (Set ${setIndex + 1})`;
                 }
             }
         }, 100);
@@ -2589,6 +2602,10 @@ const app = {
     },
 
     stopHoldTimer(autoCheck = true) {
+        if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+
         if (!this.holdTimerState) return;
 
         const { exIndex, setIndex, startTime, status, intervalId } = this.holdTimerState;
@@ -2625,6 +2642,7 @@ const app = {
                 if (typeof store !== 'undefined') {
                     store.saveActiveWorkoutState(this.activeWorkout);
                 }
+                this.checkAutoCompleteSet(exIndex, setIndex);
                 if (this.showToast) {
                     this.showToast(`⏱️ ${netSeconds} sec gelogd voor Set ${setIndex + 1}!`, 'success');
                 }
@@ -2651,6 +2669,7 @@ const app = {
         if (typeof store !== 'undefined') {
             store.saveActiveWorkoutState(this.activeWorkout);
         }
+        this.checkAutoCompleteSet(exIndex, setIndex);
         if (typeof document !== 'undefined' && document.getElementById('workout-exercise-list')) {
             this.renderWorkoutExercises();
         }
@@ -2660,15 +2679,18 @@ const app = {
         if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
         const ex = this.activeWorkout.exercises[exIndex];
         const isHold = this.isHoldExercise(ex);
-        if (isHold) return; // hold exercises use manual check or stopwatch stop
 
-        const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
-        const wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : true;
-        
+        const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : !isHold;
+        const wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : !isHold;
+        const wantsDuration = (ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false) || isHold;
+        const wantsLevel = (ex.trackMetrics ? (ex.trackMetrics.includes('level') || ex.trackMetrics.includes('stand')) : false) || (ex.name && (ex.name.toLowerCase().includes('row machine') || ex.name.toLowerCase().includes('roeimachine')));
+
         const hasWeight = !wantsWeight || (ex.weights && String(ex.weights[setIndex] || '').trim() !== '');
         const hasReps = !wantsReps || (ex.actualReps && String(ex.actualReps[setIndex] || '').trim() !== '');
+        const hasDuration = !wantsDuration || (ex.actualReps && String(ex.actualReps[setIndex] || '').trim() !== '' && parseInt(ex.actualReps[setIndex], 10) > 0);
+        const hasLevel = !wantsLevel || (ex.levels && String(ex.levels[setIndex] || '').trim() !== '');
 
-        if (hasWeight && hasReps && ex.setsCompleted && !ex.setsCompleted[setIndex]) {
+        if (hasWeight && hasReps && hasDuration && hasLevel && ex.setsCompleted && !ex.setsCompleted[setIndex]) {
             ex.setsCompleted[setIndex] = true;
             if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
             if (ex.restSeconds) this.startRestTimer(ex.restSeconds);

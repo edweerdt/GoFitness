@@ -1574,6 +1574,59 @@ describe('Hold Timer (Stopwatch)', () => {
 
         expect(app.holdTimerState.setIndex).toBe(1); // auto-selected set 2 (index 1)
     });
+
+    it('should auto-complete hold exercises when duration is entered via updateReps or adjustDuration', () => {
+        const mockSession = {
+            id: 'sess_1',
+            name: 'Test Session',
+            exercises: [
+                { id: 'ex_1', name: 'Plank Hold', sets: 2, actualReps: ['', ''], setsCompleted: [false, false] }
+            ]
+        };
+        app.activeWorkout = {
+            session: mockSession,
+            exercises: mockSession.exercises
+        };
+
+        app.updateReps(0, 0, '45');
+        expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(true);
+
+        app.adjustDuration(0, 1, 30);
+        expect(app.activeWorkout.exercises[0].setsCompleted[1]).toBe(true);
+    });
+
+    it('should sequentially complete sets in timed exercises on stopHoldTimer', () => {
+        const mockSession = {
+            id: 'sess_1',
+            name: 'Test Session',
+            exercises: [
+                { id: 'ex_1', name: 'Plank Hold', sets: 3, actualReps: ['', '', ''], setsCompleted: [false, false, false] }
+            ]
+        };
+        app.activeWorkout = {
+            session: mockSession,
+            exercises: mockSession.exercises
+        };
+        store.holdTimerDelaySeconds = 0;
+
+        // Run set 1 timer
+        app.startHoldTimer(0);
+        expect(app.holdTimerState.setIndex).toBe(0);
+        app.holdTimerState.startTime = Date.now() - 31000;
+        app.stopHoldTimer(true);
+
+        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('30');
+        expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(true);
+
+        // Run set 2 timer (should automatically pick index 1)
+        app.startHoldTimer(0);
+        expect(app.holdTimerState.setIndex).toBe(1);
+        app.holdTimerState.startTime = Date.now() - 41000;
+        app.stopHoldTimer(true);
+
+        expect(app.activeWorkout.exercises[0].actualReps[1]).toBe('40');
+        expect(app.activeWorkout.exercises[0].setsCompleted[1]).toBe(true);
+    });
 });
 
 describe('clickable exercise web search', () => {
