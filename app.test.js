@@ -1910,6 +1910,73 @@ describe('editing logged session date & time', () => {
         renderHomeSpy.mockRestore();
         renderProgressSpy.mockRestore();
     });
+
+    it('should add extra exercise to logToEdit when addExerciseToEditLog is called', () => {
+        app.logToEdit = {
+            id: 'log_101',
+            sessionName: 'Push A',
+            exercises: [
+                { name: 'Bench Press', details: [{ setNumber: 1, weight: '60', reps: '10' }] }
+            ]
+        };
+
+        document.body.innerHTML = `
+            <div id="modal-edit-log" class="modal-overlay hidden"></div>
+            <div id="edit-log-container"></div>
+            <div id="toast-container"></div>
+        `;
+
+        app.addExerciseToEditLog({ name: 'Incline Dumbbell Press', muscleGroups: ['borst', 'schouders'] }, 3, '10');
+
+        expect(app.logToEdit.exercises.length).toBe(2);
+        expect(app.logToEdit.exercises[1].name).toBe('Incline Dumbbell Press');
+        expect(app.logToEdit.exercises[1].details.length).toBe(3);
+    });
+
+    it('should add set to exercise when addSetToEditLog is called', () => {
+        app.logToEdit = {
+            id: 'log_102',
+            exercises: [
+                { name: 'Squat', details: [{ setNumber: 1, weight: '80', reps: '8' }] }
+            ]
+        };
+
+        document.body.innerHTML = `
+            <div id="modal-edit-log" class="modal-overlay hidden"></div>
+            <div id="edit-log-container"></div>
+            <div id="toast-container"></div>
+        `;
+
+        app.addSetToEditLog(0);
+
+        expect(app.logToEdit.exercises[0].details.length).toBe(2);
+        expect(app.logToEdit.exercises[0].details[1].setNumber).toBe(2);
+        expect(app.logToEdit.exercises[0].details[1].weight).toBe('80');
+    });
+
+    it('should remove set and exercise from logToEdit', () => {
+        app.logToEdit = {
+            id: 'log_103',
+            exercises: [
+                { name: 'Squat', details: [{ setNumber: 1, weight: '80', reps: '8' }, { setNumber: 2, weight: '80', reps: '8' }] },
+                { name: 'Leg Press', details: [{ setNumber: 1, weight: '120', reps: '10' }] }
+            ]
+        };
+
+        document.body.innerHTML = `
+            <div id="modal-edit-log" class="modal-overlay hidden"></div>
+            <div id="edit-log-container"></div>
+            <div id="toast-container"></div>
+        `;
+
+        app.removeSetFromEditLog(0, 0);
+        expect(app.logToEdit.exercises[0].details.length).toBe(1);
+        expect(app.logToEdit.exercises[0].details[0].setNumber).toBe(1);
+
+        app.removeExerciseFromEditLog(1);
+        expect(app.logToEdit.exercises.length).toBe(1);
+        expect(app.logToEdit.exercises[0].name).toBe('Squat');
+    });
 });
 
 describe('add and remove sets during workout', () => {

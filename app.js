@@ -3192,12 +3192,14 @@ const app = {
         const session = plan ? plan.sessions.find(s => s.id === this.logToEdit.sessionId) : null;
         
         if (session) {
+            const matchedLoggedExs = new Set();
             const fullExercises = session.exercises.map(sessionEx => {
                 const loggedEx = this.logToEdit.exercises.find(e => 
                     e.name === sessionEx.name || 
                     (sessionEx.alternatives && sessionEx.alternatives.includes(e.name)) ||
                     (sessionEx.name && sessionEx.name.toLowerCase().includes(e.name.toLowerCase()))
                 );
+                if (loggedEx) matchedLoggedExs.add(loggedEx);
                 const details = [];
                 for (let i = 1; i <= sessionEx.sets; i++) {
                     const loggedSet = loggedEx && loggedEx.details ? loggedEx.details.find(d => d.setNumber === i) : null;
@@ -3222,6 +3224,16 @@ const app = {
                     details: details
                 };
             });
+
+            // Preserve any extra logged exercises that were NOT matched to session.exercises
+            this.logToEdit.exercises.forEach(loggedEx => {
+                if (!matchedLoggedExs.has(loggedEx)) {
+                    loggedEx.availableVariations = loggedEx.availableVariations || this.getExerciseVariations(loggedEx);
+                    if (!loggedEx.details) loggedEx.details = [];
+                    fullExercises.push(loggedEx);
+                }
+            });
+
             this.logToEdit.exercises = fullExercises;
         } else {
             this.logToEdit.exercises.forEach(ex => {
@@ -3281,11 +3293,13 @@ const app = {
     },
 
     updateEditLogWeight(exIndex, setIndex, val) {
+        if (!this.logToEdit || !this.logToEdit.exercises[exIndex]) return;
         const detail = this.logToEdit.exercises[exIndex].details.find(d => d.setNumber === setIndex + 1);
         if (detail) detail.weight = val;
     },
 
     updateEditLogReps(exIndex, setIndex, val) {
+        if (!this.logToEdit || !this.logToEdit.exercises[exIndex]) return;
         const detail = this.logToEdit.exercises[exIndex].details.find(d => d.setNumber === setIndex + 1);
         if (detail) detail.reps = val;
     },
@@ -3301,6 +3315,80 @@ const app = {
         const ex = this.logToEdit.exercises[exIndex];
         ex.name = variationName;
         this.renderEditLogModal();
+    },
+
+    addExerciseToEditLog(exData, setsCount = 3, defaultReps = '10') {
+        if (!this.logToEdit) return;
+        if (!this.logToEdit.exercises) this.logToEdit.exercises = [];
+
+        const determinedSets = (setsCount !== null && setsCount !== undefined && setsCount > 0)
+            ? setsCount
+            : ((exData && exData.defaultSets !== undefined && exData.defaultSets !== null)
+                ? exData.defaultSets
+                : ((exData && exData.name && exData.name.toLowerCase().includes('row machine')) ? 1 : 3));
+
+        const details = [];
+        for (let i = 1; i <= determinedSets; i++) {
+            details.push({
+                setNumber: i,
+                weight: '',
+                reps: defaultReps || '10',
+                level: ''
+            });
+        }
+
+        const variations = this.getExerciseVariations(exData);
+        const newExObj = {
+            name: exData.name,
+            originalName: exData.name,
+            availableVariations: variations.length > 0 ? variations : [exData.name],
+            muscleGroups: exData.muscleGroups || [],
+            totalSets: determinedSets,
+            setsCompleted: 0,
+            details: details
+        };
+
+        this.logToEdit.exercises.push(newExObj);
+        this.renderEditLogModal();
+        this.showToast(`${exData.name} toegevoegd aan sessie!`, 'success');
+    },
+
+    addSetToEditLog(exIndex) {
+        if (!this.logToEdit || !this.logToEdit.exercises || !this.logToEdit.exercises[exIndex]) return;
+        const ex = this.logToEdit.exercises[exIndex];
+        if (!ex.details) ex.details = [];
+        const newSetNumber = ex.details.length + 1;
+        const defaultReps = (ex.details.length > 0 && ex.details[ex.details.length - 1].reps) ? ex.details[ex.details.length - 1].reps : '10';
+        const defaultWeight = (ex.details.length > 0 && ex.details[ex.details.length - 1].weight) ? ex.details[ex.details.length - 1].weight : '';
+        ex.details.push({
+            setNumber: newSetNumber,
+            weight: defaultWeight,
+            reps: defaultReps,
+            level: ''
+        });
+        ex.totalSets = ex.details.length;
+        this.renderEditLogModal();
+    },
+
+    removeSetFromEditLog(exIndex, setIndex) {
+        if (!this.logToEdit || !this.logToEdit.exercises || !this.logToEdit.exercises[exIndex]) return;
+        const ex = this.logToEdit.exercises[exIndex];
+        if (!ex.details || !ex.details[setIndex]) return;
+        ex.details.splice(setIndex, 1);
+        ex.details.forEach((d, idx) => {
+            d.setNumber = idx + 1;
+        });
+        ex.totalSets = ex.details.length;
+        this.renderEditLogModal();
+    },
+
+    removeExerciseFromEditLog(exIndex) {
+        if (!this.logToEdit || !this.logToEdit.exercises || !this.logToEdit.exercises[exIndex]) return;
+        const ex = this.logToEdit.exercises[exIndex];
+        const exName = ex.name;
+        this.logToEdit.exercises.splice(exIndex, 1);
+        this.renderEditLogModal();
+        this.showToast(`${exName} verwijderd.`, 'info');
     },
 
     renderEditLogModal() {
@@ -3333,68 +3421,88 @@ const app = {
         if (!this.logToEdit.exercises || this.logToEdit.exercises.length === 0) {
             const note = document.createElement('p');
             note.className = 'text-muted';
-            note.textContent = 'Geen oefening-details beschikbaar voor deze oude sessie.';
+            note.textContent = 'Geen oefeningen in deze sessie.';
             container.appendChild(note);
-            return;
+        } else {
+            this.logToEdit.exercises.forEach((ex, exIndex) => {
+                let setsHtml = '';
+                
+                if (ex.details && ex.details.length > 0) {
+                    ex.details.forEach((d, setIndex) => {
+                        const isRow = ex.name.toLowerCase().includes('row machine') || ex.name.toLowerCase().includes('roeimachine');
+                        const hasLevel = d.level !== undefined || isRow;
+                        const levelInput = hasLevel ? `
+                            <input type="text" class="input-field" placeholder="stand" style="width:65px; text-align:center;"
+                                value="${app.escapeHTML(String(d.level || ''))}"
+                                oninput="app.updateEditLogLevel(${exIndex}, ${setIndex}, this.value)"
+                                onchange="app.updateEditLogLevel(${exIndex}, ${setIndex}, this.value)">
+                        ` : '';
+                        setsHtml += `
+                            <div class="set-row" style="margin-top: 8px; justify-content: space-between; align-items:center;">
+                                <div class="set-info text-muted">Set ${d.setNumber}</div>
+                                <div style="display:flex; gap:6px; align-items:center;">
+                                    <input type="number" class="input-field" placeholder="kg" style="width:65px; text-align:center;"
+                                        value="${app.escapeHTML(String(d.weight || ''))}"
+                                        oninput="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)"
+                                        onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
+                                    <input type="number" class="input-field" placeholder="reps/sec" style="width:65px; text-align:center;"
+                                        value="${app.escapeHTML(String(d.reps || d.durationSeconds || ''))}"
+                                        oninput="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)"
+                                        onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
+                                    ${levelInput}
+                                    <button class="icon-btn" style="color:var(--text-muted); padding:2px;" onclick="app.removeSetFromEditLog(${exIndex}, ${setIndex})" title="Set verwijderen">
+                                        <span class="material-icons-round" style="font-size:1rem;">close</span>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    setsHtml = '<div class="text-sm text-muted">Geen details opgeslagen voor deze oefening.</div>';
+                }
+
+                let variationHtml = '';
+                const variations = ex.availableVariations || app.getExerciseVariations(ex);
+                if (variations.length > 1) {
+                    variationHtml = `<div class="variation-selector mb-2">`;
+                    variations.forEach(v => {
+                        const isActive = ex.name === v;
+                        const safeV = app.escapeHTML(v);
+                        variationHtml += `<button class="variation-pill ${isActive ? 'active' : ''}" onclick="app.updateEditLogVariation(${exIndex}, '${safeV.replace(/'/g, "\\'")}')"><span class="material-icons-round" style="font-size:0.85rem;">${isActive ? 'check_circle' : 'radio_button_unchecked'}</span> ${safeV}</button>`;
+                    });
+                    variationHtml += `</div>`;
+                }
+
+                const card = document.createElement('div');
+                card.className = 'glass-panel';
+                card.style.padding = '12px';
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                        <div style="font-weight: 600;">${app.escapeHTML(ex.name)}</div>
+                        <button class="icon-btn" style="color:var(--text-muted); padding:4px;" onclick="app.removeExerciseFromEditLog(${exIndex})" title="Oefening verwijderen">
+                            <span class="material-icons-round" style="font-size:1.1rem;">delete_outline</span>
+                        </button>
+                    </div>
+                    ${variationHtml}
+                    <div>${setsHtml}</div>
+                    <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+                        <button class="btn-secondary text-xs" style="padding:4px 10px; font-size:0.8rem;" onclick="app.addSetToEditLog(${exIndex})">
+                            + Set Toevoegen
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
         }
 
-        this.logToEdit.exercises.forEach((ex, exIndex) => {
-            let setsHtml = '';
-            
-            if (ex.details && ex.details.length > 0) {
-                ex.details.forEach(d => {
-                    const setIndex = d.setNumber - 1;
-                    const isRow = ex.name.toLowerCase().includes('row machine') || ex.name.toLowerCase().includes('roeimachine');
-                    const hasLevel = d.level !== undefined || isRow;
-                    const levelInput = hasLevel ? `
-                        <input type="text" class="input-field" placeholder="stand" style="width:70px; text-align:center;"
-                            value="${app.escapeHTML(String(d.level || ''))}"
-                            oninput="app.updateEditLogLevel(${exIndex}, ${setIndex}, this.value)"
-                            onchange="app.updateEditLogLevel(${exIndex}, ${setIndex}, this.value)">
-                    ` : '';
-                    setsHtml += `
-                        <div class="set-row" style="margin-top: 8px; justify-content: space-between;">
-                            <div class="set-info text-muted">Set ${d.setNumber}</div>
-                            <div style="display:flex; gap:8px;">
-                                <input type="number" class="input-field" placeholder="kg" style="width:70px; text-align:center;"
-                                    value="${app.escapeHTML(String(d.weight || ''))}"
-                                    oninput="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)"
-                                    onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
-                                <input type="number" class="input-field" placeholder="reps/sec" style="width:70px; text-align:center;"
-                                    value="${app.escapeHTML(String(d.reps || d.durationSeconds || ''))}"
-                                    oninput="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)"
-                                    onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
-                                ${levelInput}
-                            </div>
-                        </div>
-                    `;
-                });
-            } else {
-                setsHtml = '<div class="text-sm text-muted">Geen details opgeslagen voor deze oefening.</div>';
-            }
-
-            let variationHtml = '';
-            const variations = ex.availableVariations || app.getExerciseVariations(ex);
-            if (variations.length > 1) {
-                variationHtml = `<div class="variation-selector mb-2">`;
-                variations.forEach(v => {
-                    const isActive = ex.name === v;
-                    const safeV = app.escapeHTML(v);
-                    variationHtml += `<button class="variation-pill ${isActive ? 'active' : ''}" onclick="app.updateEditLogVariation(${exIndex}, '${safeV.replace(/'/g, "\\'")}')"><span class="material-icons-round" style="font-size:0.85rem;">${isActive ? 'check_circle' : 'radio_button_unchecked'}</span> ${safeV}</button>`;
-                });
-                variationHtml += `</div>`;
-            }
-
-            const card = document.createElement('div');
-            card.className = 'glass-panel';
-            card.style.padding = '12px';
-            card.innerHTML = `
-                <div style="font-weight: 600; margin-bottom: 4px;">${app.escapeHTML(ex.name)}</div>
-                ${variationHtml}
-                <div>${setsHtml}</div>
-            `;
-            container.appendChild(card);
-        });
+        const addExBtnCard = document.createElement('div');
+        addExBtnCard.style.marginTop = '12px';
+        addExBtnCard.innerHTML = `
+            <button class="btn-primary w-full" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:10px; font-size:0.9rem;" onclick="app.showSelectExerciseForEditLogModal()">
+                <span class="material-icons-round">add_circle_outline</span> Extra Oefening Toevoegen
+            </button>
+        `;
+        container.appendChild(addExBtnCard);
     },
 
     saveEditLog() {
