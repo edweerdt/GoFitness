@@ -1419,6 +1419,22 @@ const app = {
         });
     },
 
+    formatLogTimeRange(log) {
+        if (!log) return '';
+        let startD, endD;
+        if (log.startTime && log.endTime) {
+            startD = new Date(log.startTime);
+            endD = new Date(log.endTime);
+        } else if (log.date) {
+            endD = new Date(log.date);
+            const durationMin = typeof log.duration === 'number' && log.duration >= 0 ? log.duration : 0;
+            startD = new Date(endD.getTime() - durationMin * 60000);
+        }
+        if (!startD || !endD || isNaN(startD.getTime()) || isNaN(endD.getTime())) return '';
+        const formatTime = d => d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+        return `${formatTime(startD)} - ${formatTime(endD)}`;
+    },
+
     renderHistory() {
         const hList = document.getElementById('history-list');
         if (!hList) return;
@@ -1454,6 +1470,8 @@ const app = {
 
             sortedLogs.forEach(log => {
                 const dateStr = new Date(log.date).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
+                const timeRange = app.formatLogTimeRange(log);
+                const timeRangeStr = timeRange ? ` (${timeRange})` : '';
                 
                 let summaryHtml = '';
                 if (log.exercises && log.exercises.length > 0) {
@@ -1504,7 +1522,7 @@ const app = {
                     <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
                         <div>
                             <div style="font-weight:600;">${app.escapeHTML(log.sessionName || 'Sessie')}</div>
-                            <div class="text-sm text-muted">${dateStr} • ${log.duration} min • ${log.exercisesCompleted} oefeningen</div>
+                            <div class="text-sm text-muted">${dateStr}${timeRangeStr} • ${log.duration} min • ${log.exercisesCompleted} oefeningen</div>
                         </div>
                         <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
                     </div>
@@ -2907,15 +2925,16 @@ const app = {
 
         // Gebruik het plan dat bij de start is opgeslagen (niet het huidige actieve plan)
         // Fallback naar store.getActivePlan() voor oude workout-states zonder planId
-        const snapshotPlanId = this.activeWorkout.planId;
-        const snapshotPlanName = this.activeWorkout.planName;
-        const fallbackPlan = (snapshotPlanId === undefined) ? store.getActivePlan() : null;
+        const endTime = new Date();
+        const startTime = (this.activeWorkout && this.activeWorkout.startTime) ? this.activeWorkout.startTime : new Date(endTime.getTime() - duration * 60000);
 
         store.saveWorkoutLog({
             planId: snapshotPlanId !== undefined ? snapshotPlanId : (fallbackPlan ? fallbackPlan.id : null),
             planName: snapshotPlanName !== undefined ? snapshotPlanName : (fallbackPlan ? fallbackPlan.name : 'Overige Sessies'),
             sessionId: this.activeWorkout.session.id,
             sessionName: this.activeWorkout.session.name,
+            startTime: startTime instanceof Date ? startTime.toISOString() : startTime,
+            endTime: endTime.toISOString(),
             duration: duration,
             exercisesCompleted: totalExercisesCompleted,
             exercises: exerciseLogs
