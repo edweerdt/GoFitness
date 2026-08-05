@@ -1023,29 +1023,38 @@ const app = {
     // Bouwt per oefening een reeks (datum, max gewicht) uit de logs
     progressWeeks: 1,
 
+    setProgressWeeks(val) {
+        if (val === 'all') {
+            this.progressWeeks = 'all';
+        } else {
+            let parsed = parseInt(val, 10);
+            if (isNaN(parsed) || parsed < 1) parsed = 1;
+            if (parsed > 999) parsed = 999;
+            this.progressWeeks = parsed;
+        }
+        this.renderExerciseProgress();
+    },
+
     adjustProgressWeeks(delta) {
-        let current = typeof this.progressWeeks === 'number' ? this.progressWeeks : 1;
+        let current = typeof this.progressWeeks === 'number' ? this.progressWeeks : 4;
         current += delta;
         if (current < 1) current = 1;
-        if (current > 52) current = 52;
+        if (current > 999) current = 999;
         this.progressWeeks = current;
-        
-        const valEl = document.getElementById('progress-weeks-val');
-        if (valEl) valEl.textContent = `${this.progressWeeks}w`;
-
         this.renderExerciseProgress();
     },
 
     getExerciseProgressSeries() {
+        const series = {};
+        const isAll = this.progressWeeks === 'all';
         const weeks = typeof this.progressWeeks === 'number' && this.progressWeeks >= 1 ? this.progressWeeks : 1;
         const now = Date.now();
-        const cutoffTime = now - (weeks * 7 * 24 * 60 * 60 * 1000);
+        const cutoffTime = isAll ? 0 : (now - (weeks * 7 * 24 * 60 * 60 * 1000));
 
-        const series = {};
         store.logs.forEach(log => {
             if (!log.exercises || !log.date) return;
             const logTime = new Date(log.date).getTime();
-            if (isNaN(logTime) || logTime < cutoffTime) return;
+            if (!isAll && (isNaN(logTime) || logTime < cutoffTime)) return;
 
             log.exercises.forEach(ex => {
                 let maxVal = 0;
@@ -1138,13 +1147,23 @@ const app = {
         const container = document.getElementById('exercise-progress-list');
         if (!container) return;
 
-        const valEl = document.getElementById('progress-weeks-val');
-        if (valEl) valEl.textContent = `${this.progressWeeks || 1}w`;
+        const inputEl = document.getElementById('progress-weeks-input');
+        const allBtn = document.getElementById('btn-progress-all');
+
+        if (this.progressWeeks === 'all') {
+            if (inputEl) inputEl.value = '';
+            if (allBtn) allBtn.classList.add('active');
+        } else {
+            if (inputEl) inputEl.value = this.progressWeeks || 1;
+            if (allBtn) allBtn.classList.remove('active');
+        }
 
         const series = this.getExerciseProgressSeries();
         if (series.length === 0) {
-            const weeksText = (this.progressWeeks || 1) === 1 ? 'afgelopen week' : `afgelopen ${this.progressWeeks} weken`;
-            container.innerHTML = `<p class="text-muted text-sm text-center py-4">Geen trainingen met gewichten gelogd in de ${weeksText}.</p>`;
+            const weeksText = this.progressWeeks === 'all' 
+                ? 'het hele logboek' 
+                : ((this.progressWeeks || 1) === 1 ? 'afgelopen week' : `afgelopen ${this.progressWeeks} weken`);
+            container.innerHTML = `<p class="text-muted text-sm text-center py-4">Geen trainingen met gewichten gelogd in ${weeksText}.</p>`;
             return;
         }
 

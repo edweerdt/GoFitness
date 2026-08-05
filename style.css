@@ -867,8 +867,10 @@ button:disabled {
     border-color: rgba(59, 130, 246, 0.4);
 }
 
-.weeks-stepper-val {
-    padding: 5px 12px;
+.weeks-stepper-val,
+.weeks-stepper-input {
+    width: 52px;
+    height: 34px;
     border-radius: 8px;
     border: 1.5px solid var(--status-green);
     background: rgba(16, 185, 129, 0.12);
@@ -876,7 +878,30 @@ button:disabled {
     font-weight: 700;
     font-size: 0.95rem;
     font-family: inherit;
-    user-select: none;
+    text-align: center;
+    padding: 0 4px;
+    outline: none;
+    -moz-appearance: textfield;
+}
+
+.weeks-stepper-input::-webkit-outer-spin-button,
+.weeks-stepper-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.weeks-stepper-btn.all-btn {
+    font-size: 0.8rem;
+    font-weight: 600;
+    width: auto;
+    padding: 0 10px;
+}
+
+.weeks-stepper-btn.all-btn.active {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: var(--status-green);
+    color: var(--status-green);
+    font-weight: 700;
 }
 
 .theme-light .weeks-stepper-btn {
