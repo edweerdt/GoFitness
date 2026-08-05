@@ -2944,7 +2944,11 @@ const app = {
         
         if (session) {
             const fullExercises = session.exercises.map(sessionEx => {
-                const loggedEx = this.logToEdit.exercises.find(e => e.name === sessionEx.name);
+                const loggedEx = this.logToEdit.exercises.find(e => 
+                    e.name === sessionEx.name || 
+                    (sessionEx.alternatives && sessionEx.alternatives.includes(e.name)) ||
+                    (sessionEx.name && sessionEx.name.toLowerCase().includes(e.name.toLowerCase()))
+                );
                 const details = [];
                 for (let i = 1; i <= sessionEx.sets; i++) {
                     const loggedSet = loggedEx && loggedEx.details ? loggedEx.details.find(d => d.setNumber === i) : null;
@@ -2954,8 +2958,12 @@ const app = {
                         reps: loggedSet ? loggedSet.reps : ''
                     });
                 }
+                const variations = this.getExerciseVariations(sessionEx);
                 return {
-                    name: sessionEx.name,
+                    name: loggedEx ? loggedEx.name : sessionEx.name,
+                    originalName: sessionEx.name,
+                    availableVariations: variations.length > 0 ? variations : this.getExerciseVariations(loggedEx || {}),
+                    muscleGroups: (loggedEx && loggedEx.muscleGroups && loggedEx.muscleGroups.length > 0) ? loggedEx.muscleGroups : (sessionEx.muscleGroups || []),
                     totalSets: sessionEx.sets,
                     setsCompleted: loggedEx ? loggedEx.setsCompleted : 0,
                     details: details
@@ -2964,6 +2972,7 @@ const app = {
             this.logToEdit.exercises = fullExercises;
         } else {
             this.logToEdit.exercises.forEach(ex => {
+                ex.availableVariations = this.getExerciseVariations(ex);
                 if (ex.totalSets > ex.details.length) {
                     for (let i = 1; i <= ex.totalSets; i++) {
                         if (!ex.details.find(d => d.setNumber === i)) {
@@ -3034,6 +3043,13 @@ const app = {
         if (detail) detail.level = val;
     },
 
+    updateEditLogVariation(exIndex, variationName) {
+        if (!this.logToEdit || !this.logToEdit.exercises || !this.logToEdit.exercises[exIndex]) return;
+        const ex = this.logToEdit.exercises[exIndex];
+        ex.name = variationName;
+        this.renderEditLogModal();
+    },
+
     renderEditLogModal() {
         const container = document.getElementById('edit-log-container');
         if (!container) return;
@@ -3098,11 +3114,24 @@ const app = {
                 setsHtml = '<div class="text-sm text-muted">Geen details opgeslagen voor deze oefening.</div>';
             }
 
+            let variationHtml = '';
+            const variations = ex.availableVariations || app.getExerciseVariations(ex);
+            if (variations.length > 1) {
+                variationHtml = `<div class="variation-selector mb-2">`;
+                variations.forEach(v => {
+                    const isActive = ex.name === v;
+                    const safeV = app.escapeHTML(v);
+                    variationHtml += `<button class="variation-pill ${isActive ? 'active' : ''}" onclick="app.updateEditLogVariation(${exIndex}, '${safeV.replace(/'/g, "\\'")}')"><span class="material-icons-round" style="font-size:0.85rem;">${isActive ? 'check_circle' : 'radio_button_unchecked'}</span> ${safeV}</button>`;
+                });
+                variationHtml += `</div>`;
+            }
+
             const card = document.createElement('div');
             card.className = 'glass-panel';
             card.style.padding = '12px';
             card.innerHTML = `
-                <div style="font-weight: 600; margin-bottom: 8px;">${app.escapeHTML(ex.name)}</div>
+                <div style="font-weight: 600; margin-bottom: 4px;">${app.escapeHTML(ex.name)}</div>
+                ${variationHtml}
                 <div>${setsHtml}</div>
             `;
             container.appendChild(card);
@@ -3118,6 +3147,8 @@ const app = {
             ex.setsCompleted = completedDetails.length;
             ex.details = completedDetails;
             if (ex.setsCompleted > 0) totalExercisesCompleted++;
+            delete ex.availableVariations;
+            delete ex.originalName;
         });
         
         this.logToEdit.exercises = this.logToEdit.exercises.filter(ex => ex.setsCompleted > 0);
@@ -3133,6 +3164,11 @@ const app = {
         this.hideEditLogModal();
         this.renderProgress();
         this.renderHome();
+
+        if (typeof FriendsManager !== 'undefined' && FriendsManager.pushStats) {
+            FriendsManager.pushStats().catch(e => console.warn("Friends pushStats error:", e));
+        }
+
         this.showToast('Sessie gewijzigd.', 'success');
     },
 
