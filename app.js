@@ -3489,7 +3489,11 @@ const app = {
         } else {
             ex.chosenVariation = variationName;
         }
-        store.saveActiveWorkoutState(this.activeWorkout);    toggleProfileWidget() {
+        store.saveActiveWorkoutState(this.activeWorkout);
+        this.renderWorkoutExercises();
+    },
+
+    toggleProfileWidget() {
         this.isProfileExpanded = !this.isProfileExpanded;
         this.renderFriends();
     },
@@ -3636,10 +3640,7 @@ const app = {
                     <p class="text-muted text-sm">Je hebt nog geen vrienden toegevoegd. Klik op het <span class="material-icons-round" style="font-size:1rem; vertical-align:-2px;">person_add</span> knopje hierboven of deel je vrienden-code om elkaars prestaties te vergelijken!</p>
                 </div>
             `;
-        } else if (friends.length > 0 && !this.showAddFriendInput) {       </div>
-                </div>
-            `;
-
+        } else if (friends.length > 0 && !this.showAddFriendInput) {
             // 4. Comparison View for Selected Friend
             const selectedFriend = friends.find(f => f.uid === FriendsManager.selectedFriendUid) || friends[0];
             if (selectedFriend) {
