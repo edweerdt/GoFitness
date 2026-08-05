@@ -3004,6 +3004,9 @@ const app = {
 
         // Gebruik het plan dat bij de start is opgeslagen (niet het huidige actieve plan)
         // Fallback naar store.getActivePlan() voor oude workout-states zonder planId
+        const snapshotPlanId = this.activeWorkout ? this.activeWorkout.planId : undefined;
+        const snapshotPlanName = this.activeWorkout ? this.activeWorkout.planName : undefined;
+        const fallbackPlan = (snapshotPlanId === undefined) ? store.getActivePlan() : null;
         const endTime = new Date();
         const startTime = (this.activeWorkout && this.activeWorkout.startTime) ? this.activeWorkout.startTime : new Date(endTime.getTime() - duration * 60000);
 
