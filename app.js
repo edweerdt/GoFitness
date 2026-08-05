@@ -3489,10 +3489,15 @@ const app = {
         } else {
             ex.chosenVariation = variationName;
         }
-        store.saveActiveWorkoutState(this.activeWorkout);
-        this.renderWorkoutExercises();
+        store.saveActiveWorkoutState(this.activeWorkout);    toggleProfileWidget() {
+        this.isProfileExpanded = !this.isProfileExpanded;
+        this.renderFriends();
     },
 
+    toggleAddFriendInput() {
+        this.showAddFriendInput = !this.showAddFriendInput;
+        this.renderFriends();
+    },
 
     async handleSendFriendRequest() {
         const input = document.getElementById('input-friend-code');
@@ -3501,7 +3506,9 @@ const app = {
         try {
             const name = await FriendsManager.sendFriendRequest(code);
             input.value = '';
+            this.showAddFriendInput = false;
             this.showToast(`Vriendverzoek verstuurd naar ${name}!`, 'success');
+            this.renderFriends();
         } catch (e) {
             this.showToast(e.message || "Fout bij versturen verzoek.", 'error');
         }
@@ -3534,35 +3541,39 @@ const app = {
         const name = profile.displayName || FriendsManager.user.displayName || 'Sporter';
         const photo = FriendsManager.user.photoURL || '';
 
-        // 1. Profile & Friend Code Header
+        // 1. Collapsible Profile & Friend Code Header
         let html = `
             <div class="glass-panel mb-4">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="app.toggleProfileWidget()">
                     <div style="display:flex; align-items:center; gap:12px;">
-                        ${photo ? `<img src="${this.escapeHTML(photo)}" style="width:44px; height:44px; border-radius:50%; object-fit:cover; border:2px solid var(--accent-color);">` : `<div style="width:44px; height:44px; border-radius:50%; background:var(--surface-light); display:grid; place-items:center; font-weight:700; color:var(--accent-color);">${this.escapeHTML(name.slice(0, 1).toUpperCase())}</div>`}
+                        ${photo ? `<img src="${this.escapeHTML(photo)}" style="width:38px; height:38px; border-radius:50%; object-fit:cover; border:2px solid var(--accent-color);">` : `<div style="width:38px; height:38px; border-radius:50%; background:var(--surface-light); display:grid; place-items:center; font-weight:700; color:var(--accent-color);">${this.escapeHTML(name.slice(0, 1).toUpperCase())}</div>`}
                         <div>
-                            <div style="font-weight:600; font-size:1.1rem;">${this.escapeHTML(name)}</div>
-                            <div class="text-sm text-muted">Jouw vrienden-code: <strong style="color:var(--accent-color); font-family:monospace; font-size:0.95rem;">${this.escapeHTML(code)}</strong></div>
+                            <div style="font-weight:600; font-size:0.95rem;">${this.escapeHTML(name)}</div>
+                            <div class="text-sm text-muted" style="font-size:0.75rem;">Mijn profiel & code</div>
                         </div>
                     </div>
-                    <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="navigator.clipboard.writeText('${this.escapeHTML(code)}'); app.showToast('Vrienden-code gekopieerd!', 'success');" title="Kopieer code">
-                        <span class="material-icons-round" style="font-size:1rem;">content_copy</span> Kopieer
-                    </button>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span class="material-icons-round text-muted" style="font-size:1.4rem;">${this.isProfileExpanded ? 'expand_less' : 'expand_more'}</span>
+                    </div>
                 </div>
-                <div style="display:flex; justify-content:flex-end; margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.05);">
-                    <button class="btn-secondary" style="padding:4px 10px; font-size:0.75rem; color:var(--text-muted);" onclick="FriendsManager.signOut()">
-                        <span class="material-icons-round" style="font-size:0.9rem;">logout</span> Uitloggen
-                    </button>
-                </div>
-            </div>
-
-            <!-- Add Friend Input -->
-            <div class="glass-panel mb-4">
-                <div style="font-weight:600; font-size:0.95rem; margin-bottom:8px;">Vriend Toevoegen</div>
-                <div style="display:flex; gap:8px;">
-                    <input type="text" id="input-friend-code" class="input-field" placeholder="Voer vrienden-code in (bijv. AL-1234)..." style="flex:1; text-transform:uppercase;">
-                    <button class="btn-primary" style="padding:8px 16px; font-size:0.9rem; white-space:nowrap;" onclick="app.handleSendFriendRequest()">Verstuur</button>
-                </div>
+                ${this.isProfileExpanded ? `
+                    <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.08);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <div>
+                                <div class="text-sm text-muted" style="font-size:0.75rem;">Jouw vrienden-code:</div>
+                                <div style="color:var(--accent-color); font-family:monospace; font-weight:700; font-size:0.95rem; margin-top:2px;">${this.escapeHTML(code)}</div>
+                            </div>
+                            <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="navigator.clipboard.writeText('${this.escapeHTML(code)}'); app.showToast('Vrienden-code gekopieerd!', 'success');" title="Kopieer code">
+                                <span class="material-icons-round" style="font-size:1rem;">content_copy</span> Kopieer
+                            </button>
+                        </div>
+                        <div style="display:flex; justify-content:flex-end;">
+                            <button class="btn-secondary" style="padding:4px 10px; font-size:0.75rem; color:var(--text-muted);" onclick="FriendsManager.signOut()">
+                                <span class="material-icons-round" style="font-size:0.9rem;">logout</span> Uitloggen
+                            </button>
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `;
 
@@ -3588,29 +3599,44 @@ const app = {
             `;
         }
 
-        // 3. Friends List / Selector
+        // 3. Friends List / Selector with Add Friend Pill
         const friends = FriendsManager.friends || [];
-        if (friends.length === 0) {
+        html += `
+            <div class="mb-4">
+                <div class="text-sm text-muted mb-2" style="font-weight:500;">Kies een vriend om te vergelijken:</div>
+                <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; align-items:center;">
+                    ${friends.map(f => {
+                        const isSelected = f.uid === FriendsManager.selectedFriendUid && !this.showAddFriendInput;
+                        const fName = f.displayName || 'Vriend';
+                        return `
+                            <button class="btn-secondary ${isSelected ? 'active-friend-pill' : ''}" style="padding:8px 14px; border-radius:99px; white-space:nowrap; display:flex; align-items:center; gap:6px; ${isSelected ? 'background:var(--accent-color); color:white; font-weight:600;' : ''}" onclick="FriendsManager.selectedFriendUid = '${this.escapeHTML(f.uid)}'; app.showAddFriendInput = false; app.renderFriends();">
+                                <span class="material-icons-round" style="font-size:1rem;">person</span> ${this.escapeHTML(fName)}
+                            </button>
+                        `;
+                    }).join('')}
+                    <button class="btn-secondary ${this.showAddFriendInput ? 'active-friend-pill' : ''}" style="padding:8px 12px; border-radius:99px; white-space:nowrap; display:flex; align-items:center; gap:4px; ${this.showAddFriendInput ? 'background:var(--accent-color); color:white; font-weight:600;' : 'border:1px dashed rgba(255,255,255,0.2);'}" onclick="app.toggleAddFriendInput()" title="Vriend toevoegen">
+                        <span class="material-icons-round" style="font-size:1.1rem;">person_add</span>
+                    </button>
+                </div>
+                ${this.showAddFriendInput ? `
+                    <div class="glass-panel mt-3" style="padding:12px; border-left:3px solid var(--accent-color);">
+                        <div style="font-weight:600; font-size:0.85rem; margin-bottom:8px;">Vriend Toevoegen</div>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="input-friend-code" class="input-field" placeholder="Voer vrienden-code in (bijv. GF-XXXX...)" style="flex:1; text-transform:uppercase; font-family:monospace; font-size:0.85rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleSendFriendRequest();}">
+                            <button class="btn-primary" style="padding:6px 14px; font-size:0.85rem; white-space:nowrap;" onclick="app.handleSendFriendRequest()">Verstuur</button>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+
+        if (friends.length === 0 && !this.showAddFriendInput) {
             html += `
-                <div class="glass-panel text-center p-4">
-                    <p class="text-muted text-sm">Je hebt nog geen vrienden toegevoegd. Deel je vrienden-code <strong>${this.escapeHTML(code)}</strong> met bekenden om elkaars prestaties te vergelijken!</p>
+                <div class="glass-panel text-center p-4 mb-4">
+                    <p class="text-muted text-sm">Je hebt nog geen vrienden toegevoegd. Klik op het <span class="material-icons-round" style="font-size:1rem; vertical-align:-2px;">person_add</span> knopje hierboven of deel je vrienden-code om elkaars prestaties te vergelijken!</p>
                 </div>
             `;
-        } else {
-            html += `
-                <div class="mb-4">
-                    <div class="text-sm text-muted mb-2" style="font-weight:500;">Kies een vriend om te vergelijken:</div>
-                    <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;">
-                        ${friends.map(f => {
-                            const isSelected = f.uid === FriendsManager.selectedFriendUid;
-                            const fName = f.displayName || 'Vriend';
-                            return `
-                                <button class="btn-secondary ${isSelected ? 'active-friend-pill' : ''}" style="padding:8px 14px; border-radius:99px; white-space:nowrap; display:flex; align-items:center; gap:6px; ${isSelected ? 'background:var(--accent-color); color:white; font-weight:600;' : ''}" onclick="FriendsManager.selectedFriendUid = '${this.escapeHTML(f.uid)}'; app.renderFriends();">
-                                    <span class="material-icons-round" style="font-size:1rem;">person</span> ${this.escapeHTML(fName)}
-                                </button>
-                            `;
-                        }).join('')}
-                    </div>
+        } else if (friends.length > 0 && !this.showAddFriendInput) {       </div>
                 </div>
             `;
 
