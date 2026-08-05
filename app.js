@@ -1048,20 +1048,27 @@ const app = {
             if (isNaN(logTime) || logTime < cutoffTime) return;
 
             log.exercises.forEach(ex => {
-                let maxWeight = 0;
+                let maxVal = 0;
                 let bestSet = null;
                 (ex.details || []).forEach(d => {
-                    const w = parseFloat(d.weight);
-                    if (!isNaN(w) && w > maxWeight) {
-                        maxWeight = w;
+                    const w = parseFloat(d.weight) || 0;
+                    const r = parseInt(d.reps, 10) || 0;
+                    const val = w > 0 ? w : r;
+                    if (val > maxVal) {
+                        maxVal = val;
                         bestSet = d;
                     }
                 });
-                if (maxWeight <= 0) return;
+                if (maxVal <= 0) return;
 
                 const key = String(ex.name).toLowerCase().trim();
                 if (!series[key]) series[key] = { name: ex.name, points: [] };
-                series[key].points.push({ date: log.date, weight: maxWeight, reps: parseInt(bestSet ? bestSet.reps : 0) || 0 });
+                series[key].points.push({ 
+                    date: log.date, 
+                    weight: maxVal, 
+                    isBodyweight: (parseFloat(bestSet ? bestSet.weight : 0) || 0) === 0,
+                    reps: parseInt(bestSet ? bestSet.reps : 0) || 0 
+                });
             });
         });
 
@@ -3482,7 +3489,12 @@ const app = {
                             const est1RM = weight > 0 ? (reps === 1 ? weight : weight * (1 + reps / 30)) : 0;
                             const rounded1RM = Math.round(est1RM * 10) / 10;
 
-                            if (rounded1RM > groups[mg][key].estimated1RM || (rounded1RM === groups[mg][key].estimated1RM && weight > groups[mg][key].maxKg)) {
+                            const current = groups[mg][key];
+                            const isNewBetter = (rounded1RM > current.estimated1RM) ||
+                                (rounded1RM === current.estimated1RM && weight > current.maxKg) ||
+                                (weight === 0 && current.maxKg === 0 && reps > current.maxReps);
+
+                            if (isNewBetter) {
                                 groups[mg][key] = {
                                     exercise: displayName,
                                     maxKg: weight,
@@ -3496,10 +3508,14 @@ const app = {
             });
         });
 
-        // Convert to arrays sorted by estimated1RM desc
+        // Convert to arrays sorted by performance (1RM or maxReps) desc
         const result = {};
         for (const mg in groups) {
-            result[mg] = Object.values(groups[mg]).sort((a, b) => b.estimated1RM - a.estimated1RM);
+            result[mg] = Object.values(groups[mg]).sort((a, b) => {
+                const scoreA = a.estimated1RM > 0 ? a.estimated1RM : a.maxReps;
+                const scoreB = b.estimated1RM > 0 ? b.estimated1RM : b.maxReps;
+                return scoreB - scoreA;
+            });
         }
         return result;
     },
@@ -3713,13 +3729,13 @@ const app = {
                         }
                     }
 
-                    // Merge all unique exercise names (only if at least one user has non-zero data)
+                    // Merge all unique exercise names (only if at least one user has valid data: maxKg > 0 or maxReps > 0)
                     const allExerciseNames = new Set();
                     myExercises.forEach(e => {
-                        if (e.maxKg > 0 || e.estimated1RM > 0) allExerciseNames.add(e.exercise);
+                        if (e.maxKg > 0 || e.maxReps > 0 || e.estimated1RM > 0) allExerciseNames.add(e.exercise);
                     });
                     friendExercises.forEach(e => {
-                        if (e.maxKg > 0 || e.estimated1RM > 0) allExerciseNames.add(e.exercise);
+                        if (e.maxKg > 0 || e.maxReps > 0 || e.estimated1RM > 0) allExerciseNames.add(e.exercise);
                     });
 
                     if (allExerciseNames.size === 0) return; // skip empty groups
@@ -3738,22 +3754,40 @@ const app = {
                         const fStat = friendExercises.find(e => e.exercise === exName) || null;
                         const my1RM = myStat ? (myStat.estimated1RM || 0) : 0;
                         const f1RM = fStat ? (fStat.estimated1RM || 0) : 0;
+                        const myReps = myStat ? (myStat.maxReps || 0) : 0;
+                        const fReps = fStat ? (fStat.maxReps || 0) : 0;
+                        const myKg = myStat ? (myStat.maxKg || 0) : 0;
+                        const fKg = fStat ? (fStat.maxKg || 0) : 0;
+
+                        const isBodyweightCompare = (myStat && myKg === 0) || (fStat && fKg === 0);
 
                         let leaderBadge = '';
-                        if (my1RM > 0 && f1RM > 0) {
-                            if (my1RM > f1RM) {
-                                const diff = Math.round((my1RM - f1RM) * 10) / 10;
-                                leaderBadge = `<span class="status-badge green" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap;">+${diff} kg</span>`;
-                            } else if (f1RM > my1RM) {
-                                const diff = Math.round((f1RM - my1RM) * 10) / 10;
-                                leaderBadge = `<span class="status-badge orange" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap;">-${diff} kg</span>`;
-                            } else {
-                                leaderBadge = `<span class="status-badge" style="padding:2px 8px; font-size:0.65rem; background:rgba(255,255,255,0.1); color:var(--text-primary); white-space:nowrap;">Gelijk</span>`;
+                        if (myStat && fStat) {
+                            if (isBodyweightCompare && myReps > 0 && fReps > 0) {
+                                if (myReps > fReps) {
+                                    leaderBadge = `<span class="status-badge green" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap;">+${myReps - fReps} reps</span>`;
+                                } else if (fReps > myReps) {
+                                    leaderBadge = `<span class="status-badge orange" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap;">-${fReps - myReps} reps</span>`;
+                                } else {
+                                    leaderBadge = `<span class="status-badge" style="padding:2px 8px; font-size:0.65rem; background:rgba(255,255,255,0.1); color:var(--text-primary); white-space:nowrap;">Gelijk</span>`;
+                                }
+                            } else if (my1RM > 0 && f1RM > 0) {
+                                if (my1RM > f1RM) {
+                                    const diff = Math.round((my1RM - f1RM) * 10) / 10;
+                                    leaderBadge = `<span class="status-badge green" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap;">+${diff} kg</span>`;
+                                } else if (f1RM > my1RM) {
+                                    const diff = Math.round((f1RM - my1RM) * 10) / 10;
+                                    leaderBadge = `<span class="status-badge orange" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap;">-${diff} kg</span>`;
+                                } else {
+                                    leaderBadge = `<span class="status-badge" style="padding:2px 8px; font-size:0.65rem; background:rgba(255,255,255,0.1); color:var(--text-primary); white-space:nowrap;">Gelijk</span>`;
+                                }
                             }
                         }
 
-                        const total1RM = (my1RM + f1RM) || 1;
-                        const myPct = Math.round((my1RM / total1RM) * 100) || 50;
+                        const myScore = isBodyweightCompare ? myReps : my1RM;
+                        const fScore = isBodyweightCompare ? fReps : f1RM;
+                        const totalScore = (myScore + fScore) || 1;
+                        const myPct = Math.round((myScore / totalScore) * 100) || 50;
                         const fPct = 100 - myPct;
 
                         html += `
@@ -3765,20 +3799,20 @@ const app = {
                                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                                     <div style="background:rgba(59, 130, 246, 0.06); border-left:3px solid var(--accent-color); padding:8px 10px; border-radius:6px;">
                                         <div class="text-sm text-muted" style="font-size:0.65rem; font-weight:600;">JIJ</div>
-                                        ${myStat ? `
-                                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${myStat.maxKg > 0 ? `${myStat.maxKg} kg` : '-'} <span class="text-sm font-normal text-muted">${myStat.maxReps > 0 ? `× ${myStat.maxReps}` : ''}</span></div>
-                                            <div class="text-accent" style="font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">1RM: ${my1RM > 0 ? `${my1RM} kg` : '-'}</div>
+                                        ${myStat && (myKg > 0 || myReps > 0) ? `
+                                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${myKg > 0 ? `${myKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${myReps > 0 ? `× ${myReps}` : ''}</span></div>
+                                            <div class="text-accent" style="font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${myKg > 0 ? `1RM: ${my1RM} kg` : `Max: ${myReps} reps`}</div>
                                         ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
                                     </div>
                                     <div style="background:rgba(245, 158, 11, 0.06); border-left:3px solid var(--status-orange); padding:8px 10px; border-radius:6px;">
                                         <div class="text-sm text-muted" style="font-size:0.65rem; font-weight:600; text-transform:uppercase;">${this.escapeHTML(friendName)}</div>
-                                        ${fStat ? `
-                                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${fStat.maxKg > 0 ? `${fStat.maxKg} kg` : '-'} <span class="text-sm font-normal text-muted">${fStat.maxReps > 0 ? `× ${fStat.maxReps}` : ''}</span></div>
-                                            <div style="color:var(--status-orange); font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">1RM: ${f1RM > 0 ? `${f1RM} kg` : '-'}</div>
+                                        ${fStat && (fKg > 0 || fReps > 0) ? `
+                                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${fKg > 0 ? `${fKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${fReps > 0 ? `× ${fReps}` : ''}</span></div>
+                                            <div style="color:var(--status-orange); font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${fKg > 0 ? `1RM: ${f1RM} kg` : `Max: ${fReps} reps`}</div>
                                         ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
                                     </div>
                                 </div>
-                                ${(my1RM > 0 || f1RM > 0) ? `
+                                ${(myScore > 0 || fScore > 0) ? `
                                     <div style="background:rgba(255,255,255,0.05); height:4px; border-radius:2px; overflow:hidden; display:flex; margin-top:8px;">
                                         <div style="width:${myPct}%; background:var(--accent-color); transition:width 0.3s ease;"></div>
                                         <div style="width:${fPct}%; background:var(--status-orange); transition:width 0.3s ease;"></div>
