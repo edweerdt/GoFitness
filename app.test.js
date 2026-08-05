@@ -718,6 +718,33 @@ describe('workout flow', () => {
         expect(store.logs[0].planName).toBe('Plan Alpha');
     });
 
+    it('should auto-detect completed sets with data and fallback empty fields from previous sets on finish', () => {
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Leg Day' },
+            startTime: new Date(),
+            exercises: [
+                {
+                    name: 'Squat',
+                    muscleGroups: ['legs'],
+                    sets: 3,
+                    setsCompleted: [true, false, true],
+                    weights: ['80', '80', ''],
+                    actualReps: ['10', '8', '']
+                }
+            ]
+        };
+
+        app.finishWorkout();
+
+        expect(store.logs).toHaveLength(1);
+        const log = store.logs[0];
+        expect(log.exercises[0].setsCompleted).toBe(3);
+        expect(log.exercises[0].details).toHaveLength(3);
+        expect(log.exercises[0].details[0]).toEqual({ setNumber: 1, weight: '80', reps: '10' });
+        expect(log.exercises[0].details[1]).toEqual({ setNumber: 2, weight: '80', reps: '8' });
+        expect(log.exercises[0].details[2]).toEqual({ setNumber: 3, weight: '80', reps: '8' });
+    });
+
     it('should show and hide the cancel workout confirmation modal', () => {
         const modal = document.getElementById('modal-cancel-workout');
         expect(modal.classList.contains('hidden')).toBe(true);

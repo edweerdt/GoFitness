@@ -1559,9 +1559,13 @@ const app = {
                         if (ex.details) {
                             ex.details.forEach(d => {
                                 let text = `Set ${d.setNumber}:`;
-                                if (d.weight) text += ` ${d.weight}kg`;
-                                if (d.reps) text += ` x ${d.reps}`;
-                                if (d.level) text += ` • Stand ${d.level}`;
+                                const hasW = d.weight !== null && d.weight !== undefined && String(d.weight).trim() !== '';
+                                const hasR = d.reps !== null && d.reps !== undefined && String(d.reps).trim() !== '';
+                                const hasL = d.level !== null && d.level !== undefined && String(d.level).trim() !== '';
+                                if (hasW) text += ` ${d.weight}kg`;
+                                if (hasR) text += ` x ${d.reps}`;
+                                if (hasL) text += ` • Stand ${d.level}`;
+                                if (!hasW && !hasR && !hasL) text += ` Afgevinkt`;
                                 exDetails.push(app.escapeHTML(text));
                             });
                         }
@@ -1871,6 +1875,22 @@ const app = {
     },
 
     showSelectExerciseForWorkoutModal() {
+        this.exerciseSelectTarget = 'activeWorkout';
+        this.selectedWorkoutEx = null;
+        const configPanel = document.getElementById('workout-ex-configure');
+        if (configPanel) configPanel.classList.add('hidden');
+        
+        const searchInput = document.getElementById('workout-ex-search');
+        if (searchInput) searchInput.value = '';
+
+        this.renderWorkoutExerciseSelectList();
+
+        const modal = document.getElementById('modal-select-exercise-for-workout');
+        if (modal) modal.classList.remove('hidden');
+    },
+
+    showSelectExerciseForEditLogModal() {
+        this.exerciseSelectTarget = 'editLog';
         this.selectedWorkoutEx = null;
         const configPanel = document.getElementById('workout-ex-configure');
         if (configPanel) configPanel.classList.add('hidden');
@@ -1970,7 +1990,7 @@ const app = {
     },
 
     confirmAddExerciseToWorkout() {
-        if (!this.selectedWorkoutEx || !this.activeWorkout) return;
+        if (!this.selectedWorkoutEx) return;
 
         const setsInput = document.getElementById('workout-ex-sets');
         const repsInput = document.getElementById('workout-ex-reps');
@@ -1979,7 +1999,11 @@ const app = {
         const setsCount = Math.max(1, parseInt(setsInput ? setsInput.value : String(defaultSets), 10) || defaultSets);
         const defaultReps = repsInput ? repsInput.value.trim() : '10';
 
-        this.addExerciseToActiveWorkout(this.selectedWorkoutEx, setsCount, defaultReps);
+        if (this.exerciseSelectTarget === 'editLog') {
+            this.addExerciseToEditLog(this.selectedWorkoutEx, setsCount, defaultReps);
+        } else {
+            this.addExerciseToActiveWorkout(this.selectedWorkoutEx, setsCount, defaultReps);
+        }
 
         this.hideSelectExerciseForWorkoutModal();
     },
@@ -2334,6 +2358,7 @@ const app = {
                         inputmode="decimal" enterkeyhint="next"
                         data-ex="${exIndex}" data-set="${i}" data-type="weight"
                         value="${app.escapeHTML(String(ex.weights ? ex.weights[i] : ''))}"
+                        oninput="app.updateWeight(${exIndex}, ${i}, this.value)"
                         onchange="app.updateWeight(${exIndex}, ${i}, this.value)"
                         onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'weight');}">`;
                 }
@@ -2342,6 +2367,7 @@ const app = {
                         inputmode="decimal" enterkeyhint="next"
                         data-ex="${exIndex}" data-set="${i}" data-type="reps"
                         value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}"
+                        oninput="app.updateReps(${exIndex}, ${i}, this.value)"
                         onchange="app.updateReps(${exIndex}, ${i}, this.value)"
                         onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'reps');}">`;
                 }
@@ -2350,6 +2376,7 @@ const app = {
                         inputmode="decimal" enterkeyhint="next"
                         data-ex="${exIndex}" data-set="${i}" data-type="reps"
                         value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}"
+                        oninput="app.updateReps(${exIndex}, ${i}, this.value)"
                         onchange="app.updateReps(${exIndex}, ${i}, this.value)"
                         onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'reps');}">`;
 
@@ -2369,6 +2396,7 @@ const app = {
                         inputmode="text" enterkeyhint="next"
                         data-ex="${exIndex}" data-set="${i}" data-type="level"
                         value="${app.escapeHTML(String(ex.levels ? ex.levels[i] : ''))}"
+                        oninput="app.updateLevel(${exIndex}, ${i}, this.value)"
                         onchange="app.updateLevel(${exIndex}, ${i}, this.value)"
                         onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'level');}">`;
                 }
@@ -2541,7 +2569,63 @@ const app = {
 
     toggleSet(exIndex, setIndex) {
         const ex = this.activeWorkout.exercises[exIndex];
-        ex.setsCompleted[setIndex] = !ex.setsCompleted[setIndex];
+        const isTurningOn = !ex.setsCompleted[setIndex];
+        ex.setsCompleted[setIndex] = isTurningOn;
+
+        if (isTurningOn) {
+            const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
+            const prevDetails = this.getPreviousExerciseDetails(ex.name) || [];
+
+            // Auto-fill missing weight if empty
+            if (!ex.weights) ex.weights = Array(ex.sets).fill('');
+            if (!isNonEmpty(ex.weights[setIndex])) {
+                let fillW = '';
+                for (let k = setIndex - 1; k >= 0; k--) {
+                    if (isNonEmpty(ex.weights[k])) { fillW = ex.weights[k]; break; }
+                }
+                if (!isNonEmpty(fillW) && prevDetails[setIndex] && isNonEmpty(prevDetails[setIndex].weight)) {
+                    fillW = prevDetails[setIndex].weight;
+                } else if (!isNonEmpty(fillW) && prevDetails[0] && isNonEmpty(prevDetails[0].weight)) {
+                    fillW = prevDetails[0].weight;
+                }
+                if (isNonEmpty(fillW)) ex.weights[setIndex] = fillW;
+            }
+
+            // Auto-fill missing reps if empty
+            if (!ex.actualReps) ex.actualReps = Array(ex.sets).fill('');
+            if (!isNonEmpty(ex.actualReps[setIndex])) {
+                let fillR = '';
+                for (let k = setIndex - 1; k >= 0; k--) {
+                    if (isNonEmpty(ex.actualReps[k])) { fillR = ex.actualReps[k]; break; }
+                }
+                if (!isNonEmpty(fillR) && prevDetails[setIndex] && isNonEmpty(prevDetails[setIndex].reps)) {
+                    fillR = prevDetails[setIndex].reps;
+                } else if (!isNonEmpty(fillR) && prevDetails[0] && isNonEmpty(prevDetails[0].reps)) {
+                    fillR = prevDetails[0].reps;
+                } else if (!isNonEmpty(fillR) && isNonEmpty(ex.repsMax)) {
+                    fillR = ex.repsMax;
+                } else if (!isNonEmpty(fillR) && isNonEmpty(ex.reps)) {
+                    fillR = ex.reps;
+                } else if (!isNonEmpty(fillR) && isNonEmpty(ex.durationSeconds)) {
+                    fillR = ex.durationSeconds;
+                }
+                if (isNonEmpty(fillR)) ex.actualReps[setIndex] = fillR;
+            }
+
+            // Auto-fill missing level if empty
+            if (!ex.levels) ex.levels = Array(ex.sets).fill('');
+            if (!isNonEmpty(ex.levels[setIndex])) {
+                let fillL = '';
+                for (let k = setIndex - 1; k >= 0; k--) {
+                    if (isNonEmpty(ex.levels[k])) { fillL = ex.levels[k]; break; }
+                }
+                if (!isNonEmpty(fillL) && prevDetails[setIndex] && isNonEmpty(prevDetails[setIndex].level)) {
+                    fillL = prevDetails[setIndex].level;
+                }
+                if (isNonEmpty(fillL)) ex.levels[setIndex] = fillL;
+            }
+        }
+
         store.saveActiveWorkoutState(this.activeWorkout);
 
         // Set afgevinkt en de oefening heeft een rusttijd? Start de rusttimer.
@@ -2916,6 +3000,9 @@ const app = {
     },
 
     showFinishModal() {
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
         const modal = document.getElementById('modal-finish-workout');
         if (modal) modal.classList.remove('hidden');
     },
@@ -2957,6 +3044,10 @@ const app = {
         this.stopRestTimer();
         this.releaseWakeLock();
 
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+
         // Een sessie die per ongeluk uren of dagen open bleef staan levert een
         // onrealistische duur op; begrens die zodat statistieken kloppen. De gebruiker
         // kan de duur naderhand alsnog aanpassen in het logboek.
@@ -2968,34 +3059,91 @@ const app = {
             this.showToast('Sessieduur leek onrealistisch lang en is begrensd. Pas hem eventueel aan in het logboek.', 'error');
         }
 
+        const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
+
         let totalExercisesCompleted = 0;
         
         const exerciseLogs = [];
 
         this.activeWorkout.exercises.forEach(ex => {
-            const completedSetsCount = ex.setsCompleted.filter(Boolean).length;
-            if(completedSetsCount > 0) {
-                totalExercisesCompleted++;
-                
-                const setDetails = [];
-                for(let i=0; i<ex.sets; i++) {
-                    if (ex.setsCompleted[i]) {
-                        const detail = {
-                            setNumber: i + 1,
-                            weight: ex.weights ? ex.weights[i] || '' : '',
-                            reps: ex.actualReps ? ex.actualReps[i] || '' : ''
-                        };
-                        if (ex.levels && ex.levels[i] !== undefined && String(ex.levels[i]).trim() !== '') {
-                            detail.level = ex.levels[i];
-                        }
-                        setDetails.push(detail);
-                    }
+            const prevDetails = this.getPreviousExerciseDetails(ex.name) || [];
+
+            if (!ex.setsCompleted) ex.setsCompleted = Array(ex.sets || 1).fill(false);
+            if (!ex.weights) ex.weights = Array(ex.sets || 1).fill('');
+            if (!ex.actualReps) ex.actualReps = Array(ex.sets || 1).fill('');
+            if (!ex.levels) ex.levels = Array(ex.sets || 1).fill('');
+
+            // Automatically mark set completed if any data input exists for it
+            for (let i = 0; i < ex.sets; i++) {
+                if (isNonEmpty(ex.weights[i]) || isNonEmpty(ex.actualReps[i]) || isNonEmpty(ex.levels[i])) {
+                    ex.setsCompleted[i] = true;
                 }
-                
+            }
+
+            const setDetails = [];
+            for (let i = 0; i < ex.sets; i++) {
+                if (ex.setsCompleted[i]) {
+                    // Resolve weight with fallbacks
+                    let weightVal = isNonEmpty(ex.weights[i]) ? ex.weights[i] : '';
+                    if (!isNonEmpty(weightVal)) {
+                        for (let k = i - 1; k >= 0; k--) {
+                            if (isNonEmpty(ex.weights[k])) { weightVal = ex.weights[k]; break; }
+                        }
+                    }
+                    if (!isNonEmpty(weightVal) && prevDetails[i] && isNonEmpty(prevDetails[i].weight)) {
+                        weightVal = prevDetails[i].weight;
+                    } else if (!isNonEmpty(weightVal) && prevDetails[0] && isNonEmpty(prevDetails[0].weight)) {
+                        weightVal = prevDetails[0].weight;
+                    }
+
+                    // Resolve reps with fallbacks
+                    let repsVal = isNonEmpty(ex.actualReps[i]) ? ex.actualReps[i] : '';
+                    if (!isNonEmpty(repsVal)) {
+                        for (let k = i - 1; k >= 0; k--) {
+                            if (isNonEmpty(ex.actualReps[k])) { repsVal = ex.actualReps[k]; break; }
+                        }
+                    }
+                    if (!isNonEmpty(repsVal) && prevDetails[i] && isNonEmpty(prevDetails[i].reps)) {
+                        repsVal = prevDetails[i].reps;
+                    } else if (!isNonEmpty(repsVal) && prevDetails[0] && isNonEmpty(prevDetails[0].reps)) {
+                        repsVal = prevDetails[0].reps;
+                    } else if (!isNonEmpty(repsVal) && isNonEmpty(ex.repsMax)) {
+                        repsVal = ex.repsMax;
+                    } else if (!isNonEmpty(repsVal) && isNonEmpty(ex.reps)) {
+                        repsVal = ex.reps;
+                    } else if (!isNonEmpty(repsVal) && isNonEmpty(ex.durationSeconds)) {
+                        repsVal = ex.durationSeconds;
+                    }
+
+                    // Resolve level with fallbacks
+                    let levelVal = isNonEmpty(ex.levels[i]) ? ex.levels[i] : '';
+                    if (!isNonEmpty(levelVal)) {
+                        for (let k = i - 1; k >= 0; k--) {
+                            if (isNonEmpty(ex.levels[k])) { levelVal = ex.levels[k]; break; }
+                        }
+                    }
+                    if (!isNonEmpty(levelVal) && prevDetails[i] && isNonEmpty(prevDetails[i].level)) {
+                        levelVal = prevDetails[i].level;
+                    }
+
+                    const detail = {
+                        setNumber: i + 1,
+                        weight: weightVal != null ? String(weightVal) : '',
+                        reps: repsVal != null ? String(repsVal) : ''
+                    };
+                    if (isNonEmpty(levelVal)) {
+                        detail.level = String(levelVal);
+                    }
+                    setDetails.push(detail);
+                }
+            }
+
+            if (setDetails.length > 0) {
+                totalExercisesCompleted++;
                 exerciseLogs.push({
                     name: ex.chosenVariation || ex.name,
                     muscleGroups: ex.muscleGroups || [],
-                    setsCompleted: completedSetsCount,
+                    setsCompleted: setDetails.length,
                     totalSets: ex.sets,
                     details: setDetails
                 });
@@ -3053,11 +3201,15 @@ const app = {
                 const details = [];
                 for (let i = 1; i <= sessionEx.sets; i++) {
                     const loggedSet = loggedEx && loggedEx.details ? loggedEx.details.find(d => d.setNumber === i) : null;
-                    details.push({
+                    const dObj = {
                         setNumber: i,
-                        weight: loggedSet ? loggedSet.weight : '',
-                        reps: loggedSet ? loggedSet.reps : ''
-                    });
+                        weight: loggedSet && loggedSet.weight !== undefined && loggedSet.weight !== null ? loggedSet.weight : '',
+                        reps: loggedSet && loggedSet.reps !== undefined && loggedSet.reps !== null ? loggedSet.reps : ''
+                    };
+                    if (loggedSet && loggedSet.level !== undefined && loggedSet.level !== null) {
+                        dObj.level = loggedSet.level;
+                    }
+                    details.push(dObj);
                 }
                 const variations = this.getExerciseVariations(sessionEx);
                 return {
@@ -3196,16 +3348,22 @@ const app = {
                     const hasLevel = d.level !== undefined || isRow;
                     const levelInput = hasLevel ? `
                         <input type="text" class="input-field" placeholder="stand" style="width:70px; text-align:center;"
-                            value="${app.escapeHTML(String(d.level || ''))}" onchange="app.updateEditLogLevel(${exIndex}, ${setIndex}, this.value)">
+                            value="${app.escapeHTML(String(d.level || ''))}"
+                            oninput="app.updateEditLogLevel(${exIndex}, ${setIndex}, this.value)"
+                            onchange="app.updateEditLogLevel(${exIndex}, ${setIndex}, this.value)">
                     ` : '';
                     setsHtml += `
                         <div class="set-row" style="margin-top: 8px; justify-content: space-between;">
                             <div class="set-info text-muted">Set ${d.setNumber}</div>
                             <div style="display:flex; gap:8px;">
                                 <input type="number" class="input-field" placeholder="kg" style="width:70px; text-align:center;"
-                                    value="${app.escapeHTML(String(d.weight || ''))}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
+                                    value="${app.escapeHTML(String(d.weight || ''))}"
+                                    oninput="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)"
+                                    onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
                                 <input type="number" class="input-field" placeholder="reps/sec" style="width:70px; text-align:center;"
-                                    value="${app.escapeHTML(String(d.reps || d.durationSeconds || ''))}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
+                                    value="${app.escapeHTML(String(d.reps || d.durationSeconds || ''))}"
+                                    oninput="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)"
+                                    onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
                                 ${levelInput}
                             </div>
                         </div>
@@ -3242,9 +3400,12 @@ const app = {
     saveEditLog() {
         if (!this.logToEdit) return;
         
+        const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
         let totalExercisesCompleted = 0;
         this.logToEdit.exercises.forEach(ex => {
-            const completedDetails = ex.details.filter(d => (d.weight && d.weight.toString().trim() !== '') || (d.reps && d.reps.toString().trim() !== ''));
+            const completedDetails = ex.details.filter(d => 
+                isNonEmpty(d.weight) || isNonEmpty(d.reps) || isNonEmpty(d.level)
+            );
             ex.setsCompleted = completedDetails.length;
             ex.details = completedDetails;
             if (ex.setsCompleted > 0) totalExercisesCompleted++;
