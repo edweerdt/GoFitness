@@ -153,7 +153,14 @@
                         <!-- Stats injected here -->
                     </div>
 
-                    <h3 class="mt-6">Progressie</h3>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px; margin-bottom:8px;">
+                        <h3 style="margin:0;">Progressie</h3>
+                        <div class="weeks-stepper">
+                            <button class="weeks-stepper-btn" onclick="app.adjustProgressWeeks(-1)" title="1 week minder">-</button>
+                            <div class="weeks-stepper-val" id="progress-weeks-val">1w</div>
+                            <button class="weeks-stepper-btn" onclick="app.adjustProgressWeeks(1)" title="1 week extra">+</button>
+                        </div>
+                    </div>
                     <div id="exercise-progress-list" class="mt-2 exercise-progress-grid">
                         <!-- Exercise progress injected here -->
                     </div>

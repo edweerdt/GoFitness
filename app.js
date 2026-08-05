@@ -1021,10 +1021,32 @@ const app = {
     },
 
     // Bouwt per oefening een reeks (datum, max gewicht) uit de logs
+    progressWeeks: 1,
+
+    adjustProgressWeeks(delta) {
+        let current = typeof this.progressWeeks === 'number' ? this.progressWeeks : 1;
+        current += delta;
+        if (current < 1) current = 1;
+        if (current > 52) current = 52;
+        this.progressWeeks = current;
+        
+        const valEl = document.getElementById('progress-weeks-val');
+        if (valEl) valEl.textContent = `${this.progressWeeks}w`;
+
+        this.renderExerciseProgress();
+    },
+
     getExerciseProgressSeries() {
+        const weeks = typeof this.progressWeeks === 'number' && this.progressWeeks >= 1 ? this.progressWeeks : 1;
+        const now = Date.now();
+        const cutoffTime = now - (weeks * 7 * 24 * 60 * 60 * 1000);
+
         const series = {};
         store.logs.forEach(log => {
             if (!log.exercises || !log.date) return;
+            const logTime = new Date(log.date).getTime();
+            if (isNaN(logTime) || logTime < cutoffTime) return;
+
             log.exercises.forEach(ex => {
                 let maxWeight = 0;
                 let bestSet = null;
@@ -1039,14 +1061,13 @@ const app = {
 
                 const key = String(ex.name).toLowerCase().trim();
                 if (!series[key]) series[key] = { name: ex.name, points: [] };
-                series[key].points.push({ date: log.date, weight: maxWeight, reps: parseInt(bestSet.reps) || 0 });
+                series[key].points.push({ date: log.date, weight: maxWeight, reps: parseInt(bestSet ? bestSet.reps : 0) || 0 });
             });
         });
 
-        // Alleen oefeningen met minstens 2 metingen, punten op datumvolgorde
+        // Punten op datumvolgorde
         return Object.values(series)
-            .map(s => ({ ...s, points: [...s.points].sort((a, b) => (a.date < b.date ? -1 : 1)) }))
-            .filter(s => s.points.length >= 2);
+            .map(s => ({ ...s, points: [...s.points].sort((a, b) => (a.date < b.date ? -1 : 1)) }));
     },
 
     // Epley-formule: geschat 1-rep-max op basis van gewicht en herhalingen
@@ -1057,8 +1078,15 @@ const app = {
     },
 
     buildSparklineSVG(points) {
-        // Vaste viewBox met behoud van verhouding, zodat de gewichtslabels niet vervormen
         const w = 320, h = 96;
+        if (points.length === 1) {
+            const p = points[0];
+            return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:auto; display:block; overflow:visible;">
+                <circle cx="${w/2}" cy="${h/2}" r="4" fill="var(--accent-color)"/>
+                <text x="${w/2}" y="${h/2 - 10}" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-primary)">${this.escapeHTML(String(p.weight))} kg</text>
+            </svg>`;
+        }
+
         const padX = 26, padTop = 20, padBottom = 14;
         const weights = points.map(p => p.weight);
         const min = Math.min(...weights);
@@ -1072,7 +1100,6 @@ const app = {
             return { x, y, weight: p.weight };
         });
 
-        // Bij veel metingen alle labels tonen wordt te druk: dan alleen eerste, laatste en de piek
         const showAll = points.length <= 6;
         const maxIdx = weights.indexOf(max);
         const labelIdx = showAll
@@ -1087,11 +1114,9 @@ const app = {
 
         const labels = labelIdx.map(i => {
             const c = coords[i];
-            // Labels aan de randen naar binnen uitlijnen zodat ze binnen de viewBox blijven
             let anchor = 'middle';
             if (i === 0 && points.length > 1) anchor = 'start';
             else if (i === points.length - 1) anchor = 'end';
-            // Piek onderin het bereik? Label dan onder de punt tekenen i.p.v. erboven
             const above = c.y > padTop + 6;
             const ly = above ? c.y - 7 : c.y + 13;
             return `<text x="${c.x.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anchor}" font-size="12" font-weight="600" fill="var(--text-primary)">${this.escapeHTML(String(c.weight))}</text>`;
@@ -1106,24 +1131,33 @@ const app = {
         const container = document.getElementById('exercise-progress-list');
         if (!container) return;
 
+        const valEl = document.getElementById('progress-weeks-val');
+        if (valEl) valEl.textContent = `${this.progressWeeks || 1}w`;
+
         const series = this.getExerciseProgressSeries();
         if (series.length === 0) {
-            container.innerHTML = '<p class="text-muted text-sm">Log minimaal twee sessies met gewichten om je progressie te zien.</p>';
+            const weeksText = (this.progressWeeks || 1) === 1 ? 'afgelopen week' : `afgelopen ${this.progressWeeks} weken`;
+            container.innerHTML = `<p class="text-muted text-sm text-center py-4">Geen trainingen met gewichten gelogd in de ${weeksText}.</p>`;
             return;
         }
 
-        // Meest gelogde oefeningen bovenaan, maximaal 8 grafieken
+        // Sorteer op meest gelogde oefeningen
         series.sort((a, b) => b.points.length - a.points.length);
 
         let html = '';
-        series.slice(0, 8).forEach(s => {
+        series.forEach(s => {
             const first = s.points[0].weight;
             const last = s.points[s.points.length - 1].weight;
             const diff = Math.round((last - first) * 10) / 10;
-            const diffText = diff === 0 ? 'gelijk' : (diff > 0 ? `+${diff} kg` : `${diff} kg`);
-            const diffColor = diff > 0 ? 'var(--status-green)' : (diff < 0 ? 'var(--status-red)' : 'var(--text-muted)');
+            let diffText = '';
+            let diffColor = 'var(--text-muted)';
+            if (s.points.length > 1) {
+                diffText = diff === 0 ? 'gelijk' : (diff > 0 ? `+${diff} kg` : `${diff} kg`);
+                diffColor = diff > 0 ? 'var(--status-green)' : (diff < 0 ? 'var(--status-red)' : 'var(--text-muted)');
+            } else {
+                diffText = '1 sessie';
+            }
 
-            // Beste geschatte 1RM over alle sessies van deze oefening
             let best1RM = 0;
             s.points.forEach(p => {
                 const est = this.estimate1RM(p.weight, p.reps);
@@ -1139,7 +1173,7 @@ const app = {
                     </div>
                     <div class="mt-2">${this.buildSparklineSVG(s.points)}</div>
                     <div class="text-sm text-muted" style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-                        <span>${s.points.length} sessies</span>
+                        <span>${s.points.length} sessie${s.points.length > 1 ? 's' : ''}</span>
                         ${rmHtml}
                         <span>Laatst: ${last} kg</span>
                     </div>
@@ -3679,10 +3713,14 @@ const app = {
                         }
                     }
 
-                    // Merge all unique exercise names
+                    // Merge all unique exercise names (only if at least one user has non-zero data)
                     const allExerciseNames = new Set();
-                    myExercises.forEach(e => allExerciseNames.add(e.exercise));
-                    friendExercises.forEach(e => allExerciseNames.add(e.exercise));
+                    myExercises.forEach(e => {
+                        if (e.maxKg > 0 || e.estimated1RM > 0) allExerciseNames.add(e.exercise);
+                    });
+                    friendExercises.forEach(e => {
+                        if (e.maxKg > 0 || e.estimated1RM > 0) allExerciseNames.add(e.exercise);
+                    });
 
                     if (allExerciseNames.size === 0) return; // skip empty groups
 

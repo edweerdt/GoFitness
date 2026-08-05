@@ -838,3 +838,55 @@ button:disabled {
         border-color: rgba(0, 0, 0, 0.06);
     }
 }
+
+/* Progress Weeks Stepper Widget */
+.weeks-stepper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.weeks-stepper-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 500;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: var(--transition);
+    user-select: none;
+}
+
+.weeks-stepper-btn:hover {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
+.weeks-stepper-val {
+    padding: 5px 12px;
+    border-radius: 8px;
+    border: 1.5px solid var(--status-green);
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--status-green);
+    font-weight: 700;
+    font-size: 0.95rem;
+    font-family: inherit;
+    user-select: none;
+}
+
+.theme-light .weeks-stepper-btn {
+    border-color: rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.03);
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark) .weeks-stepper-btn {
+        border-color: rgba(0, 0, 0, 0.15);
+        background: rgba(0, 0, 0, 0.03);
+    }
+}
