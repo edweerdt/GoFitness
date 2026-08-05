@@ -11,6 +11,10 @@
     <meta name="theme-color" content="#121212">
     <!-- Self-hosted fonts (Inter + Material Icons Round) voor betrouwbaar offline gebruik -->
     <link rel="stylesheet" href="fonts/fonts.css">
+    <!-- Firebase SDK (Compat voor Vanilla JS) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
     <!-- App Container -->
@@ -177,6 +181,16 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Friends View -->
+            <section id="view-friends" class="view">
+                <header class="top-nav">
+                    <h2>Vrienden</h2>
+                </header>
+                <div class="content-padded pb-32" id="friends-container">
+                    <!-- Injected by JS (FriendsManager / app.renderFriends) -->
+                </div>
+            </section>
         </main>
 
         <!-- Bottom Navigation -->
@@ -192,6 +206,10 @@
             <button class="nav-item" data-target="progress">
                 <span class="material-icons-round">bar_chart</span>
                 <span>Statistieken</span>
+            </button>
+            <button class="nav-item" data-target="friends">
+                <span class="material-icons-round">group</span>
+                <span>Vrienden</span>
             </button>
             <button class="nav-item" data-target="achievements">
                 <span class="material-icons-round">emoji_events</span>
@@ -420,8 +438,13 @@
     
     <script src="app.js"></script>
     <script src="sync.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="friends.js"></script>
     <script>
         CloudSync.init({ store: store, app: app });
+        if (typeof FriendsManager !== 'undefined') {
+            FriendsManager.init({ store: store, app: app });
+        }
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(reg => console.log('SW geregistreerd!'))

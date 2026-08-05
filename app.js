@@ -448,6 +448,7 @@ const app = {
         if(viewId === 'home') this.renderHome();
         if(viewId === 'plans') this.renderPlans();
         if(viewId === 'progress') this.renderProgress();
+        if(viewId === 'friends') this.renderFriends();
         if(viewId === 'achievements') this.renderAchievements();
     },
 
@@ -2908,6 +2909,10 @@ const app = {
         this.activeWorkout = null;
         store.saveActiveWorkoutState(null);
         
+        if (typeof FriendsManager !== 'undefined' && FriendsManager.pushStats) {
+            FriendsManager.pushStats().catch(e => console.warn("Friends pushStats fout:", e));
+        }
+
         document.getElementById('bottom-nav').classList.remove('hidden');
         this.navigate('home');
     },
@@ -3323,6 +3328,265 @@ const app = {
         this.renderProgress();
         this.renderAchievements();
         this.showToast('Backup succesvol hersteld!', 'success');
+    },
+
+    calculateMuscleGroupMaxes() {
+        const groups = {};
+        if (!store || !store.logs) return groups;
+
+        store.logs.forEach(log => {
+            if (!log.exercises) return;
+            log.exercises.forEach(ex => {
+                if (!ex.details || ex.details.length === 0) return;
+                
+                let mGroups = ex.muscleGroups || [];
+                if (mGroups.length === 0 && this.guessMuscleGroupsFromName) {
+                    mGroups = this.guessMuscleGroupsFromName(ex.name);
+                }
+
+                mGroups.forEach(rawMg => {
+                    const mg = this.normalizeMuscleGroup ? this.normalizeMuscleGroup(rawMg) : String(rawMg).toLowerCase().trim();
+                    if (!groups[mg]) {
+                        groups[mg] = { exercise: '', maxKg: 0, maxReps: 0, estimated1RM: 0 };
+                    }
+
+                    ex.details.forEach(d => {
+                        const weight = parseFloat(d.weight) || 0;
+                        const reps = parseInt(d.reps, 10) || 0;
+                        if (weight <= 0 && reps <= 0) return;
+
+                        const est1RM = weight > 0 ? (reps === 1 ? weight : weight * (1 + reps / 30)) : 0;
+                        const rounded1RM = Math.round(est1RM * 10) / 10;
+
+                        if (rounded1RM > groups[mg].estimated1RM || (rounded1RM === groups[mg].estimated1RM && weight > groups[mg].maxKg)) {
+                            groups[mg] = {
+                                exercise: ex.name,
+                                maxKg: weight,
+                                maxReps: reps,
+                                estimated1RM: rounded1RM
+                            };
+                        }
+                    });
+                });
+            });
+        });
+
+        return groups;
+    },
+
+    async handleSendFriendRequest() {
+        const input = document.getElementById('input-friend-code');
+        if (!input || !input.value.trim()) return;
+        const code = input.value.trim();
+        try {
+            const name = await FriendsManager.sendFriendRequest(code);
+            input.value = '';
+            this.showToast(`Vriendverzoek verstuurd naar ${name}!`, 'success');
+        } catch (e) {
+            this.showToast(e.message || "Fout bij versturen verzoek.", 'error');
+        }
+    },
+
+    renderFriends() {
+        const container = document.getElementById('friends-container');
+        if (!container) return;
+
+        if (typeof FriendsManager === 'undefined' || !FriendsManager.user) {
+            container.innerHTML = `
+                <div class="glass-panel text-center" style="padding:32px 20px;">
+                    <div class="stat-icon-wrapper text-accent" style="margin:0 auto 16px auto; width:64px; height:64px; border-radius:50%; display:grid; place-items:center;">
+                        <span class="material-icons-round" style="font-size:36px;">group</span>
+                    </div>
+                    <h2>Vrienden Statistieken</h2>
+                    <p class="text-sm text-muted mt-2" style="max-width:320px; margin-left:auto; margin-right:auto;">
+                        Log in met Google om je unieke vrienden-code te krijgen en elkaars max kg en reps per spiergroep te vergelijken.
+                    </p>
+                    <button class="btn-primary mt-6 w-full" onclick="FriendsManager.signIn()" style="display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+                        <span class="material-icons-round">login</span> Inloggen met Google
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        const profile = FriendsManager.userProfile || {};
+        const code = profile.friendCode || '...';
+        const name = profile.displayName || FriendsManager.user.displayName || 'Sporter';
+        const photo = FriendsManager.user.photoURL || '';
+
+        // 1. Profile & Friend Code Header
+        let html = `
+            <div class="glass-panel mb-4">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        ${photo ? `<img src="${this.escapeHTML(photo)}" style="width:44px; height:44px; border-radius:50%; object-fit:cover; border:2px solid var(--accent-color);">` : `<div style="width:44px; height:44px; border-radius:50%; background:var(--surface-light); display:grid; place-items:center; font-weight:700; color:var(--accent-color);">${this.escapeHTML(name.slice(0, 1).toUpperCase())}</div>`}
+                        <div>
+                            <div style="font-weight:600; font-size:1.1rem;">${this.escapeHTML(name)}</div>
+                            <div class="text-sm text-muted">Jouw vrienden-code: <strong style="color:var(--accent-color); font-family:monospace; font-size:0.95rem;">${this.escapeHTML(code)}</strong></div>
+                        </div>
+                    </div>
+                    <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="navigator.clipboard.writeText('${this.escapeHTML(code)}'); app.showToast('Vrienden-code gekopieerd!', 'success');" title="Kopieer code">
+                        <span class="material-icons-round" style="font-size:1rem;">content_copy</span> Kopieer
+                    </button>
+                </div>
+                <div style="display:flex; justify-content:flex-end; margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.05);">
+                    <button class="btn-secondary" style="padding:4px 10px; font-size:0.75rem; color:var(--text-muted);" onclick="FriendsManager.signOut()">
+                        <span class="material-icons-round" style="font-size:0.9rem;">logout</span> Uitloggen
+                    </button>
+                </div>
+            </div>
+
+            <!-- Add Friend Input -->
+            <div class="glass-panel mb-4">
+                <div style="font-weight:600; font-size:0.95rem; margin-bottom:8px;">Vriend Toevoegen</div>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="input-friend-code" class="input-field" placeholder="Voer vrienden-code in (bijv. AL-1234)..." style="flex:1; text-transform:uppercase;">
+                    <button class="btn-primary" style="padding:8px 16px; font-size:0.9rem; white-space:nowrap;" onclick="app.handleSendFriendRequest()">Verstuur</button>
+                </div>
+            </div>
+        `;
+
+        // 2. Pending Incoming Requests
+        if (FriendsManager.requests && FriendsManager.requests.length > 0) {
+            html += `
+                <div class="glass-panel mb-4" style="border-left:4px solid var(--status-orange);">
+                    <div style="font-weight:600; font-size:0.95rem; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                        <span class="material-icons-round text-accent" style="color:var(--status-orange);">person_add</span> Vriendverzoeken (${FriendsManager.requests.length})
+                    </div>
+                    <div class="flex-col gap-2">
+                        ${FriendsManager.requests.map(req => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.15); padding:10px 12px; border-radius:10px;">
+                                <div style="font-weight:500;">${this.escapeHTML(req.fromName)}</div>
+                                <div style="display:flex; gap:6px;">
+                                    <button class="btn-primary" style="padding:4px 10px; font-size:0.8rem; background:var(--status-green);" onclick="FriendsManager.acceptFriendRequest('${this.escapeHTML(req.id)}')">Accepteren</button>
+                                    <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="FriendsManager.rejectFriendRequest('${this.escapeHTML(req.id)}')">Weigeren</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 3. Friends List / Selector
+        const friends = FriendsManager.friends || [];
+        if (friends.length === 0) {
+            html += `
+                <div class="glass-panel text-center p-4">
+                    <p class="text-muted text-sm">Je hebt nog geen vrienden toegevoegd. Deel je vrienden-code <strong>${this.escapeHTML(code)}</strong> met bekenden om elkaars prestaties te vergelijken!</p>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="mb-4">
+                    <div class="text-sm text-muted mb-2" style="font-weight:500;">Kies een vriend om te vergelijken:</div>
+                    <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;">
+                        ${friends.map(f => {
+                            const isSelected = f.uid === FriendsManager.selectedFriendUid;
+                            const fName = f.displayName || 'Vriend';
+                            return `
+                                <button class="btn-secondary ${isSelected ? 'active-friend-pill' : ''}" style="padding:8px 14px; border-radius:99px; white-space:nowrap; display:flex; align-items:center; gap:6px; ${isSelected ? 'background:var(--accent-color); color:white; font-weight:600;' : ''}" onclick="FriendsManager.selectedFriendUid = '${this.escapeHTML(f.uid)}'; app.renderFriends();">
+                                    <span class="material-icons-round" style="font-size:1rem;">person</span> ${this.escapeHTML(fName)}
+                                </button>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+
+            // 4. Comparison View for Selected Friend
+            const selectedFriend = friends.find(f => f.uid === FriendsManager.selectedFriendUid) || friends[0];
+            if (selectedFriend) {
+                const myMaxes = this.calculateMuscleGroupMaxes();
+                const friendMaxes = (selectedFriend.stats && selectedFriend.stats.muscleGroups) ? selectedFriend.stats.muscleGroups : {};
+                const friendName = selectedFriend.displayName || 'Vriend';
+
+                const muscleGroupDefs = [
+                    { id: 'chest', name: 'Borst', icon: 'fitness_center' },
+                    { id: 'back', name: 'Rug', icon: 'shield' },
+                    { id: 'legs', name: 'Benen', icon: 'directions_run' },
+                    { id: 'shoulders', name: 'Schouders', icon: 'accessibility_new' },
+                    { id: 'arms', name: 'Armen', icon: 'sports_gymnastics' },
+                    { id: 'glutes', name: 'Billen', icon: 'sports_kabaddi' },
+                    { id: 'core', name: 'Core', icon: 'grid_view' }
+                ];
+
+                html += `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <h3 style="margin:0; text-transform:none; font-size:1.1rem; color:var(--text-primary);">Vergelijking met ${this.escapeHTML(friendName)}</h3>
+                        <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; color:var(--status-red);" onclick="if(confirm('Weet je zeker dat je ${this.escapeHTML(friendName)} wilt verwijderen uit je vriendenlijst?')){ FriendsManager.removeFriend('${this.escapeHTML(selectedFriend.uid)}'); }">Verwijder vriend</button>
+                    </div>
+                    <div class="flex-col gap-3">
+                        ${muscleGroupDefs.map(mgDef => {
+                            const myStat = myMaxes[mgDef.id] || { exercise: '-', maxKg: 0, maxReps: 0, estimated1RM: 0 };
+                            const fStat = friendMaxes[mgDef.id] || { exercise: '-', maxKg: 0, maxReps: 0, estimated1RM: 0 };
+
+                            const my1RM = myStat.estimated1RM || 0;
+                            const f1RM = fStat.estimated1RM || 0;
+
+                            let leaderBadge = '';
+                            if (my1RM > 0 || f1RM > 0) {
+                                if (my1RM > f1RM) {
+                                    const diff = Math.round((my1RM - f1RM) * 10) / 10;
+                                    leaderBadge = `<span class="status-badge green" style="padding:2px 8px; font-size:0.7rem;">Jij leidt! (+${diff} kg 1RM)</span>`;
+                                } else if (f1RM > my1RM) {
+                                    const diff = Math.round((f1RM - my1RM) * 10) / 10;
+                                    leaderBadge = `<span class="status-badge orange" style="padding:2px 8px; font-size:0.7rem;">${this.escapeHTML(friendName)} leidt! (+${diff} kg 1RM)</span>`;
+                                } else {
+                                    leaderBadge = `<span class="status-badge" style="padding:2px 8px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-primary);">Gelijk spel!</span>`;
+                                }
+                            } else {
+                                leaderBadge = `<span class="text-sm text-muted">Nog geen data</span>`;
+                            }
+
+                            // Progress bar calculation
+                            const total1RM = (my1RM + f1RM) || 1;
+                            const myPct = Math.round((my1RM / total1RM) * 100) || 50;
+                            const fPct = 100 - myPct;
+
+                            return `
+                                <div class="glass-panel" style="padding:16px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <span class="material-icons-round text-accent" style="font-size:1.2rem;">${mgDef.icon}</span>
+                                            <div style="font-weight:600; font-size:1rem; color:var(--text-primary);">${mgDef.name}</div>
+                                        </div>
+                                        ${leaderBadge}
+                                    </div>
+
+                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                        <!-- My Stat -->
+                                        <div style="background:rgba(59, 130, 246, 0.08); border-left:3px solid var(--accent-color); padding:10px; border-radius:8px;">
+                                            <div class="text-sm text-muted" style="font-size:0.7rem; font-weight:600;">JIJ (ED)</div>
+                                            <div style="font-size:1.1rem; font-weight:700; margin-top:2px;">${myStat.maxKg > 0 ? `${myStat.maxKg} kg` : '-'} <span class="text-sm font-normal text-muted">${myStat.maxReps > 0 ? `× ${myStat.maxReps}` : ''}</span></div>
+                                            <div class="text-sm text-muted" style="font-size:0.75rem; margin-top:2px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${this.escapeHTML(myStat.exercise || '-')}</div>
+                                            <div class="text-accent" style="font-size:0.75rem; font-weight:600; margin-top:4px; font-family:monospace;">1RM: ${my1RM > 0 ? `${my1RM} kg` : '-'}</div>
+                                        </div>
+
+                                        <!-- Friend Stat -->
+                                        <div style="background:rgba(245, 158, 11, 0.08); border-left:3px solid var(--status-orange); padding:10px; border-radius:8px;">
+                                            <div class="text-sm text-muted" style="font-size:0.7rem; font-weight:600; text-transform:uppercase;">${this.escapeHTML(friendName)}</div>
+                                            <div style="font-size:1.1rem; font-weight:700; margin-top:2px;">${fStat.maxKg > 0 ? `${fStat.maxKg} kg` : '-'} <span class="text-sm font-normal text-muted">${fStat.maxReps > 0 ? `× ${fStat.maxReps}` : ''}</span></div>
+                                            <div class="text-sm text-muted" style="font-size:0.75rem; margin-top:2px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${this.escapeHTML(fStat.exercise || '-')}</div>
+                                            <div style="color:var(--status-orange); font-size:0.75rem; font-weight:600; margin-top:4px; font-family:monospace;">1RM: ${f1RM > 0 ? `${f1RM} kg` : '-'}</div>
+                                        </div>
+                                    </div>
+
+                                    ${(my1RM > 0 || f1RM > 0) ? `
+                                        <div style="background:rgba(255,255,255,0.05); height:6px; border-radius:3px; overflow:hidden; display:flex; margin-top:10px;">
+                                            <div style="width:${myPct}%; background:var(--accent-color); transition:width 0.3s ease;"></div>
+                                            <div style="width:${fPct}%; background:var(--status-orange); transition:width 0.3s ease;"></div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        container.innerHTML = html;
     }
 };
 
