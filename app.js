@@ -1044,6 +1044,20 @@ const app = {
         this.renderExerciseProgress();
     },
 
+    parseLogDate(dateStr) {
+        if (!dateStr) return 0;
+        let t = new Date(dateStr).getTime();
+        if (!isNaN(t) && t > 0) return t;
+        const parts = String(dateStr).split(/[-/]/);
+        if (parts.length === 3) {
+            if (parts[0].length === 2 && parts[2].length === 4) {
+                t = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime();
+                if (!isNaN(t)) return t;
+            }
+        }
+        return 0;
+    },
+
     getExerciseProgressSeries() {
         const series = {};
         const isAll = this.progressWeeks === 'all';
@@ -1053,8 +1067,8 @@ const app = {
 
         store.logs.forEach(log => {
             if (!log.exercises || !log.date) return;
-            const logTime = new Date(log.date).getTime();
-            if (!isAll && (isNaN(logTime) || logTime < cutoffTime)) return;
+            const logTime = this.parseLogDate(log.date);
+            if (!isAll && (logTime === 0 || logTime < cutoffTime)) return;
 
             log.exercises.forEach(ex => {
                 let maxVal = 0;
@@ -1070,13 +1084,18 @@ const app = {
                 });
                 if (maxVal <= 0) return;
 
-                const key = String(ex.name).toLowerCase().trim();
-                if (!series[key]) series[key] = { name: ex.name, points: [] };
-                series[key].points.push({ 
-                    date: log.date, 
-                    weight: maxVal, 
-                    isBodyweight: (parseFloat(bestSet ? bestSet.weight : 0) || 0) === 0,
-                    reps: parseInt(bestSet ? bestSet.reps : 0) || 0 
+                // Split combined names ("X of Y") so historical logs attribute data to each variation name
+                const exNames = String(ex.name || '').split(/\s+of\s+/i).map(s => s.trim()).filter(Boolean);
+
+                exNames.forEach(displayName => {
+                    const key = displayName.toLowerCase();
+                    if (!series[key]) series[key] = { name: displayName, points: [] };
+                    series[key].points.push({ 
+                        date: log.date, 
+                        weight: maxVal, 
+                        isBodyweight: (parseFloat(bestSet ? bestSet.weight : 0) || 0) === 0,
+                        reps: parseInt(bestSet ? bestSet.reps : 0) || 0 
+                    });
                 });
             });
         });
