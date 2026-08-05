@@ -447,8 +447,19 @@
         }
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('SW geregistreerd!'))
+                .then(reg => {
+                    console.log('SW geregistreerd!');
+                    reg.update();
+                })
                 .catch(err => console.log('SW registratie faalde', err));
+
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!refreshing) {
+                    refreshing = true;
+                    window.location.reload();
+                }
+            });
         }
     </script>
 </body>
