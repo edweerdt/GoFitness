@@ -3429,34 +3429,34 @@ const app = {
 
                 // Split old "X of Y" names into individual exercise names
                 const exNames = String(ex.name || '').split(/\s+of\s+/i).map(s => s.trim()).filter(Boolean);
-                const displayName = exNames.length === 1 ? exNames[0] : ex.name;
 
-                mGroups.forEach(rawMg => {
-                    const mg = this.normalizeMuscleGroup ? this.normalizeMuscleGroup(rawMg) : String(rawMg).toLowerCase().trim();
-                    if (!groups[mg]) groups[mg] = {};
+                exNames.forEach(displayName => {
+                    mGroups.forEach(rawMg => {
+                        const mg = this.normalizeMuscleGroup ? this.normalizeMuscleGroup(rawMg) : String(rawMg).toLowerCase().trim();
+                        if (!groups[mg]) groups[mg] = {};
 
-                    // For combined names ("X of Y"), credit to main name
-                    const key = displayName;
-                    if (!groups[mg][key]) {
-                        groups[mg][key] = { exercise: displayName, maxKg: 0, maxReps: 0, estimated1RM: 0 };
-                    }
-
-                    ex.details.forEach(d => {
-                        const weight = parseFloat(d.weight) || 0;
-                        const reps = parseInt(d.reps, 10) || 0;
-                        if (weight <= 0 && reps <= 0) return;
-
-                        const est1RM = weight > 0 ? (reps === 1 ? weight : weight * (1 + reps / 30)) : 0;
-                        const rounded1RM = Math.round(est1RM * 10) / 10;
-
-                        if (rounded1RM > groups[mg][key].estimated1RM || (rounded1RM === groups[mg][key].estimated1RM && weight > groups[mg][key].maxKg)) {
-                            groups[mg][key] = {
-                                exercise: displayName,
-                                maxKg: weight,
-                                maxReps: reps,
-                                estimated1RM: rounded1RM
-                            };
+                        const key = displayName;
+                        if (!groups[mg][key]) {
+                            groups[mg][key] = { exercise: displayName, maxKg: 0, maxReps: 0, estimated1RM: 0 };
                         }
+
+                        ex.details.forEach(d => {
+                            const weight = parseFloat(d.weight) || 0;
+                            const reps = parseInt(d.reps, 10) || 0;
+                            if (weight <= 0 && reps <= 0) return;
+
+                            const est1RM = weight > 0 ? (reps === 1 ? weight : weight * (1 + reps / 30)) : 0;
+                            const rounded1RM = Math.round(est1RM * 10) / 10;
+
+                            if (rounded1RM > groups[mg][key].estimated1RM || (rounded1RM === groups[mg][key].estimated1RM && weight > groups[mg][key].maxKg)) {
+                                groups[mg][key] = {
+                                    exercise: displayName,
+                                    maxKg: weight,
+                                    maxReps: reps,
+                                    estimated1RM: rounded1RM
+                                };
+                            }
+                        });
                     });
                 });
             });
@@ -3702,15 +3702,15 @@ const app = {
                         const f1RM = fStat ? (fStat.estimated1RM || 0) : 0;
 
                         let leaderBadge = '';
-                        if (my1RM > 0 || f1RM > 0) {
+                        if (my1RM > 0 && f1RM > 0) {
                             if (my1RM > f1RM) {
                                 const diff = Math.round((my1RM - f1RM) * 10) / 10;
-                                leaderBadge = `<span class="status-badge green" style="padding:2px 8px; font-size:0.65rem;">+${diff} kg</span>`;
+                                leaderBadge = `<span class="status-badge green" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap;">+${diff} kg</span>`;
                             } else if (f1RM > my1RM) {
                                 const diff = Math.round((f1RM - my1RM) * 10) / 10;
-                                leaderBadge = `<span class="status-badge orange" style="padding:2px 8px; font-size:0.65rem;">-${diff} kg</span>`;
+                                leaderBadge = `<span class="status-badge orange" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap;">-${diff} kg</span>`;
                             } else {
-                                leaderBadge = `<span class="status-badge" style="padding:2px 8px; font-size:0.65rem; background:rgba(255,255,255,0.1); color:var(--text-primary);">Gelijk</span>`;
+                                leaderBadge = `<span class="status-badge" style="padding:2px 8px; font-size:0.65rem; background:rgba(255,255,255,0.1); color:var(--text-primary); white-space:nowrap;">Gelijk</span>`;
                             }
                         }
 
