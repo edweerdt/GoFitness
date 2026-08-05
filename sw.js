@@ -1,5 +1,5 @@
 // Versienummer ophogen bij wijzigingen aan de assets, zodat oude caches opgeruimd worden
-const CACHE_NAME = 'go-fitness-cache-v4';
+const CACHE_NAME = 'go-fitness-cache-v5';
 const ASSETS = [
     './',
     './index.html',

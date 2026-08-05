@@ -114,20 +114,26 @@ const FriendsManager = {
         }
     },
 
-    // Berekent spiergroep-maxima uit lokale logs en pusht de lichte samenvatting naar Firestore
+    // Berekent per-oefening maxima per spiergroep en pusht naar Firestore
     async pushStats() {
         const db = getDb();
         if (!db || !this.user || !this.app) return;
 
-        const muscleMaxes = this.app.calculateMuscleGroupMaxes();
+        const exercisesByGroup = this.app.calculateExerciseMaxesByMuscleGroup();
         const totalWorkouts = this.store.logs ? this.store.logs.length : 0;
         const weekStreak = this.app.calculateStreak ? this.app.calculateStreak() : 0;
+
+        // Format: { muscleGroups: { chest: { exercises: [...] }, back: { exercises: [...] } } }
+        const muscleGroups = {};
+        for (const mg in exercisesByGroup) {
+            muscleGroups[mg] = { exercises: exercisesByGroup[mg] };
+        }
 
         const statsData = {
             lastUpdated: new Date().toISOString(),
             totalWorkouts: totalWorkouts,
             weekStreak: weekStreak,
-            muscleGroups: muscleMaxes
+            muscleGroups: muscleGroups
         };
 
         await db.collection('users').doc(this.user.uid).update({
@@ -139,6 +145,7 @@ const FriendsManager = {
             this.userProfile.stats = statsData;
         }
     },
+
 
     // Luister naar binnenkomende vriendverzoeken
     listenToRequests() {

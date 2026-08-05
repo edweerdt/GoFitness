@@ -731,5 +731,97 @@ button:disabled {
     color: var(--text-primary);
 }
 
+/* Variation Pill Selector */
+.variation-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0 4px 0;
+}
 
+.variation-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition);
+    user-select: none;
+}
 
+.variation-pill:hover {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.3);
+    color: var(--text-primary);
+}
+
+.variation-pill.active {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
+    font-weight: 600;
+}
+
+.theme-light .variation-pill {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.12);
+}
+
+.theme-light .variation-pill:hover {
+    background: rgba(37, 99, 235, 0.08);
+    border-color: rgba(37, 99, 235, 0.3);
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark) .variation-pill {
+        background: rgba(0, 0, 0, 0.04);
+        border-color: rgba(0, 0, 0, 0.12);
+    }
+    :root:not(.theme-dark) .variation-pill:hover {
+        background: rgba(37, 99, 235, 0.08);
+        border-color: rgba(37, 99, 235, 0.3);
+    }
+}
+
+/* Friends Exercise Comparison */
+.muscle-group-section {
+    margin-bottom: 20px;
+}
+
+.muscle-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0 8px 0;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-primary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 10px;
+}
+
+.exercise-compare-card {
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.theme-light .exercise-compare-card,
+.theme-light .muscle-group-header {
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark) .exercise-compare-card,
+    :root:not(.theme-dark) .muscle-group-header {
+        border-color: rgba(0, 0, 0, 0.06);
+    }
+}

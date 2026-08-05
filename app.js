@@ -2350,6 +2350,20 @@ const app = {
                 }
             }
             
+            // --- Variation Pill Selector ---
+            let variationHtml = '';
+            const variations = app.getExerciseVariations(ex);
+            if (variations.length > 1) {
+                const chosen = ex.chosenVariation || '';
+                variationHtml = `<div class="variation-selector">`;
+                variations.forEach(v => {
+                    const isActive = chosen === v;
+                    const safeV = app.escapeHTML(v);
+                    variationHtml += `<button class="variation-pill ${isActive ? 'active' : ''}" onclick="app.selectVariation(${exIndex}, '${safeV.replace(/'/g, "\\'")}')"><span class="material-icons-round" style="font-size:0.85rem;">${isActive ? 'check_circle' : 'radio_button_unchecked'}</span> ${safeV}</button>`;
+                });
+                variationHtml += `</div>`;
+            }
+
             const card = document.createElement('div');
             card.className = 'glass-panel exercise-card';
             card.innerHTML = `
@@ -2358,6 +2372,7 @@ const app = {
                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
                             <div class="exercise-title" style="margin:0;">${app.formatClickableExerciseName(ex.name)}</div>
                         </div>
+                        ${variationHtml}
                         <div style="margin-bottom:4px;">${badgesHtml}</div>
                         <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
                         ${notesHtml}
@@ -2881,7 +2896,7 @@ const app = {
                 }
                 
                 exerciseLogs.push({
-                    name: ex.name,
+                    name: ex.chosenVariation || ex.name,
                     muscleGroups: ex.muscleGroups || [],
                     setsCompleted: completedSetsCount,
                     totalSets: ex.sets,
@@ -3331,7 +3346,20 @@ const app = {
     },
 
     calculateMuscleGroupMaxes() {
-        const groups = {};
+        // Legacy wrapper: returns best single exercise per muscle group.
+        // Used by progress/achievements views.
+        const byGroup = this.calculateExerciseMaxesByMuscleGroup();
+        const result = {};
+        for (const mg in byGroup) {
+            if (byGroup[mg].length > 0) {
+                result[mg] = byGroup[mg][0]; // already sorted best-first
+            }
+        }
+        return result;
+    },
+
+    calculateExerciseMaxesByMuscleGroup() {
+        const groups = {}; // mg -> { exerciseName -> { exercise, maxKg, maxReps, estimated1RM } }
         if (!store || !store.logs) return groups;
 
         store.logs.forEach(log => {
@@ -3344,10 +3372,18 @@ const app = {
                     mGroups = this.guessMuscleGroupsFromName(ex.name);
                 }
 
+                // Split old "X of Y" names into individual exercise names
+                const exNames = String(ex.name || '').split(/\s+of\s+/i).map(s => s.trim()).filter(Boolean);
+                const displayName = exNames.length === 1 ? exNames[0] : ex.name;
+
                 mGroups.forEach(rawMg => {
                     const mg = this.normalizeMuscleGroup ? this.normalizeMuscleGroup(rawMg) : String(rawMg).toLowerCase().trim();
-                    if (!groups[mg]) {
-                        groups[mg] = { exercise: '', maxKg: 0, maxReps: 0, estimated1RM: 0 };
+                    if (!groups[mg]) groups[mg] = {};
+
+                    // For combined names ("X of Y"), credit to main name
+                    const key = displayName;
+                    if (!groups[mg][key]) {
+                        groups[mg][key] = { exercise: displayName, maxKg: 0, maxReps: 0, estimated1RM: 0 };
                     }
 
                     ex.details.forEach(d => {
@@ -3358,9 +3394,9 @@ const app = {
                         const est1RM = weight > 0 ? (reps === 1 ? weight : weight * (1 + reps / 30)) : 0;
                         const rounded1RM = Math.round(est1RM * 10) / 10;
 
-                        if (rounded1RM > groups[mg].estimated1RM || (rounded1RM === groups[mg].estimated1RM && weight > groups[mg].maxKg)) {
-                            groups[mg] = {
-                                exercise: ex.name,
+                        if (rounded1RM > groups[mg][key].estimated1RM || (rounded1RM === groups[mg][key].estimated1RM && weight > groups[mg][key].maxKg)) {
+                            groups[mg][key] = {
+                                exercise: displayName,
                                 maxKg: weight,
                                 maxReps: reps,
                                 estimated1RM: rounded1RM
@@ -3371,8 +3407,37 @@ const app = {
             });
         });
 
-        return groups;
+        // Convert to arrays sorted by estimated1RM desc
+        const result = {};
+        for (const mg in groups) {
+            result[mg] = Object.values(groups[mg]).sort((a, b) => b.estimated1RM - a.estimated1RM);
+        }
+        return result;
     },
+
+    // --- Variation helpers ---
+    getExerciseVariations(ex) {
+        // 1. Use alternatives field if present
+        if (ex.alternatives && ex.alternatives.length > 0) return ex.alternatives;
+        if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) return ex.optionalAlternatives;
+        // 2. Split name by " of " as fallback
+        const parts = String(ex.name || '').split(/\s+of\s+/i).map(s => s.trim()).filter(Boolean);
+        return parts.length > 1 ? parts : [];
+    },
+
+    selectVariation(exIndex, variationName) {
+        if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+        // Toggle: deselect if already chosen
+        if (ex.chosenVariation === variationName) {
+            ex.chosenVariation = '';
+        } else {
+            ex.chosenVariation = variationName;
+        }
+        store.saveActiveWorkoutState(this.activeWorkout);
+        this.renderWorkoutExercises();
+    },
+
 
     async handleSendFriendRequest() {
         const input = document.getElementById('input-friend-code');
@@ -3497,7 +3562,7 @@ const app = {
             // 4. Comparison View for Selected Friend
             const selectedFriend = friends.find(f => f.uid === FriendsManager.selectedFriendUid) || friends[0];
             if (selectedFriend) {
-                const myMaxes = this.calculateMuscleGroupMaxes();
+                const myMaxesByGroup = this.calculateExerciseMaxesByMuscleGroup();
                 const friendMaxes = (selectedFriend.stats && selectedFriend.stats.muscleGroups) ? selectedFriend.stats.muscleGroups : {};
                 const friendName = selectedFriend.displayName || 'Vriend';
 
@@ -3516,73 +3581,95 @@ const app = {
                         <h3 style="margin:0; text-transform:none; font-size:1.1rem; color:var(--text-primary);">Vergelijking met ${this.escapeHTML(friendName)}</h3>
                         <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; color:var(--status-red);" onclick="if(confirm('Weet je zeker dat je ${this.escapeHTML(friendName)} wilt verwijderen uit je vriendenlijst?')){ FriendsManager.removeFriend('${this.escapeHTML(selectedFriend.uid)}'); }">Verwijder vriend</button>
                     </div>
-                    <div class="flex-col gap-3">
-                        ${muscleGroupDefs.map(mgDef => {
-                            const myStat = myMaxes[mgDef.id] || { exercise: '-', maxKg: 0, maxReps: 0, estimated1RM: 0 };
-                            const fStat = friendMaxes[mgDef.id] || { exercise: '-', maxKg: 0, maxReps: 0, estimated1RM: 0 };
-
-                            const my1RM = myStat.estimated1RM || 0;
-                            const f1RM = fStat.estimated1RM || 0;
-
-                            let leaderBadge = '';
-                            if (my1RM > 0 || f1RM > 0) {
-                                if (my1RM > f1RM) {
-                                    const diff = Math.round((my1RM - f1RM) * 10) / 10;
-                                    leaderBadge = `<span class="status-badge green" style="padding:2px 8px; font-size:0.7rem;">Jij leidt! (+${diff} kg 1RM)</span>`;
-                                } else if (f1RM > my1RM) {
-                                    const diff = Math.round((f1RM - my1RM) * 10) / 10;
-                                    leaderBadge = `<span class="status-badge orange" style="padding:2px 8px; font-size:0.7rem;">${this.escapeHTML(friendName)} leidt! (+${diff} kg 1RM)</span>`;
-                                } else {
-                                    leaderBadge = `<span class="status-badge" style="padding:2px 8px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-primary);">Gelijk spel!</span>`;
-                                }
-                            } else {
-                                leaderBadge = `<span class="text-sm text-muted">Nog geen data</span>`;
-                            }
-
-                            // Progress bar calculation
-                            const total1RM = (my1RM + f1RM) || 1;
-                            const myPct = Math.round((my1RM / total1RM) * 100) || 50;
-                            const fPct = 100 - myPct;
-
-                            return `
-                                <div class="glass-panel" style="padding:16px;">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                                        <div style="display:flex; align-items:center; gap:8px;">
-                                            <span class="material-icons-round text-accent" style="font-size:1.2rem;">${mgDef.icon}</span>
-                                            <div style="font-weight:600; font-size:1rem; color:var(--text-primary);">${mgDef.name}</div>
-                                        </div>
-                                        ${leaderBadge}
-                                    </div>
-
-                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                                        <!-- My Stat -->
-                                        <div style="background:rgba(59, 130, 246, 0.08); border-left:3px solid var(--accent-color); padding:10px; border-radius:8px;">
-                                            <div class="text-sm text-muted" style="font-size:0.7rem; font-weight:600;">JIJ (ED)</div>
-                                            <div style="font-size:1.1rem; font-weight:700; margin-top:2px;">${myStat.maxKg > 0 ? `${myStat.maxKg} kg` : '-'} <span class="text-sm font-normal text-muted">${myStat.maxReps > 0 ? `× ${myStat.maxReps}` : ''}</span></div>
-                                            <div class="text-sm text-muted" style="font-size:0.75rem; margin-top:2px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${this.escapeHTML(myStat.exercise || '-')}</div>
-                                            <div class="text-accent" style="font-size:0.75rem; font-weight:600; margin-top:4px; font-family:monospace;">1RM: ${my1RM > 0 ? `${my1RM} kg` : '-'}</div>
-                                        </div>
-
-                                        <!-- Friend Stat -->
-                                        <div style="background:rgba(245, 158, 11, 0.08); border-left:3px solid var(--status-orange); padding:10px; border-radius:8px;">
-                                            <div class="text-sm text-muted" style="font-size:0.7rem; font-weight:600; text-transform:uppercase;">${this.escapeHTML(friendName)}</div>
-                                            <div style="font-size:1.1rem; font-weight:700; margin-top:2px;">${fStat.maxKg > 0 ? `${fStat.maxKg} kg` : '-'} <span class="text-sm font-normal text-muted">${fStat.maxReps > 0 ? `× ${fStat.maxReps}` : ''}</span></div>
-                                            <div class="text-sm text-muted" style="font-size:0.75rem; margin-top:2px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${this.escapeHTML(fStat.exercise || '-')}</div>
-                                            <div style="color:var(--status-orange); font-size:0.75rem; font-weight:600; margin-top:4px; font-family:monospace;">1RM: ${f1RM > 0 ? `${f1RM} kg` : '-'}</div>
-                                        </div>
-                                    </div>
-
-                                    ${(my1RM > 0 || f1RM > 0) ? `
-                                        <div style="background:rgba(255,255,255,0.05); height:6px; border-radius:3px; overflow:hidden; display:flex; margin-top:10px;">
-                                            <div style="width:${myPct}%; background:var(--accent-color); transition:width 0.3s ease;"></div>
-                                            <div style="width:${fPct}%; background:var(--status-orange); transition:width 0.3s ease;"></div>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
                 `;
+
+                muscleGroupDefs.forEach(mgDef => {
+                    const myExercises = myMaxesByGroup[mgDef.id] || [];
+                    // Friend data: supports both old (single object) and new (exercises array) format
+                    const friendMgData = friendMaxes[mgDef.id];
+                    let friendExercises = [];
+                    if (friendMgData) {
+                        if (Array.isArray(friendMgData.exercises)) {
+                            friendExercises = friendMgData.exercises;
+                        } else if (friendMgData.exercise) {
+                            // Legacy single-exercise format
+                            friendExercises = [friendMgData];
+                        }
+                    }
+
+                    // Merge all unique exercise names
+                    const allExerciseNames = new Set();
+                    myExercises.forEach(e => allExerciseNames.add(e.exercise));
+                    friendExercises.forEach(e => allExerciseNames.add(e.exercise));
+
+                    if (allExerciseNames.size === 0) return; // skip empty groups
+
+                    html += `
+                        <div class="muscle-group-section">
+                            <div class="muscle-group-header">
+                                <span class="material-icons-round text-accent" style="font-size:1.2rem;">${mgDef.icon}</span>
+                                ${mgDef.name}
+                                <span class="text-sm text-muted" style="font-weight:400;">(${allExerciseNames.size} oefening${allExerciseNames.size !== 1 ? 'en' : ''})</span>
+                            </div>
+                    `;
+
+                    allExerciseNames.forEach(exName => {
+                        const myStat = myExercises.find(e => e.exercise === exName) || null;
+                        const fStat = friendExercises.find(e => e.exercise === exName) || null;
+                        const my1RM = myStat ? (myStat.estimated1RM || 0) : 0;
+                        const f1RM = fStat ? (fStat.estimated1RM || 0) : 0;
+
+                        let leaderBadge = '';
+                        if (my1RM > 0 || f1RM > 0) {
+                            if (my1RM > f1RM) {
+                                const diff = Math.round((my1RM - f1RM) * 10) / 10;
+                                leaderBadge = `<span class="status-badge green" style="padding:2px 8px; font-size:0.65rem;">+${diff} kg</span>`;
+                            } else if (f1RM > my1RM) {
+                                const diff = Math.round((f1RM - my1RM) * 10) / 10;
+                                leaderBadge = `<span class="status-badge orange" style="padding:2px 8px; font-size:0.65rem;">-${diff} kg</span>`;
+                            } else {
+                                leaderBadge = `<span class="status-badge" style="padding:2px 8px; font-size:0.65rem; background:rgba(255,255,255,0.1); color:var(--text-primary);">Gelijk</span>`;
+                            }
+                        }
+
+                        const total1RM = (my1RM + f1RM) || 1;
+                        const myPct = Math.round((my1RM / total1RM) * 100) || 50;
+                        const fPct = 100 - myPct;
+
+                        html += `
+                            <div class="exercise-compare-card">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">${this.escapeHTML(exName)}</div>
+                                    ${leaderBadge}
+                                </div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                    <div style="background:rgba(59, 130, 246, 0.06); border-left:3px solid var(--accent-color); padding:8px 10px; border-radius:6px;">
+                                        <div class="text-sm text-muted" style="font-size:0.65rem; font-weight:600;">JIJ</div>
+                                        ${myStat ? `
+                                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${myStat.maxKg > 0 ? `${myStat.maxKg} kg` : '-'} <span class="text-sm font-normal text-muted">${myStat.maxReps > 0 ? `× ${myStat.maxReps}` : ''}</span></div>
+                                            <div class="text-accent" style="font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">1RM: ${my1RM > 0 ? `${my1RM} kg` : '-'}</div>
+                                        ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
+                                    </div>
+                                    <div style="background:rgba(245, 158, 11, 0.06); border-left:3px solid var(--status-orange); padding:8px 10px; border-radius:6px;">
+                                        <div class="text-sm text-muted" style="font-size:0.65rem; font-weight:600; text-transform:uppercase;">${this.escapeHTML(friendName)}</div>
+                                        ${fStat ? `
+                                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${fStat.maxKg > 0 ? `${fStat.maxKg} kg` : '-'} <span class="text-sm font-normal text-muted">${fStat.maxReps > 0 ? `× ${fStat.maxReps}` : ''}</span></div>
+                                            <div style="color:var(--status-orange); font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">1RM: ${f1RM > 0 ? `${f1RM} kg` : '-'}</div>
+                                        ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
+                                    </div>
+                                </div>
+                                ${(my1RM > 0 || f1RM > 0) ? `
+                                    <div style="background:rgba(255,255,255,0.05); height:4px; border-radius:2px; overflow:hidden; display:flex; margin-top:8px;">
+                                        <div style="width:${myPct}%; background:var(--accent-color); transition:width 0.3s ease;"></div>
+                                        <div style="width:${fPct}%; background:var(--status-orange); transition:width 0.3s ease;"></div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    });
+
+                    html += `</div>`;
+                });
             }
         }
 
