@@ -334,14 +334,14 @@ describe('app logic', () => {
     describe('getRecoveryStatus', () => {
         it('should return green when no plan is active', () => {
             const status = app.getRecoveryStatus();
-            expect(status).toEqual({ status: 'green', text: 'Klaar om te trainen' });
+            expect(status).toEqual({ status: 'green', text: 'Klaar om te trainen', hoursSinceLast: null });
         });
 
         it('should return green when there are no logs', () => {
             store.plans = [{ id: 'plan_1', minRecoveryHours: 48 }];
             store.activePlanId = 'plan_1';
             const status = app.getRecoveryStatus();
-            expect(status).toEqual({ status: 'green', text: 'Klaar om te trainen' });
+            expect(status).toEqual({ status: 'green', text: 'Klaar om te trainen', hoursSinceLast: null });
         });
 
         it('should return red when hours since last log is less than half min recovery hours', () => {
@@ -352,7 +352,9 @@ describe('app logic', () => {
             store.logs = [{ date: logDate.toISOString() }];
 
             const status = app.getRecoveryStatus();
-            expect(status).toEqual({ status: 'red', text: 'Beter rusten' });
+            expect(status.status).toBe('red');
+            expect(status.text).toBe('Beter rusten');
+            expect(status.hoursSinceLast).toBeCloseTo(10, 0);
         });
 
         it('should return orange when hours since last log is between half and full min recovery hours', () => {
@@ -363,7 +365,9 @@ describe('app logic', () => {
             store.logs = [{ date: logDate.toISOString() }];
 
             const status = app.getRecoveryStatus();
-            expect(status).toEqual({ status: 'orange', text: 'Rustig aan' });
+            expect(status.status).toBe('orange');
+            expect(status.text).toBe('Rustig aan');
+            expect(status.hoursSinceLast).toBeCloseTo(30, 0);
         });
 
         it('should return green when hours since last log is greater than min recovery hours', () => {
@@ -374,7 +378,9 @@ describe('app logic', () => {
             store.logs = [{ date: logDate.toISOString() }];
 
             const status = app.getRecoveryStatus();
-            expect(status).toEqual({ status: 'green', text: 'Volledig hersteld' });
+            expect(status.status).toBe('green');
+            expect(status.text).toBe('Volledig hersteld');
+            expect(status.hoursSinceLast).toBeCloseTo(50, 0);
         });
 
         it('should be green when the next session trains recovered muscle groups', () => {
@@ -827,6 +833,37 @@ describe('workout flow', () => {
 
         expect(document.getElementById('recommended-session-name').textContent).toBe('Sessie 2');
         expect(document.getElementById('recommended-card-title').textContent).toBe('Gekozen Sessie');
+    });
+
+    it('should render hours since last training in recovery-hours element on home view', () => {
+        document.body.innerHTML = `
+            <div id="recovery-status" class="status-badge"><span class="material-icons-round"></span></div>
+            <div id="recovery-text"></div>
+            <div id="recovery-hours"></div>
+            <div id="recommended-card-title"></div>
+            <div id="recommended-session-name"></div>
+            <div id="recommended-reason"></div>
+            <div id="session-picker-wrapper" class="hidden"><select id="home-session-select"></select></div>
+            <button id="btn-start-session"></button>
+            <div id="home-date"></div>
+            <div id="stat-completed"></div>
+            <div id="stat-streak"></div>
+            <div class="stats-mini"></div>
+        `;
+
+        const plan = { id: 'plan_1', name: 'Plan 1', minRecoveryHours: 48, sessions: [{ id: 's1', name: 'Sessie 1', exercises: [] }] };
+        store.plans = [plan];
+        store.activePlanId = 'plan_1';
+
+        const twelveHoursAgo = new Date();
+        twelveHoursAgo.setHours(twelveHoursAgo.getHours() - 12);
+        store.logs = [{ date: twelveHoursAgo.toISOString() }];
+
+        app.renderHome();
+
+        const recHoursEl = document.getElementById('recovery-hours');
+        expect(recHoursEl.textContent).toBe('• 12 uur sinds laatste training');
+        expect(recHoursEl.style.display).toBe('inline');
     });
 });
 

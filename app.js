@@ -477,12 +477,29 @@ const app = {
     },
     
     getRecoveryStatus() {
+        let hoursSinceLast = null;
+        if (store.logs && store.logs.length > 0) {
+            const validLogs = store.logs.filter(log => log && log.date);
+            if (validLogs.length > 0) {
+                const nowTime = new Date().getTime();
+                const latestLog = validLogs.reduce((latest, current) => {
+                    const currentDate = current.endTime ? new Date(current.endTime) : new Date(current.date);
+                    const latestDate = latest.endTime ? new Date(latest.endTime) : new Date(latest.date);
+                    return currentDate > latestDate ? current : latest;
+                });
+                const lastTrainingTime = latestLog.endTime ? new Date(latestLog.endTime) : new Date(latestLog.date);
+                if (!isNaN(lastTrainingTime.getTime())) {
+                    hoursSinceLast = Math.max(0, (nowTime - lastTrainingTime.getTime()) / (1000 * 60 * 60));
+                }
+            }
+        }
+
         const plan = store.getActivePlan();
-        if(!plan || store.logs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
+        if(!plan || store.logs.length === 0) return { status: 'green', text: 'Klaar om te trainen', hoursSinceLast };
 
         // Filter logs die bij het actieve plan horen (of legacy logs / matching op naam/id)
         const planLogs = store.logs.filter(log => this.isLogForPlan(log, plan) && log.date);
-        if (planLogs.length === 0) return { status: 'green', text: 'Klaar om te trainen' };
+        if (planLogs.length === 0) return { status: 'green', text: 'Klaar om te trainen', hoursSinceLast };
 
         const minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
         const now = new Date();
@@ -499,7 +516,8 @@ const app = {
         const lastTrained = {};
         planLogs.forEach(log => {
             if (!log.date || !log.exercises) return;
-            const t = new Date(log.date).getTime();
+            const logTime = log.endTime ? new Date(log.endTime) : new Date(log.date);
+            const t = logTime.getTime();
             log.exercises.forEach(ex => {
                 const groups = (ex.muscleGroups && ex.muscleGroups.length > 0) ? ex.muscleGroups : this.guessMuscleGroupsFromName(ex.name);
                 groups.forEach(mg => {
@@ -532,19 +550,24 @@ const app = {
                 const required = mgRules[g] || minHours;
                 worstRatio = Math.min(worstRatio, hoursSince / required);
             });
-            if (worstRatio === Infinity || worstRatio >= 1) return { status: 'green', text: 'Klaar om te trainen' };
-            if (worstRatio < 0.5) return { status: 'red', text: 'Beter rusten' };
-            return { status: 'orange', text: 'Rustig aan' };
+            if (worstRatio === Infinity || worstRatio >= 1) return { status: 'green', text: 'Klaar om te trainen', hoursSinceLast };
+            if (worstRatio < 0.5) return { status: 'red', text: 'Beter rusten', hoursSinceLast };
+            return { status: 'orange', text: 'Rustig aan', hoursSinceLast };
         }
 
         // Fallback zonder spiergroep-data: algemene rusttijd sinds de laatste sessie van DIT plan
-        const sortedLogs = [...planLogs].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const sortedLogs = [...planLogs].sort((a, b) => {
+            const dateB = b.endTime ? new Date(b.endTime) : new Date(b.date);
+            const dateA = a.endTime ? new Date(a.endTime) : new Date(a.date);
+            return dateB - dateA;
+        });
         const lastLog = sortedLogs[0];
-        const hoursSinceLast = (now - new Date(lastLog.date)) / (1000 * 60 * 60);
+        const lastLogTime = lastLog.endTime ? new Date(lastLog.endTime) : new Date(lastLog.date);
+        const hoursSinceLastPlanLog = (now - lastLogTime) / (1000 * 60 * 60);
 
-        if(hoursSinceLast < (minHours * 0.5)) return { status: 'red', text: 'Beter rusten' };
-        if(hoursSinceLast < minHours) return { status: 'orange', text: 'Rustig aan' };
-        return { status: 'green', text: 'Volledig hersteld' };
+        if(hoursSinceLastPlanLog < (minHours * 0.5)) return { status: 'red', text: 'Beter rusten', hoursSinceLast };
+        if(hoursSinceLastPlanLog < minHours) return { status: 'orange', text: 'Rustig aan', hoursSinceLast };
+        return { status: 'green', text: 'Volledig hersteld', hoursSinceLast };
     },
 
     getRecommendedSession() {
@@ -754,6 +777,19 @@ const app = {
         
         const recTextEl = document.getElementById('recovery-text');
         if (recTextEl) recTextEl.textContent = recStatus.text;
+
+        const recHoursEl = document.getElementById('recovery-hours');
+        if (recHoursEl) {
+            if (recStatus.hoursSinceLast !== null && recStatus.hoursSinceLast !== undefined) {
+                const hours = Math.round(recStatus.hoursSinceLast);
+                const hoursText = hours < 1 ? '< 1 uur' : `${hours} uur`;
+                recHoursEl.textContent = `• ${hoursText} sinds laatste training`;
+                recHoursEl.style.display = 'inline';
+            } else {
+                recHoursEl.textContent = '';
+                recHoursEl.style.display = 'none';
+            }
+        }
 
         const btnStart = document.getElementById('btn-start-session');
         const pickerWrapper = document.getElementById('session-picker-wrapper');
