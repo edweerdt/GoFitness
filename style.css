@@ -102,14 +102,22 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
 .status-badge {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 6px 14px;
     border-radius: 999px;
     font-weight: 500;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    width: fit-content;
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: nowrap;
 }
 
-.status-badge .material-icons-round { font-size: 1.2rem; }
+.status-badge .material-icons-round {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
 
 .status-badge.green { background: var(--status-green-bg); color: var(--status-green); }
 .status-badge.orange { background: var(--status-orange-bg); color: var(--status-orange); }
@@ -119,6 +127,7 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
     font-size: 0.85em;
     opacity: 0.85;
     font-weight: normal;
+    white-space: nowrap;
 }
 
 /* Headers */
