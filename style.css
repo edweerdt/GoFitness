@@ -100,23 +100,30 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
 }
 
 .status-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-start;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
     gap: 6px;
     padding: 6px 14px;
     border-radius: 999px;
     font-weight: 500;
     font-size: 0.85rem;
-    width: fit-content;
+    width: auto !important;
     max-width: 100%;
     box-sizing: border-box;
+    align-self: flex-start;
     white-space: nowrap;
+    overflow: hidden;
 }
 
 .status-badge .material-icons-round {
     font-size: 1.1rem;
     flex-shrink: 0;
+}
+
+.status-badge #recovery-text {
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .status-badge.green { background: var(--status-green-bg); color: var(--status-green); }
@@ -128,14 +135,24 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
     opacity: 0.85;
     font-weight: normal;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Headers */
 .home-header {
-    padding: 40px 20px 20px;
+    padding: 40px 20px 16px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.home-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
 }
 
 .workout-header, .top-nav {

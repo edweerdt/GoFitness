@@ -765,7 +765,7 @@ const app = {
         const recStatus = this.getRecoveryStatus();
         const badge = document.getElementById('recovery-status');
         if (badge) {
-            badge.className = `status-badge ${recStatus.status} mt-2`;
+            badge.className = `status-badge ${recStatus.status}`;
             const iconEl = badge.querySelector('.material-icons-round');
             if (iconEl) {
                 let icon = 'battery_charging_full';
@@ -782,8 +782,8 @@ const app = {
         if (recHoursEl) {
             if (recStatus.hoursSinceLast !== null && recStatus.hoursSinceLast !== undefined) {
                 const hours = Math.round(recStatus.hoursSinceLast);
-                const hoursText = hours < 1 ? '< 1 uur' : `${hours} uur`;
-                recHoursEl.textContent = `• ${hoursText} sinds laatste training`;
+                const hoursText = hours < 1 ? '< 1u' : `${hours}u`;
+                recHoursEl.textContent = `• ${hoursText} geleden`;
                 recHoursEl.style.display = '';
             } else {
                 recHoursEl.textContent = '';

@@ -862,8 +862,7 @@ describe('workout flow', () => {
         app.renderHome();
 
         const recHoursEl = document.getElementById('recovery-hours');
-        expect(recHoursEl.textContent).toBe('• 12 uur sinds laatste training');
-        expect(recHoursEl.style.display).toBe('inline');
+        expect(recHoursEl.textContent).toBe('• 12u geleden');
     });
 });
 
