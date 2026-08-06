@@ -1080,6 +1080,19 @@ const app = {
         this.renderExerciseProgress();
     },
 
+    formatShortDate(dateStr) {
+        if (!dateStr) return '';
+        const t = this.parseLogDate ? this.parseLogDate(dateStr) : new Date(dateStr).getTime();
+        if (!t || isNaN(t)) return '';
+        const d = new Date(t);
+        const now = new Date();
+        const isSameYear = d.getFullYear() === now.getFullYear();
+        const day = d.getDate();
+        const months = ['jan.', 'feb.', 'mrt.', 'apr.', 'mei', 'jun.', 'jul.', 'aug.', 'sep.', 'okt.', 'nov.', 'dec.'];
+        const monthStr = months[d.getMonth()];
+        return isSameYear ? `${day} ${monthStr}` : `${day} ${monthStr} '${String(d.getFullYear()).slice(-2)}`;
+    },
+
     parseLogDate(dateStr) {
         if (!dateStr) return 0;
         let t = new Date(dateStr).getTime();
@@ -3845,7 +3858,8 @@ const app = {
                                     exercise: displayName,
                                     maxKg: weight,
                                     maxReps: reps,
-                                    estimated1RM: rounded1RM
+                                    estimated1RM: rounded1RM,
+                                    date: log.date
                                 };
                             }
                         });
@@ -4136,6 +4150,9 @@ const app = {
                         const myPct = Math.round((myScore / totalScore) * 100) || 50;
                         const fPct = 100 - myPct;
 
+                        const myDateStr = myStat && myStat.date ? this.formatShortDate(myStat.date) : '';
+                        const fDateStr = fStat && fStat.date ? this.formatShortDate(fStat.date) : '';
+
                         html += `
                             <div class="exercise-compare-card">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -4144,14 +4161,20 @@ const app = {
                                 </div>
                                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                                     <div style="background:rgba(59, 130, 246, 0.06); border-left:3px solid var(--accent-color); padding:8px 10px; border-radius:6px;">
-                                        <div class="text-sm text-muted" style="font-size:0.65rem; font-weight:600;">JIJ</div>
+                                        <div class="text-sm text-muted" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:4px; font-size:0.65rem; font-weight:600;">
+                                            <span>JIJ</span>
+                                            ${myDateStr ? `<span style="font-weight:600; opacity:0.8; white-space:nowrap;">${this.escapeHTML(myDateStr)}</span>` : ''}
+                                        </div>
                                         ${myStat && (myKg > 0 || myReps > 0) ? `
                                             <div style="font-size:1rem; font-weight:700; margin-top:2px;">${myKg > 0 ? `${myKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${myReps > 0 ? `× ${myReps}` : ''}</span></div>
                                             <div class="text-accent" style="font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${myKg > 0 ? `1RM: ${my1RM} kg` : `Max: ${myReps} reps`}</div>
                                         ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
                                     </div>
                                     <div style="background:rgba(245, 158, 11, 0.06); border-left:3px solid var(--status-orange); padding:8px 10px; border-radius:6px;">
-                                        <div class="text-sm text-muted" style="font-size:0.65rem; font-weight:600; text-transform:uppercase;">${this.escapeHTML(friendName)}</div>
+                                        <div class="text-sm text-muted" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:4px; font-size:0.65rem; font-weight:600;">
+                                            <span style="text-transform:uppercase;">${this.escapeHTML(friendName)}</span>
+                                            ${fDateStr ? `<span style="font-weight:600; opacity:0.8; white-space:nowrap;">${this.escapeHTML(fDateStr)}</span>` : ''}
+                                        </div>
                                         ${fStat && (fKg > 0 || fReps > 0) ? `
                                             <div style="font-size:1rem; font-weight:700; margin-top:2px;">${fKg > 0 ? `${fKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${fReps > 0 ? `× ${fReps}` : ''}</span></div>
                                             <div style="color:var(--status-orange); font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${fKg > 0 ? `1RM: ${f1RM} kg` : `Max: ${fReps} reps`}</div>
