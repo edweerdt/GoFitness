@@ -53,6 +53,7 @@ const CloudSync = {
     accessToken: null,
     tokenExpiry: 0,
     fileId: null,
+    _remoteVersion: null,
     pushTimer: null,
     status: 'uit', // uit | verbinden | synchroniseren | actief | verlopen | offline | fout
     lastError: null,
@@ -156,6 +157,7 @@ const CloudSync = {
         this.accessToken = null;
         this.tokenExpiry = 0;
         this.fileId = null;
+        this._remoteVersion = null;
         localStorage.removeItem('sync_enabled');
         localStorage.removeItem('sync_email');
         localStorage.removeItem('sync_lastSyncedAt');
@@ -189,7 +191,17 @@ const CloudSync = {
 
     async pull() {
         const id = await this.findFileId();
-        if (!id) return null;
+        if (!id) {
+            this._remoteVersion = null;
+            return null;
+        }
+
+        // Versie onthouden voor optimistic locking: schrijft een ander device
+        // tussen onze pull en push, dan zien we dat aan een veranderde versie
+        const metaRes = await this.driveRequest(`/drive/v3/files/${id}?fields=version`);
+        const meta = await metaRes.json();
+        this._remoteVersion = meta.version || null;
+
         const res = await this.driveRequest(`/drive/v3/files/${id}?alt=media`);
         try {
             return await res.json();
@@ -209,11 +221,21 @@ const CloudSync = {
 
         const id = await this.findFileId();
         if (id) {
-            await this.driveRequest(`/upload/drive/v3/files/${id}?uploadType=media`, {
+            // Optimistic lock: is de cloud tussentijds door een ander device beschreven?
+            if (this._remoteVersion != null) {
+                const check = await this.driveRequest(`/drive/v3/files/${id}?fields=version`);
+                const meta = await check.json();
+                if (meta.version && String(meta.version) !== String(this._remoteVersion)) {
+                    throw new Error('conflict');
+                }
+            }
+            const res = await this.driveRequest(`/upload/drive/v3/files/${id}?uploadType=media&fields=id,version`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body
             });
+            const updated = await res.json().catch(() => null);
+            if (updated && updated.version) this._remoteVersion = updated.version;
         } else {
             const boundary = 'gofitness_sync_boundary';
             const multipart =
@@ -222,13 +244,14 @@ const CloudSync = {
                 `\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n` +
                 body +
                 `\r\n--${boundary}--`;
-            const res = await this.driveRequest(`/upload/drive/v3/files?uploadType=multipart&fields=id`, {
+            const res = await this.driveRequest(`/upload/drive/v3/files?uploadType=multipart&fields=id,version`, {
                 method: 'POST',
                 headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
                 body: multipart
             });
             const created = await res.json();
             this.fileId = created.id;
+            if (created.version) this._remoteVersion = created.version;
         }
     },
 
@@ -244,19 +267,30 @@ const CloudSync = {
         this.setStatus('synchroniseren');
         this._syncing = true;
         try {
-            const remote = await this.pull();
-            const local = { plans: this.store.plans, logs: this.store.logs, deleted: this.store.deleted };
-            const merged = remote ? mergeSyncData(local, remote) : local;
+            // Schreef een ander device tussen onze pull en push? Dan de hele
+            // cyclus (pull -> merge -> push) opnieuw doen, met een bovengrens.
+            let attempts = 0;
+            for (;;) {
+                try {
+                    const remote = await this.pull();
+                    const local = { plans: this.store.plans, logs: this.store.logs, deleted: this.store.deleted };
+                    const merged = remote ? mergeSyncData(local, remote) : local;
 
-            this.store.plans = merged.plans;
-            this.store.logs = merged.logs;
-            this.store.deleted = merged.deleted;
-            if (this.store.activePlanId && !merged.plans.find(p => p.id === this.store.activePlanId)) {
-                this.store.activePlanId = merged.plans.length > 0 ? merged.plans[0].id : null;
+                    this.store.plans = merged.plans;
+                    this.store.logs = merged.logs;
+                    this.store.deleted = merged.deleted;
+                    if (this.store.activePlanId && !merged.plans.find(p => p.id === this.store.activePlanId)) {
+                        this.store.activePlanId = merged.plans.length > 0 ? merged.plans[0].id : null;
+                    }
+                    this._saveWithoutSync();
+
+                    await this.push(merged);
+                    break;
+                } catch (e) {
+                    if (e.message === 'conflict' && ++attempts < 3) continue;
+                    throw e;
+                }
             }
-            this._saveWithoutSync();
-
-            await this.push(merged);
 
             localStorage.setItem('sync_lastSyncedAt', new Date().toISOString());
             this.lastError = null;
@@ -285,6 +319,8 @@ const CloudSync = {
         this.setStatus('synchroniseren');
         this._syncing = true;
         try {
+            // Bewuste overwrite: versie-check overslaan zodat de restore altijd wint
+            this._remoteVersion = null;
             await this.push({ plans: this.store.plans, logs: this.store.logs, deleted: this.store.deleted });
             localStorage.setItem('sync_lastSyncedAt', new Date().toISOString());
             this.lastError = null;

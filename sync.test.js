@@ -95,6 +95,7 @@ describe('CloudSync.syncNow', () => {
         CloudSync.accessToken = 'test-token';
         CloudSync.tokenExpiry = Date.now() + 3600 * 1000;
         CloudSync.fileId = null;
+        CloudSync._remoteVersion = null;
     });
 
     afterEach(() => {
@@ -102,6 +103,7 @@ describe('CloudSync.syncNow', () => {
         localStorage.clear();
         CloudSync.clientId = '';
         CloudSync.accessToken = null;
+        CloudSync._remoteVersion = null;
     });
 
     it('should pull remote data, merge it into the store and push the union', async () => {
@@ -161,6 +163,39 @@ describe('CloudSync.syncNow', () => {
         expect(CloudSync.fileId).toBe('newfile1');
     });
 
+    it('should retry the full sync when another device wrote in between', async () => {
+        let versionCall = 0;
+        let mediaCalls = 0;
+        let patchCalls = 0;
+        const ok = data => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) });
+
+        global.fetch = jest.fn((url, options = {}) => {
+            if (url.includes('www.googleapis.com/drive/v3/files?')) return ok({ files: [{ id: 'f1' }] });
+            if (url.includes('alt=media')) {
+                mediaCalls++;
+                return ok({ plans: [], logs: [], deleted: { plans: [], logs: [] } });
+            }
+            if (options.method === 'PATCH') {
+                patchCalls++;
+                return ok({ id: 'f1', version: '3' });
+            }
+            if (url.includes('fields=version')) {
+                versionCall++;
+                // 1: pull-meta v1, 2: push-check v2 (conflict!), 3: pull-meta v2, 4: push-check v2 (ok)
+                return ok({ version: versionCall === 1 ? '1' : '2' });
+            }
+            return ok({});
+        });
+
+        await CloudSync.syncNow();
+
+        // Na het conflict is de remote data opnieuw opgehaald en alsnog 1x gepusht
+        expect(mediaCalls).toBe(2);
+        expect(patchCalls).toBe(1);
+        expect(CloudSync.status).toBe('actief');
+        expect(CloudSync._remoteVersion).toBe('3');
+    });
+
     it('should mark the session as expired on a 401 from Drive', async () => {
         global.fetch = jest.fn(() => Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({}) }));
 
@@ -197,6 +232,7 @@ describe('CloudSync.overwriteRemote', () => {
         CloudSync.accessToken = 'test-token';
         CloudSync.tokenExpiry = Date.now() + 3600 * 1000;
         CloudSync.fileId = 'file123';
+        CloudSync._remoteVersion = '7';
     });
 
     afterEach(() => {
