@@ -777,6 +777,65 @@ describe('wake lock', () => {
     });
 });
 
+describe('renderWorkoutExercises', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [];
+        document.body.innerHTML = '<div id="workout-exercise-list"></div>';
+    });
+
+    it('should render sets, inputs, meta and placeholders from the previous session', () => {
+        store.logs = [{ id: 'l1', date: '2026-07-01T10:00:00.000Z', exercises: [{ name: 'Bench Press', details: [{ setNumber: 1, weight: '40', reps: '10' }] }] }];
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Push' },
+            startTime: new Date(),
+            exercises: [{
+                id: 'e1', name: 'Bench Press', sets: 2, repsMin: 8, repsMax: 12, restSeconds: 90,
+                category: 'compound', trackMetrics: ['weight', 'reps'],
+                notes: ['Rustig zakken'], alternatives: ['Dumbbell Press'],
+                setsCompleted: [true, false], weights: ['42.5', ''], actualReps: ['10', '']
+            }]
+        };
+
+        app.renderWorkoutExercises();
+
+        const html = document.getElementById('workout-exercise-list').innerHTML;
+        expect(html).toContain('Bench Press');
+        expect(html).toContain('2 sets');
+        expect(html).toContain('8-12 reps');
+        expect(html).toContain('90s rust');
+        expect(html).toContain('compound');
+        expect(html).toContain('Rustig zakken');
+        expect(html).toContain('Dumbbell Press');
+        expect((html.match(/class="set-row"/g) || []).length).toBe(2);
+        // Ingevulde waarde en placeholder uit de vorige sessie
+        expect(html).toContain('value="42.5"');
+        expect(html).toContain('placeholder="40"');
+        // Eerste set is afgevinkt
+        expect(html).toContain('check-btn checked');
+    });
+
+    it('should escape malicious exercise fields', () => {
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Push' },
+            startTime: new Date(),
+            exercises: [{
+                id: 'e1', name: '<img src=x onerror=alert(1)>', sets: 1,
+                category: '<script>x</script>', notes: '<b onmouseover=x>notitie</b>',
+                setsCompleted: [false], weights: [''], actualReps: ['']
+            }]
+        };
+
+        app.renderWorkoutExercises();
+
+        const html = document.getElementById('workout-exercise-list').innerHTML;
+        expect(html).not.toContain('<img');
+        expect(html).not.toContain('<script>');
+        expect(html).toContain('&lt;img');
+    });
+});
+
 describe('rest timer', () => {
     beforeEach(() => {
         jest.useFakeTimers();
