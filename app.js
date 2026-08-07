@@ -533,11 +533,11 @@ const app = {
             
             const sched = p.schedule || {};
             const targetSessions = sched.targetSessionsPerWeek || p.targetSessionsPerWeek || '?';
-            let descriptionText = p.description || '';
-            descriptionText = descriptionText.split(/Herstelregels/i)[0];
-            descriptionText = descriptionText.split(/Voltooiingsregels/i)[0];
-            descriptionText = descriptionText.split(/Mijlpalen/i)[0];
-            descriptionText = descriptionText.trim();
+            // Oude platte beschrijvingen hadden secties als "Herstelregels: ..." achteraan;
+            // alleen knippen als zo'n kopje op een eigen regel begint, zodat een zin
+            // die toevallig het woord 'mijlpalen' bevat niet wordt afgekapt
+            let descriptionText = String(p.description || '');
+            descriptionText = descriptionText.split(/\n\s*(?:Herstelregels|Voltooiingsregels|Mijlpalen)/i)[0].trim();
             const desc = descriptionText ? html`<p class="text-sm mt-1" style="color:var(--text-primary);">${descriptionText}</p>` : '';
             const recPattern = sched.recommendedPattern || p.recommendedPattern ?
                 html`<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${sched.recommendedPattern || p.recommendedPattern}</div>` : '';

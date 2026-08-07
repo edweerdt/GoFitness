@@ -1016,6 +1016,24 @@ describe('app XSS Security', () => {
         expect(html).toContain('&lt;img');
     });
 
+    it('should only strip legacy description sections that start on their own line', () => {
+        document.body.innerHTML = '<div id="plans-list"></div>';
+        store.plans = [{
+            id: 'p1', name: 'Plan',
+            description: 'Werk in kleine mijlpalen naar je doel.\nHerstelregels: minimaal 48 uur rust.',
+            sessions: []
+        }];
+        store.activePlanId = 'p1';
+
+        app.renderPlans();
+
+        const listHtml = document.getElementById('plans-list').innerHTML;
+        // Het woord 'mijlpalen' midden in een zin blijft staan
+        expect(listHtml).toContain('Werk in kleine mijlpalen naar je doel.');
+        // De sectie op een eigen regel wordt wel weggeknipt
+        expect(listHtml).not.toContain('minimaal 48 uur rust');
+    });
+
     it('should escape malicious imported plan fields when rendering plans', () => {
         document.body.innerHTML = '<div id="plans-list"></div>';
         store.plans = [{
