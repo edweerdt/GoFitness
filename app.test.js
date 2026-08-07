@@ -588,7 +588,8 @@ describe('getOverloadSuggestion', () => {
         const ex = { name: 'Bench Press', repsMax: 12, muscleGroups: ['chest'], sets: 3 };
         const prev = [
             { setNumber: 1, weight: '40', reps: '12' },
-            { setNumber: 2, weight: '40', reps: '13' }
+            { setNumber: 2, weight: '40', reps: '13' },
+            { setNumber: 3, weight: '40', reps: '12' }
         ];
         const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 2.0, lowerBodyKg: 5.0 } } };
 
@@ -596,11 +597,19 @@ describe('getOverloadSuggestion', () => {
     });
 
     it('should use the lower body increment for leg exercises', () => {
-        const ex = { name: 'Squat', repsMax: 10, muscleGroups: ['legs'], sets: 3 };
+        const ex = { name: 'Squat', repsMax: 10, muscleGroups: ['legs'], sets: 1 };
         const prev = [{ setNumber: 1, weight: '80', reps: '10' }];
         const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 2.0, lowerBodyKg: 5.0 } } };
 
         expect(app.getOverloadSuggestion(ex, prev, plan)).toEqual({ prevWeight: 80, newWeight: 85 });
+    });
+
+    it('should not suggest anything when the previous session was incomplete', () => {
+        const ex = { name: 'Bench Press', repsMax: 12, muscleGroups: ['chest'], sets: 3 };
+        // Slechts 1 van de 3 geplande sets gedaan, ook al haalde die de bovenkant
+        const prev = [{ setNumber: 1, weight: '40', reps: '12' }];
+
+        expect(app.getOverloadSuggestion(ex, prev, null)).toBeNull();
     });
 
     it('should not suggest anything when a set stayed below the top of the rep range', () => {

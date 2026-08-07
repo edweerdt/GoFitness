@@ -1191,6 +1191,10 @@ const app = {
     getOverloadSuggestion(ex, prevDetails, plan) {
         if (!prevDetails || prevDetails.length === 0 || !ex.repsMax) return null;
 
+        // Alleen adviseren als de vorige sessie alle geplande sets heeft afgerond;
+        // 1 van de 3 sets aan de bovenkant halen is geen reden om zwaarder te gaan
+        if (ex.sets && prevDetails.length < ex.sets) return null;
+
         let maxWeight = 0;
         for (const d of prevDetails) {
             const reps = parseInt(d.reps);
