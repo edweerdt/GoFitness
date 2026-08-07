@@ -495,6 +495,20 @@ describe('editing session duration', () => {
         expect(store.logs[0].exercises[0].details[0].completed).toBeUndefined();
     });
 
+    it('should remove a set via the explicit remove button', () => {
+        app.showEditLogModal('log1');
+
+        // De verwijder-knop staat bij de bewaarde set
+        expect(document.getElementById('edit-log-container').innerHTML).toContain('removeEditLogSet');
+
+        app.removeEditLogSet(0, 1);
+        app.saveEditLog();
+
+        // Enige set verwijderd -> hele oefening weg uit het log
+        expect(store.logs[0].exercises).toHaveLength(0);
+        expect(store.logs[0].exercisesCompleted).toBe(0);
+    });
+
     it('should ignore invalid or negative duration input', () => {
         app.logToEdit = JSON.parse(JSON.stringify(store.logs[0]));
         app.updateEditLogDuration('abc');

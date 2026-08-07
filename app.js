@@ -1583,6 +1583,17 @@ const app = {
         if (detail) detail.weight = val;
     },
 
+    // Verwijdert een set expliciet uit de bewerking: waardes leeg en niet meer
+    // als voltooid gemarkeerd, zodat hij bij opslaan wegvalt
+    removeEditLogSet(exIndex, setNumber) {
+        const detail = this.logToEdit.exercises[exIndex].details.find(d => d.setNumber === setNumber);
+        if (!detail) return;
+        detail.weight = '';
+        detail.reps = '';
+        detail.completed = false;
+        this.renderEditLogModal();
+    },
+
     updateEditLogReps(exIndex, setIndex, val) {
         const detail = this.logToEdit.exercises[exIndex].details.find(d => d.setNumber === setIndex + 1);
         if (detail) detail.reps = val;
@@ -1620,6 +1631,13 @@ const app = {
             if (ex.details && ex.details.length > 0) {
                 ex.details.forEach(d => {
                     const setIndex = d.setNumber - 1;
+                    // Alleen sets die nu zouden worden bewaard, kunnen verwijderd worden
+                    const kept = d.completed ||
+                        (d.weight && String(d.weight).trim() !== '') ||
+                        (d.reps && String(d.reps).trim() !== '');
+                    const removeIcon = kept
+                        ? html`<span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:#ff5252;" title="Set verwijderen" onclick="app.removeEditLogSet(${exIndex}, ${d.setNumber})">close</span>`
+                        : '';
                     setRows.push(html`
                         <div class="set-row" style="margin-top: 8px; justify-content: space-between;">
                             <div class="set-info text-muted">Set ${d.setNumber}</div>
@@ -1628,6 +1646,7 @@ const app = {
                                     value="${d.weight || ''}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
                                 <input type="number" class="input-field" placeholder="reps" style="width:70px; text-align:center;"
                                     value="${d.reps || ''}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
+                                ${removeIcon}
                             </div>
                         </div>
                     `);
