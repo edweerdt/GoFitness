@@ -278,11 +278,17 @@
     <script src="app.js"></script>
     <script src="sync.js"></script>
     <script>
-        CloudSync.init({ store: store, app: app });
+        // Service worker eerst: offline-functionaliteit mag nooit sneuvelen
+        // door een fout in de (optionele) cloud-sync
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(reg => console.log('SW geregistreerd!'))
                 .catch(err => console.log('SW registratie faalde', err));
+        }
+        try {
+            CloudSync.init({ store: store, app: app });
+        } catch (e) {
+            console.error('Cloud-sync initialisatie faalde', e);
         }
     </script>
 </body>
