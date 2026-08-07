@@ -19,10 +19,11 @@ const SYNC_FILE_NAME = 'gofitness-data.json';
 // - verwijderingen (tombstones) winnen van beide kanten
 // - bij hetzelfde id op beide devices wint de nieuwste bewerking
 function mergeSyncData(local, remote) {
-    const uniq = arr => [...new Set(arr)];
+    // Uniek en begrensd: de tombstone-lijst mag het cloud-bestand niet laten groeien
+    const uniqCapped = arr => [...new Set(arr)].slice(-500);
     const deleted = {
-        plans: uniq([...(local.deleted && local.deleted.plans || []), ...(remote.deleted && remote.deleted.plans || [])]),
-        logs: uniq([...(local.deleted && local.deleted.logs || []), ...(remote.deleted && remote.deleted.logs || [])])
+        plans: uniqCapped([...(local.deleted && local.deleted.plans || []), ...(remote.deleted && remote.deleted.plans || [])]),
+        logs: uniqCapped([...(local.deleted && local.deleted.logs || []), ...(remote.deleted && remote.deleted.logs || [])])
     };
 
     const ts = item => new Date(item.updatedAt || item.date || 0).getTime() || 0;
