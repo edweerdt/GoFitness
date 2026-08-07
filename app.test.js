@@ -1,4 +1,4 @@
-const { DataStore, app, store } = require('./app');
+const { DataStore, app, store, html, rawHtml } = require('./app');
 
 describe('DataStore', () => {
     let mockLocalStorage;
@@ -956,6 +956,24 @@ describe('app achievements', () => {
         app.renderAchievements();
         const card = document.querySelector('[data-achievement-id="rhythm"]');
         expect(card.classList.contains('unlocked')).toBe(false);
+    });
+});
+
+describe('html template helper', () => {
+    it('should escape interpolated values automatically', () => {
+        const result = String(html`<div>${'<script>alert(1)</script>'}</div>`);
+        expect(result).toBe('<div>&lt;script&gt;alert(1)&lt;/script&gt;</div>');
+    });
+
+    it('should insert nested html results and arrays as HTML', () => {
+        const item = html`<li>${'<b>x</b>'}</li>`;
+        const result = String(html`<ul>${[item, item]}</ul>`);
+        expect(result).toBe('<ul><li>&lt;b&gt;x&lt;/b&gt;</li><li>&lt;b&gt;x&lt;/b&gt;</li></ul>');
+    });
+
+    it('should render null, undefined and rawHtml correctly', () => {
+        expect(String(html`<p>${null}${undefined}</p>`)).toBe('<p></p>');
+        expect(String(html`<p>${rawHtml('<em>ok</em>')}</p>`)).toBe('<p><em>ok</em></p>');
     });
 });
 

@@ -122,6 +122,34 @@ class DataStore {
 
 const store = new DataStore();
 
+// --- VEILIG RENDEREN ---
+
+// Resultaat van html`` dat bij hergebruik in een volgende template als HTML geldt
+class HtmlString {
+    constructor(value) { this.value = value; }
+    toString() { return this.value; }
+}
+
+// Markeert een string expliciet als bedoelde HTML (spaarzaam gebruiken,
+// alleen voor output die zelf al veilig is opgebouwd)
+const rawHtml = value => new HtmlString(String(value));
+
+// Tagged template die alle interpolaties automatisch escapet, zodat vergeten
+// escaping structureel onmogelijk wordt. Geneste html``-resultaten en arrays
+// daarvan worden wel als HTML ingevoegd.
+function html(strings, ...values) {
+    const escape = str => String(str).replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[tag] || tag));
+    const render = v => {
+        if (v === null || v === undefined) return '';
+        if (v instanceof HtmlString) return v.value;
+        if (Array.isArray(v)) return v.map(render).join('');
+        return escape(v);
+    };
+    return new HtmlString(strings.reduce((out, s, i) => (i === 0 ? s : out + render(values[i - 1]) + s), ''));
+}
+
 const app = {
     currentView: 'home',
     activeWorkout: null,
@@ -168,9 +196,9 @@ const app = {
         const iconName = type === 'success' ? 'check_circle' : 'error_outline';
         const iconColor = type === 'success' ? 'var(--status-green)' : 'var(--status-red)';
 
-        toast.innerHTML = `
+        toast.innerHTML = html`
             <span class="material-icons-round" style="color: ${iconColor};">${iconName}</span>
-            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${this.escapeHTML(String(message))}</div>
+            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${message}</div>
         `;
 
         container.appendChild(toast);
@@ -510,47 +538,47 @@ const app = {
             descriptionText = descriptionText.split(/Voltooiingsregels/i)[0];
             descriptionText = descriptionText.split(/Mijlpalen/i)[0];
             descriptionText = descriptionText.trim();
-            const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${this.escapeHTML(descriptionText)}</p>` : '';
+            const desc = descriptionText ? html`<p class="text-sm mt-1" style="color:var(--text-primary);">${descriptionText}</p>` : '';
             const recPattern = sched.recommendedPattern || p.recommendedPattern ?
-                `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${this.escapeHTML(String(sched.recommendedPattern || p.recommendedPattern))}</div>` : '';
+                html`<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${sched.recommendedPattern || p.recommendedPattern}</div>` : '';
             const recovery = sched.minRecoveryHours || p.minRecoveryHours ?
-                `<div class="text-sm text-muted"><strong>Herstel:</strong> Minimaal ${this.escapeHTML(String(sched.minRecoveryHours || p.minRecoveryHours))} uur</div>` : '';
+                html`<div class="text-sm text-muted"><strong>Herstel:</strong> Minimaal ${sched.minRecoveryHours || p.minRecoveryHours} uur</div>` : '';
             const weeklyMins = p.estimatedWeeklyMinutes ?
-                `<div class="text-sm text-muted"><strong>Geschatte tijd per week:</strong> ${this.escapeHTML(String(p.estimatedWeeklyMinutes))} min</div>` : '';
+                html`<div class="text-sm text-muted"><strong>Geschatte tijd per week:</strong> ${p.estimatedWeeklyMinutes} min</div>` : '';
             const sessionOrder = p.defaultSessionOrder ?
-                `<div class="text-sm text-muted mt-1"><strong>Sessie volgorde:</strong> ${this.escapeHTML(p.defaultSessionOrder.join(', '))}</div>` :
-                (p.sessions ? `<div class="text-sm text-muted mt-1"><strong>Sessies:</strong> ${this.escapeHTML(p.sessions.map(s=>s.name).join(', '))}</div>` : '');
+                html`<div class="text-sm text-muted mt-1"><strong>Sessie volgorde:</strong> ${p.defaultSessionOrder.join(', ')}</div>` :
+                (p.sessions ? html`<div class="text-sm text-muted mt-1"><strong>Sessies:</strong> ${p.sessions.map(s=>s.name).join(', ')}</div>` : '');
 
-            const level = p.level ? `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${this.escapeHTML(String(p.level))}</span>` : '';
-            const goal = p.goal ? `<div class="text-sm text-muted"><strong>Doel:</strong> ${this.escapeHTML(String(p.goal))}</div>` : '';
-            const equipment = p.equipment && p.equipment.length > 0 ? `<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${this.escapeHTML(p.equipment.join(', '))}</div>` : '';
+            const level = p.level ? html`<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${p.level}</span>` : '';
+            const goal = p.goal ? html`<div class="text-sm text-muted"><strong>Doel:</strong> ${p.goal}</div>` : '';
+            const equipment = p.equipment && p.equipment.length > 0 ? html`<div class="text-sm text-muted mt-1"><strong>Apparatuur:</strong> ${p.equipment.join(', ')}</div>` : '';
 
-            const scheduleInfo = this.formatRichField(p.schedule, 'Schema Regels');
-            const progressionRules = this.formatRichField(p.progressionRules, 'Progressieregels');
+            // formatRichField escapet zelf al en levert bewust HTML op
+            const scheduleInfo = rawHtml(this.formatRichField(p.schedule, 'Schema Regels'));
+            const progressionRules = rawHtml(this.formatRichField(p.progressionRules, 'Progressieregels'));
 
-
-            el.innerHTML = `
+            el.innerHTML = html`
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div style="flex:1; min-width:0;">
                         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                            <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0; overflow-wrap:anywhere;">${this.escapeHTML(p.name)}</h3>
+                            <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0; overflow-wrap:anywhere;">${p.name}</h3>
                             ${level}
                         </div>
                         ${desc}
                     </div>
                     <div style="display:flex; align-items:center; gap:8px; margin-left:12px; flex-shrink:0;">
-                        ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
+                        ${isActive ? html`<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>` : ''}
                         <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${p.id}')" title="Schema delen">ios_share</span>
                         <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${p.id}')">delete_outline</span>
                     </div>
                 </div>
-                
+
                 <div style="background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; margin-top: 8px; cursor: pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div style="font-weight:600; font-size:0.85rem; color:var(--accent-color);">DETAILS</div>
                         <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
                     </div>
-                    <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${this.escapeHTML(String(targetSessions))}x per week (${p.sessions.length} unieke sessies)</div>
+                    <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${targetSessions}x per week (${p.sessions.length} unieke sessies)</div>
                     ${goal}
                 </div>
 
@@ -563,8 +591,8 @@ const app = {
                     ${recPattern}
                     ${sessionOrder}
                 </div>
-                
-                ${!isActive ? `<button class="btn-secondary mt-3 w-full" onclick="app.setActivePlan('${p.id}')">Maak Actief</button>` : ''}
+
+                ${!isActive ? html`<button class="btn-secondary mt-3 w-full" onclick="app.setActivePlan('${p.id}')">Maak Actief</button>` : ''}
             `;
             list.appendChild(el);
         });
@@ -1014,59 +1042,51 @@ const app = {
             sortedLogs.forEach(log => {
                 const dateStr = new Date(log.date).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
                 
-                let summaryHtml = '';
+                const summaryParts = [];
                 if (log.exercises && log.exercises.length > 0) {
                     log.exercises.forEach(ex => {
-                        let exDetails = [];
-                        if (ex.details) {
-                            ex.details.forEach(d => {
-                                let text = `Set ${d.setNumber}:`;
-                                if (d.weight) text += ` ${d.weight}kg`;
-                                if (d.reps) text += ` x ${d.reps}`;
-                                exDetails.push(app.escapeHTML(text));
-                            });
-                        }
-                        
-                        summaryHtml += `
+                        const exDetails = (ex.details || []).map(d => {
+                            let text = `Set ${d.setNumber}:`;
+                            if (d.weight) text += ` ${d.weight}kg`;
+                            if (d.reps) text += ` x ${d.reps}`;
+                            return text;
+                        });
+
+                        summaryParts.push(html`
                             <div class="mt-2 pt-2" style="border-top: 1px solid rgba(0,0,0,0.05);">
-                                <div style="font-weight:600; font-size:0.9rem;">${app.escapeHTML(ex.name)} (${ex.setsCompleted}/${ex.totalSets} sets)</div>
+                                <div style="font-weight:600; font-size:0.9rem;">${ex.name} (${ex.setsCompleted}/${ex.totalSets} sets)</div>
                                 <div class="text-sm text-muted" style="margin-top:2px;">
                                     ${exDetails.length > 0 ? exDetails.join(', ') : 'Afgevinkt (geen details)'}
                                 </div>
                             </div>
-                        `;
+                        `);
                     });
                 } else {
-                    summaryHtml = '<div class="text-sm text-muted mt-2">Geen details beschikbaar (oude sessie).</div>';
+                    summaryParts.push(html`<div class="text-sm text-muted mt-2">Geen details beschikbaar (oude sessie).</div>`);
                 }
 
-                if (log.exercises && log.exercises.length > 0) {
-                    summaryHtml += `
-                        <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal('${log.id}')">edit_note</span>
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${log.id}')">delete_outline</span>
-                        </div>
-                    `;
-                } else {
-                    summaryHtml += `
-                        <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${log.id}')">delete_outline</span>
-                        </div>
-                    `;
-                }
+                const editIcon = (log.exercises && log.exercises.length > 0)
+                    ? html`<span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal('${log.id}')">edit_note</span>`
+                    : '';
+                summaryParts.push(html`
+                    <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
+                        ${editIcon}
+                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${log.id}')">delete_outline</span>
+                    </div>
+                `);
 
                 const el = document.createElement('div');
                 el.className = 'glass-panel';
-                el.innerHTML = `
+                el.innerHTML = html`
                     <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
                         <div>
-                            <div style="font-weight:600;">${app.escapeHTML(log.sessionName || 'Sessie')}</div>
+                            <div style="font-weight:600;">${log.sessionName || 'Sessie'}</div>
                             <div class="text-sm text-muted">${dateStr} • ${log.duration != null ? log.duration : '?'} min • ${log.exercisesCompleted != null ? log.exercisesCompleted : '?'} oefeningen</div>
                         </div>
                         <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
                     </div>
                     <div class="hidden history-details">
-                        ${summaryHtml}
+                        ${summaryParts}
                     </div>
                 `;
                 listWrapper.appendChild(el);
@@ -1253,36 +1273,34 @@ const app = {
             if (ex.restSeconds) metaString += ` • ${ex.restSeconds}s rust`;
 
             // Build badges
-            let badgesHtml = '';
-            if (ex.category) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted); margin-right:4px;">${app.escapeHTML(String(ex.category))}</span>`;
-            if (ex.exerciseType) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${app.escapeHTML(String(ex.exerciseType))}</span>`;
+            const badges = [];
+            if (ex.category) badges.push(html`<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted); margin-right:4px;">${ex.category}</span>`);
+            if (ex.exerciseType) badges.push(html`<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${ex.exerciseType}</span>`);
 
             // Build notes & alternatives
-            let notesHtml = '';
+            const notesParts = [];
             if (ex.notes && Array.isArray(ex.notes) && ex.notes.length > 0) {
-                notesHtml += `<ul class="text-sm text-muted mt-2" style="list-style-type: disc; padding-left: 20px;">`;
-                ex.notes.forEach(n => notesHtml += `<li>${app.escapeHTML(String(n))}</li>`);
-                notesHtml += `</ul>`;
+                notesParts.push(html`<ul class="text-sm text-muted mt-2" style="list-style-type: disc; padding-left: 20px;">${ex.notes.map(n => html`<li>${n}</li>`)}</ul>`);
             } else if (ex.notes && typeof ex.notes === 'string') {
-                notesHtml += `<div class="text-sm text-muted mt-2">${app.escapeHTML(ex.notes)}</div>`;
+                notesParts.push(html`<div class="text-sm text-muted mt-2">${ex.notes}</div>`);
             }
 
             if (ex.alternatives && ex.alternatives.length > 0) {
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.alternatives.join(', '))}</div>`;
+                notesParts.push(html`<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${ex.alternatives.join(', ')}</div>`);
             } else if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${app.escapeHTML(ex.optionalAlternatives.join(', '))}</div>`;
+                notesParts.push(html`<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${ex.optionalAlternatives.join(', ')}</div>`);
             }
 
             // Progressive-overload-advies op basis van de vorige sessie
             const overload = app.getOverloadSuggestion(ex, prevDetails, store.getActivePlan());
             if (overload) {
-                notesHtml += `<div class="text-sm mt-2 progression-hint"><span class="material-icons-round" style="font-size:1rem; vertical-align:-3px;">trending_up</span> Vorige keer alle sets op ${app.escapeHTML(String(ex.repsMax))} reps met ${app.escapeHTML(String(overload.prevWeight))} kg. Probeer nu ${app.escapeHTML(String(overload.newWeight))} kg.</div>`;
+                notesParts.push(html`<div class="text-sm mt-2 progression-hint"><span class="material-icons-round" style="font-size:1rem; vertical-align:-3px;">trending_up</span> Vorige keer alle sets op ${ex.repsMax} reps met ${overload.prevWeight} kg. Probeer nu ${overload.newWeight} kg.</div>`);
             }
 
-            let setsHtml = '';
+            const setRows = [];
             for(let i=0; i<ex.sets; i++) {
                 const checked = ex.setsCompleted[i] ? 'checked' : '';
-                
+
                 const prevSet = prevDetails[i] || {};
                 const weightPlaceholder = prevSet.weight || 'kg';
                 const repsPlaceholder = prevSet.reps || 'reps';
@@ -1291,49 +1309,49 @@ const app = {
                 const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
                 const wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : false;
                 const wantsDuration = ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false;
-                
-                let inputsHtml = '';
+
+                const inputs = [];
                 if (wantsWeight) {
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(weightPlaceholder))}"
-                        value="${app.escapeHTML(String(ex.weights ? ex.weights[i] : ''))}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">`;
+                    inputs.push(html`<input type="number" class="weight-input" placeholder="${weightPlaceholder}"
+                        value="${ex.weights ? ex.weights[i] : ''}" onchange="app.updateWeight(${exIndex}, ${i}, this.value)">`);
                 }
                 if (wantsReps) {
-                    inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(repsPlaceholder))}" style="width: 55px;"
-                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+                    inputs.push(html`<input type="number" class="weight-input" placeholder="${repsPlaceholder}" style="width: 55px;"
+                        value="${ex.actualReps ? ex.actualReps[i] : ''}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`);
                 }
                 if (wantsDuration && !wantsReps) {
-                     inputsHtml += `<input type="number" class="weight-input" placeholder="sec" style="width: 55px;"
-                        value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`;
+                     inputs.push(html`<input type="number" class="weight-input" placeholder="sec" style="width: 55px;"
+                        value="${ex.actualReps ? ex.actualReps[i] : ''}" onchange="app.updateReps(${exIndex}, ${i}, this.value)">`);
                 }
 
-                setsHtml += `
+                setRows.push(html`
                     <div class="set-row">
                         <div class="set-info text-muted">Set ${i+1}</div>
                         <div class="set-actions">
-                            ${inputsHtml}
+                            ${inputs}
                             <button class="check-btn ${checked}" onclick="app.toggleSet(${exIndex}, ${i})">
                                 <span class="material-icons-round">check</span>
                             </button>
                         </div>
                     </div>
-                `;
+                `);
             }
-            
+
             const card = document.createElement('div');
             card.className = 'glass-panel exercise-card';
-            card.innerHTML = `
+            card.innerHTML = html`
                 <div class="exercise-header">
                     <div>
                         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                            <div class="exercise-title" style="margin:0;">${app.escapeHTML(ex.name)}</div>
+                            <div class="exercise-title" style="margin:0;">${ex.name}</div>
                         </div>
-                        <div style="margin-bottom:4px;">${badgesHtml}</div>
-                        <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
-                        ${notesHtml}
+                        <div style="margin-bottom:4px;">${badges}</div>
+                        <div class="exercise-meta">${metaString}</div>
+                        ${notesParts}
                     </div>
                 </div>
                 <div class="exercise-body">
-                    ${setsHtml}
+                    ${setRows}
                 </div>
             `;
             list.appendChild(card);
@@ -1578,11 +1596,11 @@ const app = {
         const durationCard = document.createElement('div');
         durationCard.className = 'glass-panel';
         durationCard.style.padding = '12px';
-        durationCard.innerHTML = `
+        durationCard.innerHTML = html`
             <div class="set-row" style="justify-content: space-between; align-items:center;">
                 <div style="font-weight:600;">Duur (minuten)</div>
                 <input type="number" min="0" class="input-field" style="width:90px; text-align:center;"
-                    value="${app.escapeHTML(String(this.logToEdit.duration != null ? this.logToEdit.duration : ''))}"
+                    value="${this.logToEdit.duration != null ? this.logToEdit.duration : ''}"
                     onchange="app.updateEditLogDuration(this.value)">
             </div>
         `;
@@ -1597,33 +1615,33 @@ const app = {
         }
 
         this.logToEdit.exercises.forEach((ex, exIndex) => {
-            let setsHtml = '';
-            
+            const setRows = [];
+
             if (ex.details && ex.details.length > 0) {
                 ex.details.forEach(d => {
                     const setIndex = d.setNumber - 1;
-                    setsHtml += `
+                    setRows.push(html`
                         <div class="set-row" style="margin-top: 8px; justify-content: space-between;">
                             <div class="set-info text-muted">Set ${d.setNumber}</div>
-                            <div style="display:flex; gap:8px;">
+                            <div style="display:flex; gap:8px; align-items:center;">
                                 <input type="number" class="input-field" placeholder="kg" style="width:70px; text-align:center;"
-                                    value="${app.escapeHTML(String(d.weight || ''))}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
+                                    value="${d.weight || ''}" onchange="app.updateEditLogWeight(${exIndex}, ${setIndex}, this.value)">
                                 <input type="number" class="input-field" placeholder="reps" style="width:70px; text-align:center;"
-                                    value="${app.escapeHTML(String(d.reps || ''))}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
+                                    value="${d.reps || ''}" onchange="app.updateEditLogReps(${exIndex}, ${setIndex}, this.value)">
                             </div>
                         </div>
-                    `;
+                    `);
                 });
             } else {
-                setsHtml = '<div class="text-sm text-muted">Geen details opgeslagen voor deze oefening.</div>';
+                setRows.push(html`<div class="text-sm text-muted">Geen details opgeslagen voor deze oefening.</div>`);
             }
 
             const card = document.createElement('div');
             card.className = 'glass-panel';
             card.style.padding = '12px';
-            card.innerHTML = `
-                <div style="font-weight: 600; margin-bottom: 8px;">${app.escapeHTML(ex.name)}</div>
-                <div>${setsHtml}</div>
+            card.innerHTML = html`
+                <div style="font-weight: 600; margin-bottom: 8px;">${ex.name}</div>
+                <div>${setRows}</div>
             `;
             container.appendChild(card);
         });
@@ -1882,5 +1900,5 @@ if (typeof document !== 'undefined' && document.getElementById('import-file')) {
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { DataStore, app, store };
+    module.exports = { DataStore, app, store, html, rawHtml };
 }
