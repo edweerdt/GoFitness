@@ -1500,7 +1500,9 @@ const app = {
                     details.push({
                         setNumber: i,
                         weight: loggedSet ? loggedSet.weight : '',
-                        reps: loggedSet ? loggedSet.reps : ''
+                        reps: loggedSet ? loggedSet.reps : '',
+                        // Afgevinkte sets zonder kg/reps moeten bij opslaan behouden blijven
+                        completed: !!loggedSet
                     });
                 }
                 return {
@@ -1513,10 +1515,12 @@ const app = {
             this.logToEdit.exercises = fullExercises;
         } else {
             this.logToEdit.exercises.forEach(ex => {
+                // Bestaande details zijn oorspronkelijk voltooide sets
+                ex.details.forEach(d => { d.completed = true; });
                 if (ex.totalSets > ex.details.length) {
                     for (let i = 1; i <= ex.totalSets; i++) {
                         if (!ex.details.find(d => d.setNumber === i)) {
-                            ex.details.push({ setNumber: i, weight: '', reps: '' });
+                            ex.details.push({ setNumber: i, weight: '', reps: '', completed: false });
                         }
                     }
                     ex.details.sort((a,b) => a.setNumber - b.setNumber);
@@ -1615,9 +1619,16 @@ const app = {
         
         let totalExercisesCompleted = 0;
         this.logToEdit.exercises.forEach(ex => {
-            const completedDetails = ex.details.filter(d => (d.weight && d.weight.toString().trim() !== '') || (d.reps && d.reps.toString().trim() !== ''));
+            // Een set telt mee als hij oorspronkelijk was afgevinkt (ook zonder kg/reps)
+            // of als er nu waardes zijn ingevuld
+            const completedDetails = ex.details.filter(d =>
+                d.completed ||
+                (d.weight && d.weight.toString().trim() !== '') ||
+                (d.reps && d.reps.toString().trim() !== '')
+            );
             ex.setsCompleted = completedDetails.length;
-            ex.details = completedDetails;
+            // Interne 'completed'-markering niet mee opslaan in het log
+            ex.details = completedDetails.map(d => ({ setNumber: d.setNumber, weight: d.weight, reps: d.reps }));
             if (ex.setsCompleted > 0) totalExercisesCompleted++;
         });
         

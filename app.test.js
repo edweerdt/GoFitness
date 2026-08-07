@@ -462,6 +462,33 @@ describe('editing session duration', () => {
         expect(store.logs[0].updatedAt).toBeDefined();
     });
 
+    it('should keep checkbox-only sets when only the duration is edited', () => {
+        // Sets die zijn afgevinkt zonder kg/reps mogen niet verdwijnen door een bewerking
+        store.logs = [{
+            id: 'log2', planId: null, planName: 'Overige Sessies', sessionName: 'Bodyweight',
+            duration: 30, exercisesCompleted: 1,
+            exercises: [{
+                name: 'Push-up', totalSets: 3, setsCompleted: 3,
+                details: [
+                    { setNumber: 1, weight: '', reps: '' },
+                    { setNumber: 2, weight: '', reps: '' },
+                    { setNumber: 3, weight: '', reps: '' }
+                ]
+            }]
+        }];
+
+        app.showEditLogModal('log2');
+        app.updateEditLogDuration('45');
+        app.saveEditLog();
+
+        expect(store.logs[0].duration).toBe(45);
+        expect(store.logs[0].exercises).toHaveLength(1);
+        expect(store.logs[0].exercises[0].setsCompleted).toBe(3);
+        expect(store.logs[0].exercisesCompleted).toBe(1);
+        // De interne markering lekt niet mee het log in
+        expect(store.logs[0].exercises[0].details[0].completed).toBeUndefined();
+    });
+
     it('should ignore invalid or negative duration input', () => {
         app.logToEdit = JSON.parse(JSON.stringify(store.logs[0]));
         app.updateEditLogDuration('abc');
