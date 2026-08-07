@@ -535,6 +535,8 @@ describe('import flow', () => {
 
         expect(store.plans).toHaveLength(2);
         expect(store.activePlanId).toBe(firstId);
+        // Ids botsen niet, ook niet bij imports binnen dezelfde milliseconde
+        expect(store.plans[0].id).not.toBe(store.plans[1].id);
     });
 
     it('should reject JSON without name or sessions in the import preview', () => {

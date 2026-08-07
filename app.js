@@ -63,8 +63,12 @@ class DataStore {
     getActivePlan() {
         return this.plans.find(p => p.id === this.activePlanId) || null;
     }
+    // Uniek over devices heen: sync merget op id, dus een botsing zou data laten verdwijnen
+    generateId(prefix) {
+        return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    }
     importPlan(planData) {
-        planData.id = 'plan_' + Date.now();
+        planData.id = this.generateId('plan');
 
         // Normalize top-level rich schema fields
         if (!planData.schemaVersion) planData.schemaVersion = "1.0";
@@ -96,7 +100,7 @@ class DataStore {
         this.save();
     }
     saveWorkoutLog(log) {
-        this.logs.push({ ...log, id: 'log_' + Date.now(), date: new Date().toISOString() });
+        this.logs.push({ ...log, id: this.generateId('log'), date: new Date().toISOString() });
         this.save();
     }
     restoreBackup(backup) {
