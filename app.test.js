@@ -140,7 +140,7 @@ describe('DataStore', () => {
                 logs: [{ id: 'log_new' }, { id: 'log_new2' }]
             });
 
-            expect(store.plans).toEqual([{ id: 'plan_new', name: 'Nieuw' }]);
+            expect(store.plans).toEqual([{ id: 'plan_new', name: 'Nieuw', sessions: [] }]);
             expect(store.logs).toHaveLength(2);
             // Oude activePlanId bestaat niet meer -> eerste plan uit de backup wordt actief
             expect(store.activePlanId).toBe('plan_new');
