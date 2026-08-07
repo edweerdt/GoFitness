@@ -162,7 +162,7 @@ const app = {
 
         toast.innerHTML = `
             <span class="material-icons-round" style="color: ${iconColor};">${iconName}</span>
-            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${message}</div>
+            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${this.escapeHTML(String(message))}</div>
         `;
 
         container.appendChild(toast);

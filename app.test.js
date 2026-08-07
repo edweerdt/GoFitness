@@ -898,6 +898,16 @@ describe('app XSS Security', () => {
         expect(result).toContain('&lt;style&gt;body{display:none}&lt;/style&gt;');
     });
 
+    it('should escape markup in toast messages', () => {
+        // Foutmeldingen (bijv. JSON.parse-fouten) bevatten ruwe bestandsinhoud
+        document.body.innerHTML = '<div id="toast-container"></div>';
+        app.showToast('Herstellen mislukt: Unexpected token \'<\', "<img src=x onerror=alert(1)>" is not valid JSON', 'error');
+
+        const html = document.getElementById('toast-container').innerHTML;
+        expect(html).not.toContain('<img');
+        expect(html).toContain('&lt;img');
+    });
+
     it('should escape malicious imported plan fields when rendering plans', () => {
         document.body.innerHTML = '<div id="plans-list"></div>';
         store.plans = [{
