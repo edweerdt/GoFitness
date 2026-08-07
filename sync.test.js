@@ -183,6 +183,63 @@ describe('CloudSync.syncNow', () => {
     });
 });
 
+describe('CloudSync.overwriteRemote', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        localStorage.setItem('sync_enabled', '1');
+        CloudSync.clientId = 'test-client-id';
+        CloudSync.store = {
+            plans: [{ id: 'p_backup' }],
+            logs: [{ id: 'l_backup', date: '2026-07-01T10:00:00.000Z' }],
+            deleted: { plans: [], logs: [] },
+            save: jest.fn()
+        };
+        CloudSync.accessToken = 'test-token';
+        CloudSync.tokenExpiry = Date.now() + 3600 * 1000;
+        CloudSync.fileId = 'file123';
+    });
+
+    afterEach(() => {
+        delete global.fetch;
+        localStorage.clear();
+        CloudSync.clientId = '';
+        CloudSync.accessToken = null;
+        CloudSync.fileId = null;
+    });
+
+    it('should push local data without pulling or merging remote data', async () => {
+        const calls = [];
+        global.fetch = jest.fn((url, options = {}) => {
+            calls.push({ url, options });
+            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) });
+        });
+
+        await CloudSync.overwriteRemote();
+
+        // Geen download van remote data (alt=media), alleen een upload
+        expect(calls.some(c => c.url.includes('alt=media'))).toBe(false);
+        const pushCall = calls.find(c => c.options.method === 'PATCH');
+        expect(pushCall).toBeDefined();
+        expect(pushCall.options.body).toContain('p_backup');
+        expect(CloudSync.status).toBe('actief');
+    });
+
+    it('should cancel a pending debounced push', async () => {
+        jest.useFakeTimers();
+        global.fetch = jest.fn(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) }));
+
+        CloudSync.schedulePush();
+        expect(CloudSync.pushTimer).toBeDefined();
+        await CloudSync.overwriteRemote();
+
+        // De geplande merge-sync mag niet meer afgaan na de overwrite
+        const fetchCount = global.fetch.mock.calls.length;
+        jest.advanceTimersByTime(10000);
+        expect(global.fetch.mock.calls.length).toBe(fetchCount);
+        jest.useRealTimers();
+    });
+});
+
 describe('CloudSync.signOut', () => {
     it('should clear sync state', () => {
         localStorage.setItem('sync_enabled', '1');

@@ -270,6 +270,33 @@ const CloudSync = {
         }
     },
 
+    // Overschrijft de cloud-versie met de lokale data, zonder te mergen.
+    // Nodig na een bewuste restore van een backup: die moet de cloud vervangen,
+    // anders brengt de eerstvolgende merge de oude data gewoon weer terug.
+    async overwriteRemote() {
+        if (!this.enabled || !this.clientId) return;
+        clearTimeout(this.pushTimer);
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            this.setStatus('offline');
+            return;
+        }
+
+        this.setStatus('synchroniseren');
+        this._syncing = true;
+        try {
+            await this.push({ plans: this.store.plans, logs: this.store.logs, deleted: this.store.deleted });
+            localStorage.setItem('sync_lastSyncedAt', new Date().toISOString());
+            this.lastError = null;
+            this.setStatus('actief');
+        } catch (e) {
+            this.lastError = e.message;
+            this.setStatus(e.message === 'auth' ? 'verlopen' : 'fout');
+            throw e;
+        } finally {
+            this._syncing = false;
+        }
+    },
+
     // Debounced push: meerdere snelle wijzigingen worden gebundeld tot 1 sync
     schedulePush() {
         if (!this.enabled || !this.clientId) return;

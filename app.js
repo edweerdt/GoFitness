@@ -1849,6 +1849,10 @@ const app = {
     confirmRestore() {
         if (!this.backupToRestore) return;
         store.restoreBackup(this.backupToRestore);
+        // Met sync actief moet de backup de cloud-versie vervangen, niet ermee mergen
+        if (typeof CloudSync !== 'undefined' && CloudSync.enabled) {
+            CloudSync.overwriteRemote().catch(() => {});
+        }
         this.hideRestoreModal();
         this.renderPlans();
         this.renderHome();
