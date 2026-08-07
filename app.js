@@ -82,7 +82,10 @@ class DataStore {
         planData.sessions.forEach(s => {
             if (!s.id && !s.sessionId) s.id = 'sess_' + Math.random().toString(36).slice(2, 11);
             else if (s.sessionId) s.id = s.sessionId;
-            
+
+            // Sessies zonder oefeningen (de preview laat ze door) mogen de import niet breken
+            if (!Array.isArray(s.exercises)) s.exercises = [];
+
             s.exercises.forEach(e => {
                 if (!e.id && !e.exerciseId) e.id = 'ex_' + Math.random().toString(36).slice(2, 11);
                 else if (e.exerciseId) e.id = e.exerciseId;

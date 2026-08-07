@@ -520,6 +520,14 @@ describe('import flow', () => {
         expect(plan.schedule).toBeDefined();
     });
 
+    it('should not crash on sessions without an exercises array', () => {
+        store.importPlan({ name: 'Kaal Plan', sessions: [{ name: 'Rustdag-instructies' }] });
+
+        expect(store.plans).toHaveLength(1);
+        expect(store.plans[0].sessions[0].exercises).toEqual([]);
+        expect(store.plans[0].sessions[0].id).toMatch(/^sess_/);
+    });
+
     it('should keep the existing active plan when importing another plan', () => {
         store.importPlan({ name: 'Plan A', sessions: [] });
         const firstId = store.activePlanId;
