@@ -19,16 +19,37 @@ describe('DataStore', () => {
             })
         };
 
-        // Assign mock to global context
-        Object.defineProperty(global, 'localStorage', {
-            value: mockLocalStorage,
-            configurable: true
-        });
+        // Assign mock to global context safely across Node versions
+        try {
+            Object.defineProperty(global, 'localStorage', {
+                value: mockLocalStorage,
+                configurable: true,
+                writable: true
+            });
+        } catch (e) {
+            if (global.localStorage) {
+                global.localStorage.getItem = mockLocalStorage.getItem;
+                global.localStorage.setItem = mockLocalStorage.setItem;
+                global.localStorage.removeItem = mockLocalStorage.removeItem;
+                global.localStorage.clear = mockLocalStorage.clear;
+            }
+        }
     });
 
     afterEach(() => {
         // Clean up
         jest.restoreAllMocks();
+        if (typeof window !== 'undefined' && window.localStorage) {
+            try {
+                Object.defineProperty(global, 'localStorage', {
+                    value: window.localStorage,
+                    configurable: true,
+                    writable: true
+                });
+            } catch (e) {
+                global.localStorage = window.localStorage;
+            }
+        }
     });
 
     it('should initialize with default empty state when localStorage is empty', () => {
@@ -39,6 +60,7 @@ describe('DataStore', () => {
         expect(store.logs).toEqual([]);
         expect(store.activeWorkoutState).toBeNull();
         expect(store.theme).toBe('auto');
+        expect(store.holdTimerDelaySeconds).toBe(3);
 
         // Assert load was called (indicated by calling localStorage.getItem)
         expect(mockLocalStorage.getItem).toHaveBeenCalledWith('plans');
@@ -72,17 +94,54 @@ describe('DataStore', () => {
     it('should handle malformed JSON in localStorage gracefully without crashing', () => {
         // Put invalid JSON in localStorage
         mockLocalStorage.setItem('plans', 'invalid json data');
-        mockLocalStorage.setItem('logs', '{not valid');
+        mockLocalStorage.setItem('logs', '{broken}}}');
 
+        // Spy on console.warn to verify it logs the corruption
+        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        // Should NOT throw — graceful fallback to defaults
         let store;
         expect(() => {
             store = new DataStore();
         }).not.toThrow();
 
-        // Corrupte keys vallen terug op de standaardwaarde
         expect(store.plans).toEqual([]);
         expect(store.logs).toEqual([]);
+        expect(store.activeWorkoutState).toBeNull();
         expect(store.theme).toBe('auto');
+
+        // Verify corrupt keys were removed from localStorage
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('plans');
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('logs');
+
+        // Verify warnings were logged
+        expect(consoleSpy).toHaveBeenCalled();
+
+        consoleSpy.mockRestore();
+    });
+
+    it('should recover partial data when only some localStorage keys are corrupt', () => {
+        // Valid plans, corrupt logs
+        const validPlans = [{ id: 'plan_1', name: 'Good Plan' }];
+        mockLocalStorage.setItem('plans', JSON.stringify(validPlans));
+        mockLocalStorage.setItem('logs', 'not valid json');
+        mockLocalStorage.setItem('theme', 'dark');
+
+        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const store = new DataStore();
+
+        // Valid data should be loaded correctly
+        expect(store.plans).toEqual(validPlans);
+        expect(store.theme).toBe('dark');
+
+        // Corrupt data should fall back to defaults
+        expect(store.logs).toEqual([]);
+
+        // Only the corrupt key should be removed
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('logs');
+
+        consoleSpy.mockRestore();
     });
 
     it('should remove activePlanId from localStorage when it is cleared', () => {
@@ -165,6 +224,65 @@ describe('DataStore', () => {
         });
     });
 
+    describe('quota handling', () => {
+        it('should not crash when localStorage is full on save()', () => {
+            const store = new DataStore();
+            store.plans = [{ id: 'plan_1', name: 'Test' }];
+            store.logs = [{ id: 'log_1' }];
+
+            // Simulate QuotaExceededError
+            mockLocalStorage.setItem = jest.fn(() => {
+                throw new DOMException('quota exceeded', 'QuotaExceededError');
+            });
+
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+            // Should not throw and return false
+            expect(() => {
+                const result = store.save();
+                expect(result).toBe(false);
+            }).not.toThrow();
+
+            // In-memory state should still be intact
+            expect(store.plans).toEqual([{ id: 'plan_1', name: 'Test' }]);
+            expect(store.logs).toEqual([{ id: 'log_1' }]);
+
+            expect(consoleSpy).toHaveBeenCalled();
+            consoleSpy.mockRestore();
+        });
+
+        it('should return true on successful save()', () => {
+            const store = new DataStore();
+            store.plans = [];
+            store.logs = [];
+            const result = store.save();
+            expect(result).toBe(true);
+        });
+
+        it('should not crash when localStorage is full on saveActiveWorkoutState()', () => {
+            const store = new DataStore();
+            const mockState = { exerciseId: 'ex_1', sets: [true, false] };
+
+            // Simulate QuotaExceededError
+            mockLocalStorage.setItem = jest.fn(() => {
+                throw new DOMException('quota exceeded', 'QuotaExceededError');
+            });
+
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+            // Should not throw
+            expect(() => {
+                store.saveActiveWorkoutState(mockState);
+            }).not.toThrow();
+
+            // In-memory state should still be updated
+            expect(store.activeWorkoutState).toEqual(mockState);
+
+            expect(consoleSpy).toHaveBeenCalled();
+            consoleSpy.mockRestore();
+        });
+    });
+
     describe('saveActiveWorkoutState', () => {
         it('should save active workout state to localStorage when state is provided', () => {
             const store = new DataStore();
@@ -188,6 +306,26 @@ describe('DataStore', () => {
             expect(store.activeWorkoutState).toBeNull();
             expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('activeWorkoutState');
         });
+
+        it('should update an existing plan in place when importing a plan with matching id, planId or name', () => {
+            const store = new DataStore();
+            store.plans = [{ id: 'plan_1781938748008', planId: 'my-schema', name: 'Beginner Gym', sessions: [] }];
+            store.activePlanId = 'plan_1781938748008';
+
+            const updatedPlanData = {
+                id: 'plan_1781938748008',
+                planId: 'my-schema',
+                name: 'Beginner Gym',
+                sessions: [{ name: 'Full Body A', exercises: [{ name: 'Squat', sets: 3 }] }]
+            };
+
+            store.importPlan(updatedPlanData);
+
+            expect(store.plans.length).toBe(1);
+            expect(store.plans[0].id).toBe('plan_1781938748008');
+            expect(store.plans[0].sessions.length).toBe(1);
+            expect(store.activePlanId).toBe('plan_1781938748008');
+        });
     });
 });
 
@@ -202,14 +340,14 @@ describe('app logic', () => {
     describe('getRecoveryStatus', () => {
         it('should return green when no plan is active', () => {
             const status = app.getRecoveryStatus();
-            expect(status).toEqual({ status: 'green', text: 'Klaar om te trainen' });
+            expect(status).toEqual({ status: 'green', text: 'Klaar om te trainen', hoursSinceLast: null });
         });
 
         it('should return green when there are no logs', () => {
             store.plans = [{ id: 'plan_1', minRecoveryHours: 48 }];
             store.activePlanId = 'plan_1';
             const status = app.getRecoveryStatus();
-            expect(status).toEqual({ status: 'green', text: 'Klaar om te trainen' });
+            expect(status).toEqual({ status: 'green', text: 'Klaar om te trainen', hoursSinceLast: null });
         });
 
         it('should return red when hours since last log is less than half min recovery hours', () => {
@@ -220,7 +358,9 @@ describe('app logic', () => {
             store.logs = [{ date: logDate.toISOString() }];
 
             const status = app.getRecoveryStatus();
-            expect(status).toEqual({ status: 'red', text: 'Beter rusten' });
+            expect(status.status).toBe('red');
+            expect(status.text).toBe('Beter rusten');
+            expect(status.hoursSinceLast).toBeCloseTo(10, 0);
         });
 
         it('should return orange when hours since last log is between half and full min recovery hours', () => {
@@ -231,7 +371,9 @@ describe('app logic', () => {
             store.logs = [{ date: logDate.toISOString() }];
 
             const status = app.getRecoveryStatus();
-            expect(status).toEqual({ status: 'orange', text: 'Rustig aan' });
+            expect(status.status).toBe('orange');
+            expect(status.text).toBe('Rustig aan');
+            expect(status.hoursSinceLast).toBeCloseTo(30, 0);
         });
 
         it('should return green when hours since last log is greater than min recovery hours', () => {
@@ -242,7 +384,9 @@ describe('app logic', () => {
             store.logs = [{ date: logDate.toISOString() }];
 
             const status = app.getRecoveryStatus();
-            expect(status).toEqual({ status: 'green', text: 'Volledig hersteld' });
+            expect(status.status).toBe('green');
+            expect(status.text).toBe('Volledig hersteld');
+            expect(status.hoursSinceLast).toBeCloseTo(50, 0);
         });
 
         it('should be green when the next session trains recovered muscle groups', () => {
@@ -276,10 +420,33 @@ describe('app logic', () => {
 
             expect(app.getRecoveryStatus().status).toBe('red');
         });
+
+        it('should ignore logs from other plans when calculating recovery status', () => {
+            const tenHoursAgo = new Date();
+            tenHoursAgo.setHours(tenHoursAgo.getHours() - 10);
+
+            const plan1 = { id: 'plan_1', minRecoveryHours: 48, sessions: [{ id: 'push1', name: 'Push 1', exercises: [{ name: 'Bench', muscleGroups: ['chest'] }] }] };
+            const plan2 = { id: 'plan_2', minRecoveryHours: 48, sessions: [{ id: 'push2', name: 'Push 2', exercises: [{ name: 'Bench', muscleGroups: ['chest'] }] }] };
+
+            store.plans = [plan1, plan2];
+            store.activePlanId = 'plan_1';
+
+            // Log belongs to plan_2 (recent)
+            store.logs = [{ planId: 'plan_2', sessionId: 'push2', date: tenHoursAgo.toISOString(), exercises: [{ name: 'Bench', muscleGroups: ['chest'] }] }];
+
+            // For plan_1, no logs exist -> green
+            expect(app.getRecoveryStatus().status).toBe('green');
+        });
     });
 
     describe('getRecommendedSession', () => {
         it('should return null when no plan is active', () => {
+            expect(app.getRecommendedSession()).toBeNull();
+        });
+
+        it('should return null when active plan has no sessions', () => {
+            store.plans = [{ id: 'plan_1', name: 'Empty Plan' }];
+            store.activePlanId = 'plan_1';
             expect(app.getRecommendedSession()).toBeNull();
         });
 
@@ -313,15 +480,97 @@ describe('app logic', () => {
             store.plans = [{ id: 'plan_1', name: 'Test Plan', sessions: [session1, session2] }];
             store.activePlanId = 'plan_1';
 
-            const logDate = new Date();
+            const now = Date.now();
             store.logs = [
-                { sessionId: 's1', date: logDate.toISOString() },
-                { sessionId: 's2', date: logDate.toISOString() }
+                { sessionId: 's2', date: new Date(now).toISOString() },
+                { sessionId: 's1', date: new Date(now - 86400000).toISOString() }
             ];
 
             const recommended = app.getRecommendedSession();
             expect(recommended.session).toEqual(session1);
             expect(recommended.reason).toContain('we beginnen weer vooraan');
+        });
+
+        it('should continuously alternate sessions A-B-A-B across multiple cycles', () => {
+            const sessionA = { id: 'sA', name: 'Full Body A' };
+            const sessionB = { id: 'sB', name: 'Full Body B' };
+            store.plans = [{ id: 'plan_1', name: 'Test Plan', sessions: [sessionA, sessionB] }];
+            store.activePlanId = 'plan_1';
+
+            const now = Date.now();
+            // Log sequence: A (oldest), B, A (most recent)
+            store.logs = [
+                { sessionId: 'sA', date: new Date(now).toISOString() },
+                { sessionId: 'sB', date: new Date(now - 86400000).toISOString() },
+                { sessionId: 'sA', date: new Date(now - 172800000).toISOString() }
+            ];
+
+            // After completing A, next should be B
+            const rec1 = app.getRecommendedSession();
+            expect(rec1.session).toEqual(sessionB);
+
+            // Simulate completing B
+            store.logs.unshift({ sessionId: 'sB', date: new Date(now + 86400000).toISOString() });
+            const rec2 = app.getRecommendedSession();
+            expect(rec2.session).toEqual(sessionA);
+        });
+
+        it('should ignore recent logs from other plans when recommending next session', () => {
+            const session1 = { id: 's1', name: 'Session 1' };
+            const session2 = { id: 's2', name: 'Session 2' };
+            store.plans = [
+                { id: 'plan_1', name: 'Plan 1', sessions: [session1, session2] },
+                { id: 'plan_2', name: 'Plan 2', sessions: [session1, session2] }
+            ];
+            store.activePlanId = 'plan_1';
+
+            // s1 was completed recently under plan_2
+            store.logs = [{ planId: 'plan_2', sessionId: 's1', date: new Date().toISOString() }];
+
+            // For plan_1, s1 has not been done yet -> recommend s1
+            const recommended = app.getRecommendedSession();
+            expect(recommended.session).toEqual(session1);
+        });
+
+        it('should match logs by planName when planId differs due to plan re-import', () => {
+            const sessionA = { id: 'full-body-a', name: 'Full Body A' };
+            const sessionB = { id: 'full-body-b', name: 'Full Body B' };
+            const plan = { id: 'plan_new', planId: 'my-schema', name: 'My Schema', sessions: [sessionA, sessionB] };
+            store.plans = [plan];
+            store.activePlanId = 'plan_new';
+
+            // Log has an old planId from a previous import, but same planName
+            const recentLog = {
+                planId: 'plan_old',
+                planName: 'My Schema',
+                sessionId: 'full-body-a',
+                date: new Date(Date.now() - 3600000).toISOString(),
+                exercises: [{ name: 'Leg Press', muscleGroups: ['legs'] }]
+            };
+            store.logs = [recentLog];
+
+            // isLogForPlan should match this log to the active plan
+            expect(app.isLogForPlan(recentLog, plan)).toBe(true);
+
+            // getRecoveryStatus should recognize the recent log and not blindly return green
+            const recStatus = app.getRecoveryStatus();
+            expect(recStatus.status).not.toBe('green');
+
+            // sanitizeLogPlanIds should update the log planId to matched active plan.id
+            store.sanitizeLogPlanIds();
+            expect(store.logs[0].planId).toBe('plan_new');
+        });
+
+        it('should normalize muscle groups separating biceps/triceps and mapping rear_shoulders/obliques', () => {
+            expect(app.normalizeMuscleGroup('biceps')).toBe('biceps');
+            expect(app.normalizeMuscleGroup('triceps')).toBe('triceps');
+            expect(app.normalizeMuscleGroup('rear_shoulders')).toBe('shoulders');
+            expect(app.normalizeMuscleGroup('obliques')).toBe('core');
+        });
+
+        it('should guess biceps and triceps from exercise names when muscleGroups are missing', () => {
+            expect(app.guessMuscleGroupsFromName('Bicep Curl')).toContain('biceps');
+            expect(app.guessMuscleGroupsFromName('Triceps Pushdown')).toContain('triceps');
         });
     });
 
@@ -375,12 +624,15 @@ describe('workout flow', () => {
         store.plans = [];
         store.activePlanId = null;
         store.logs = [];
+        app.activeWorkout = null;
         document.body.innerHTML = `
-            <div id="modal-finish-workout" class="modal-overlay"></div>
+            <div id="modal-finish-workout" class="modal-overlay hidden"></div>
+            <div id="modal-cancel-workout" class="modal-overlay hidden"></div>
             <div id="bottom-nav" class="hidden"></div>
             <div id="toast-container"></div>
         `;
         jest.spyOn(app, 'navigate').mockImplementation(() => {});
+        jest.spyOn(app, 'openWorkoutView').mockImplementation(() => {});
     });
 
     afterEach(() => {
@@ -427,6 +679,197 @@ describe('workout flow', () => {
 
         expect(store.logs).toHaveLength(1);
         expect(store.logs[0].duration).toBe(240);
+    });
+
+    it('should snapshot planId and planName at workout start and retain them on finish even if active plan changes', () => {
+        const planA = { id: 'plan_A', name: 'Plan Alpha', sessions: [] };
+        const planB = { id: 'plan_B', name: 'Plan Beta', sessions: [] };
+        store.plans = [planA, planB];
+        store.activePlanId = 'plan_A';
+
+        const session = { id: 's1', name: 'Leg Day', exercises: [] };
+
+        // Start workout under Plan Alpha
+        app.startWorkout(session);
+
+        expect(app.activeWorkout.planId).toBe('plan_A');
+        expect(app.activeWorkout.planName).toBe('Plan Alpha');
+
+        // Switch active plan to Plan Beta mid-workout
+        store.activePlanId = 'plan_B';
+
+        // Complete workout
+        app.activeWorkout.exercises = [
+            { name: 'Squat', muscleGroups: ['legs'], sets: 1, setsCompleted: [true], weights: ['100'], actualReps: ['5'] }
+        ];
+        app.finishWorkout();
+
+        expect(store.logs).toHaveLength(1);
+        expect(store.logs[0].planId).toBe('plan_A');
+        expect(store.logs[0].planName).toBe('Plan Alpha');
+    });
+
+    it('should fallback to store.getActivePlan() when finishing an activeWorkout lacking snapshot planId', () => {
+        const planA = { id: 'plan_A', name: 'Plan Alpha' };
+        store.plans = [planA];
+        store.activePlanId = 'plan_A';
+
+        // Legacy active workout object without planId/planName
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Arm Day' },
+            startTime: new Date(),
+            exercises: [
+                { name: 'Curl', muscleGroups: ['biceps'], sets: 1, setsCompleted: [true], weights: ['15'], actualReps: ['10'] }
+            ]
+        };
+
+        app.finishWorkout();
+
+        expect(store.logs).toHaveLength(1);
+        expect(store.logs[0].planId).toBe('plan_A');
+        expect(store.logs[0].planName).toBe('Plan Alpha');
+    });
+
+    it('should auto-detect completed sets with data and fallback empty fields from previous sets on finish', () => {
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Leg Day' },
+            startTime: new Date(),
+            exercises: [
+                {
+                    name: 'Squat',
+                    muscleGroups: ['legs'],
+                    sets: 3,
+                    setsCompleted: [true, false, true],
+                    weights: ['80', '80', ''],
+                    actualReps: ['10', '8', '']
+                }
+            ]
+        };
+
+        app.finishWorkout();
+
+        expect(store.logs).toHaveLength(1);
+        const log = store.logs[0];
+        expect(log.exercises[0].setsCompleted).toBe(3);
+        expect(log.exercises[0].details).toHaveLength(3);
+        expect(log.exercises[0].details[0]).toEqual({ setNumber: 1, weight: '80', reps: '10' });
+        expect(log.exercises[0].details[1]).toEqual({ setNumber: 2, weight: '80', reps: '8' });
+        expect(log.exercises[0].details[2]).toEqual({ setNumber: 3, weight: '80', reps: '8' });
+    });
+
+    it('should show and hide the cancel workout confirmation modal', () => {
+        const modal = document.getElementById('modal-cancel-workout');
+        expect(modal.classList.contains('hidden')).toBe(true);
+
+        app.showCancelWorkoutModal();
+        expect(modal.classList.contains('hidden')).toBe(false);
+
+        app.hideCancelWorkoutModal();
+        expect(modal.classList.contains('hidden')).toBe(true);
+    });
+
+    it('should cancel active workout, clear activeWorkoutState, and navigate home', () => {
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Leg Day' },
+            startTime: new Date(),
+            exercises: []
+        };
+        store.activeWorkoutState = app.activeWorkout;
+
+        app.showCancelWorkoutModal();
+        app.cancelWorkout();
+
+        expect(app.activeWorkout).toBeNull();
+        expect(store.activeWorkoutState).toBeNull();
+        expect(localStorage.getItem('activeWorkoutState')).toBeNull();
+        expect(app.navigate).toHaveBeenCalledWith('home');
+        expect(store.logs).toHaveLength(0);
+    });
+
+    it('should start a specific session via startWorkoutBySessionId and make its plan active', () => {
+        const session1 = { id: 's1', name: 'Push', exercises: [{ name: 'Bench', sets: 3 }] };
+        const session2 = { id: 's2', name: 'Pull', exercises: [{ name: 'Row', sets: 3 }] };
+        const plan = { id: 'plan_1', name: 'PPL Plan', sessions: [session1, session2] };
+
+        store.plans = [plan];
+        store.activePlanId = null;
+
+        app.startWorkoutBySessionId('plan_1', 's2');
+
+        expect(store.activePlanId).toBe('plan_1');
+        expect(app.activeWorkout).not.toBeNull();
+        expect(app.activeWorkout.session.name).toBe('Pull');
+        expect(app.activeWorkout.planId).toBe('plan_1');
+        expect(app.activeWorkout.planName).toBe('PPL Plan');
+    });
+
+    it('should populate session picker on home view when plan has multiple sessions', () => {
+        document.body.innerHTML = `
+            <div id="recovery-status" class="status-badge"><span class="material-icons-round"></span></div>
+            <div id="recovery-text"></div>
+            <div id="recommended-card-title"></div>
+            <div id="recommended-session-name"></div>
+            <div id="recommended-reason"></div>
+            <div id="session-picker-wrapper" class="hidden"><select id="home-session-select"></select></div>
+            <button id="btn-start-session"></button>
+            <div id="home-date"></div>
+            <div id="stat-completed"></div>
+            <div id="stat-streak"></div>
+            <div class="stats-mini"></div>
+        `;
+
+        const session1 = { id: 's1', name: 'Sessie 1', exercises: [{ name: 'Squat', sets: 3 }] };
+        const session2 = { id: 's2', name: 'Sessie 2', exercises: [{ name: 'Bench', sets: 3 }] };
+        const plan = { id: 'plan_1', name: 'Duo Schema', sessions: [session1, session2] };
+
+        store.plans = [plan];
+        store.activePlanId = 'plan_1';
+        store.logs = [];
+
+        app.renderHome();
+
+        const pickerWrapper = document.getElementById('session-picker-wrapper');
+        const sessionSelect = document.getElementById('home-session-select');
+        expect(pickerWrapper.classList.contains('hidden')).toBe(false);
+        // 2 sessies uit het plan + de vaste 'Vrije Sessie'-optie
+        expect(sessionSelect.children.length).toBe(3);
+
+        // Change dropdown to session 2
+        sessionSelect.value = 's2';
+        sessionSelect.onchange();
+
+        expect(document.getElementById('recommended-session-name').textContent).toBe('Sessie 2');
+        expect(document.getElementById('recommended-card-title').textContent).toBe('Gekozen Sessie');
+    });
+
+    it('should render hours since last training in recovery-hours element on home view', () => {
+        document.body.innerHTML = `
+            <div id="recovery-status" class="status-badge"><span class="material-icons-round"></span></div>
+            <div id="recovery-text"></div>
+            <div id="recovery-hours"></div>
+            <div id="recommended-card-title"></div>
+            <div id="recommended-session-name"></div>
+            <div id="recommended-reason"></div>
+            <div id="session-picker-wrapper" class="hidden"><select id="home-session-select"></select></div>
+            <button id="btn-start-session"></button>
+            <div id="home-date"></div>
+            <div id="stat-completed"></div>
+            <div id="stat-streak"></div>
+            <div class="stats-mini"></div>
+        `;
+
+        const plan = { id: 'plan_1', name: 'Plan 1', minRecoveryHours: 48, sessions: [{ id: 's1', name: 'Sessie 1', exercises: [] }] };
+        store.plans = [plan];
+        store.activePlanId = 'plan_1';
+
+        const twelveHoursAgo = new Date();
+        twelveHoursAgo.setHours(twelveHoursAgo.getHours() - 12);
+        store.logs = [{ date: twelveHoursAgo.toISOString() }];
+
+        app.renderHome();
+
+        const recHoursEl = document.getElementById('recovery-hours');
+        expect(recHoursEl.textContent).toBe('• 12u geleden');
     });
 });
 
@@ -498,10 +941,10 @@ describe('editing session duration', () => {
     it('should remove a set via the explicit remove button', () => {
         app.showEditLogModal('log1');
 
-        // De verwijder-knop staat bij de bewaarde set
-        expect(document.getElementById('edit-log-container').innerHTML).toContain('removeEditLogSet');
+        // De verwijder-knop staat bij elke set
+        expect(document.getElementById('edit-log-container').innerHTML).toContain('removeSetFromEditLog');
 
-        app.removeEditLogSet(0, 1);
+        app.removeSetFromEditLog(0, 0);
         app.saveEditLog();
 
         // Enige set verwijderd -> hele oefening weg uit het log
@@ -540,23 +983,28 @@ describe('import flow', () => {
         expect(plan.schedule).toBeDefined();
     });
 
-    it('should not crash on sessions without an exercises array', () => {
-        store.importPlan({ name: 'Kaal Plan', sessions: [{ name: 'Rustdag-instructies' }] });
-
-        expect(store.plans).toHaveLength(1);
-        expect(store.plans[0].sessions[0].exercises).toEqual([]);
-        expect(store.plans[0].sessions[0].id).toMatch(/^sess_/);
+    it('should reject sessions without exercises with a clear validation error', () => {
+        // Schema-validatie geeft een duidelijke fout in plaats van een crash
+        expect(() => store.importPlan({ name: 'Kaal Plan', sessions: [{ name: 'Rustdag-instructies' }] }))
+            .toThrow(/oefening/i);
+        expect(store.plans).toHaveLength(0);
     });
 
-    it('should keep the existing active plan when importing another plan', () => {
-        store.importPlan({ name: 'Plan A', sessions: [] });
+    it('should activate the imported plan and upsert on re-import by name', () => {
+        store.importPlan({ name: 'Plan A', sessions: [{ name: 'S1', exercises: [{ name: 'Squat', sets: 3 }] }] });
         const firstId = store.activePlanId;
-        store.importPlan({ name: 'Plan B', sessions: [] });
+        store.importPlan({ name: 'Plan B', sessions: [{ name: 'S1', exercises: [{ name: 'Bench Press', sets: 3 }] }] });
 
         expect(store.plans).toHaveLength(2);
-        expect(store.activePlanId).toBe(firstId);
+        // Het zojuist geïmporteerde plan wordt actief
+        expect(store.activePlanId).toBe(store.plans[1].id);
         // Ids botsen niet, ook niet bij imports binnen dezelfde milliseconde
         expect(store.plans[0].id).not.toBe(store.plans[1].id);
+
+        // Re-import met dezelfde naam vervangt het plan en behoudt het id (logs blijven gekoppeld)
+        store.importPlan({ name: 'Plan A', sessions: [{ name: 'S2', exercises: [{ name: 'Row', sets: 3 }] }] });
+        expect(store.plans).toHaveLength(2);
+        expect(store.plans.find(p => p.name === 'Plan A').id).toBe(firstId);
     });
 
     it('should reject JSON without name or sessions in the import preview', () => {
@@ -615,7 +1063,54 @@ describe('getOverloadSuggestion', () => {
         ];
         const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 2.0, lowerBodyKg: 5.0 } } };
 
-        expect(app.getOverloadSuggestion(ex, prev, plan)).toEqual({ prevWeight: 40, newWeight: 42 });
+        expect(app.getOverloadSuggestion(ex, prev, plan)).toEqual({
+            prevWeight: 40,
+            maxWeight: 40,
+            minWeight: 40,
+            allSameWeight: true,
+            newWeight: 42,
+            increment: 2
+        });
+    });
+
+    it('should correctly handle varied set weights and report min and max weight', () => {
+        const ex = { name: 'Dumbbell Shoulder Press', repsMax: 12, muscleGroups: ['shoulders'], sets: 3 };
+        const prev = [
+            { setNumber: 1, weight: '10', reps: '12' },
+            { setNumber: 2, weight: '12.5', reps: '12' },
+            { setNumber: 3, weight: '15', reps: '12' }
+        ];
+        const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 2.0, lowerBodyKg: 5.0 } } };
+
+        const suggestion = app.getOverloadSuggestion(ex, prev, plan);
+        expect(suggestion).toEqual({
+            prevWeight: 15,
+            maxWeight: 15,
+            minWeight: 10,
+            allSameWeight: false,
+            newWeight: 16,
+            increment: 1
+        });
+    });
+
+    it('should cap dumbbell exercise increments to realistic +1 kg step for upper body', () => {
+        const ex = { name: 'Dumbbell Curl', repsMax: 12, muscleGroups: ['biceps'] };
+        const prev = [{ setNumber: 1, weight: '15', reps: '12' }];
+        const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 5.0, lowerBodyKg: 6.0 } } };
+
+        const suggestion = app.getOverloadSuggestion(ex, prev, plan);
+        expect(suggestion.increment).toBe(1);
+        expect(suggestion.newWeight).toBe(16);
+    });
+
+    it('should cap dumbbell exercise increments to realistic +2 kg step for lower body', () => {
+        const ex = { name: 'Dumbbell Lunge', repsMax: 10, muscleGroups: ['legs'] };
+        const prev = [{ setNumber: 1, weight: '15', reps: '10' }];
+        const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 5.0, lowerBodyKg: 6.0 } } };
+
+        const suggestion = app.getOverloadSuggestion(ex, prev, plan);
+        expect(suggestion.increment).toBe(2);
+        expect(suggestion.newWeight).toBe(17);
     });
 
     it('should use the lower body increment for leg exercises', () => {
@@ -623,7 +1118,14 @@ describe('getOverloadSuggestion', () => {
         const prev = [{ setNumber: 1, weight: '80', reps: '10' }];
         const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 2.0, lowerBodyKg: 5.0 } } };
 
-        expect(app.getOverloadSuggestion(ex, prev, plan)).toEqual({ prevWeight: 80, newWeight: 85 });
+        expect(app.getOverloadSuggestion(ex, prev, plan)).toEqual({
+            prevWeight: 80,
+            maxWeight: 80,
+            minWeight: 80,
+            allSameWeight: true,
+            newWeight: 85,
+            increment: 5
+        });
     });
 
     it('should not suggest anything when the previous session was incomplete', () => {
@@ -647,7 +1149,14 @@ describe('getOverloadSuggestion', () => {
         const ex = { name: 'Row', repsMax: 12, muscleGroups: ['back'] };
         const prev = [{ setNumber: 1, weight: '50', reps: '12' }];
 
-        expect(app.getOverloadSuggestion(ex, prev, null)).toEqual({ prevWeight: 50, newWeight: 52.5 });
+        expect(app.getOverloadSuggestion(ex, prev, null)).toEqual({
+            prevWeight: 50,
+            maxWeight: 50,
+            minWeight: 50,
+            allSameWeight: true,
+            newWeight: 52.5,
+            increment: 2.5
+        });
     });
 
     it('should not suggest anything for bodyweight sets or missing rep targets', () => {
@@ -661,6 +1170,8 @@ describe('exercise progress', () => {
         store.plans = [];
         store.activePlanId = null;
         store.logs = [];
+        // Testdata heeft vaste datums: het weken-filter uitzetten
+        app.progressWeeks = 'all';
         document.body.innerHTML = '<div id="exercise-progress-list"></div>';
     });
 
@@ -703,7 +1214,7 @@ describe('exercise progress', () => {
 
     it('should show a hint when there is not enough data', () => {
         app.renderExerciseProgress();
-        expect(document.getElementById('exercise-progress-list').innerHTML).toContain('minimaal twee sessies');
+        expect(document.getElementById('exercise-progress-list').innerHTML).toContain('Geen trainingen met gewichten');
     });
 
     it('should show the estimated 1RM based on the best set (Epley)', () => {
@@ -731,17 +1242,20 @@ describe('sharePlan', () => {
         store.activePlanId = 'p1';
         store.logs = [];
         document.body.innerHTML = '<div id="toast-container"></div>';
+        try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
+        try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
+        try { delete global.navigator.clipboard; } catch(e) { global.navigator.clipboard = undefined; }
     });
 
     afterEach(() => {
-        delete global.navigator.share;
-        delete global.navigator.canShare;
-        delete global.navigator.clipboard;
+        try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
+        try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
+        try { delete global.navigator.clipboard; } catch(e) { global.navigator.clipboard = undefined; }
     });
 
     it('should share the plan JSON without the internal id via the Web Share API', async () => {
         const share = jest.fn().mockResolvedValue();
-        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true });
+        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
 
         await app.sharePlan('p1');
 
@@ -753,8 +1267,10 @@ describe('sharePlan', () => {
     });
 
     it('should copy the JSON to the clipboard when Web Share is unavailable', async () => {
+        try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
+        try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
         const writeText = jest.fn().mockResolvedValue();
-        Object.defineProperty(global.navigator, 'clipboard', { value: { writeText }, configurable: true });
+        Object.defineProperty(global.navigator, 'clipboard', { value: { writeText }, configurable: true, writable: true });
 
         await app.sharePlan('p1');
 
@@ -843,10 +1359,24 @@ describe('renderWorkoutExercises', () => {
 
         app.renderWorkoutExercises();
 
-        const html = document.getElementById('workout-exercise-list').innerHTML;
-        expect(html).not.toContain('<img');
-        expect(html).not.toContain('<script>');
-        expect(html).toContain('&lt;img');
+        // Geen daadwerkelijke element-injectie: kwaadaardige namen worden data, geen DOM
+        expect(document.querySelector('#workout-exercise-list img')).toBeNull();
+        expect(document.querySelector('#workout-exercise-list script')).toBeNull();
+        expect(document.getElementById('workout-exercise-list').innerHTML).toContain('&lt;img');
+    });
+
+    it('should not allow quote-injection into inline handlers via exercise names', () => {
+        // Een naam met quotes mag nooit uit de JS-string van een onclick breken
+        // (geen '/' in de payload: daar splitst de functie bewust op als alternatieven-scheiding)
+        const evil = "x');window.__pwned=true;('";
+        const markup = app.formatClickableExerciseName(evil);
+        document.body.innerHTML = `<div id="wrap">${markup}</div>`;
+
+        const span = document.querySelector('#wrap .exercise-search-target');
+        expect(span.dataset.exerciseName).toBe(evil);
+        // De handler haalt de naam uit het data-attribuut, niet uit een letterlijke string
+        expect(span.getAttribute('onclick')).toContain('this.dataset.exerciseName');
+        expect(span.getAttribute('onclick')).not.toContain('window.__pwned');
     });
 });
 
@@ -909,6 +1439,92 @@ describe('validateBackup', () => {
         expect(() => app.validateBackup({})).toThrow();
         expect(() => app.validateBackup({ plans: 'geen array', logs: [] })).toThrow();
         expect(() => app.validateBackup({ plans: [], logs: 'geen array' })).toThrow();
+    });
+});
+
+describe('validatePlanSchema', () => {
+    const validPlan = {
+        name: 'Full Body Schema',
+        sessions: [
+            {
+                name: 'Sessie A',
+                exercises: [
+                    { name: 'Squat', sets: 3 },
+                    { name: 'Bench Press', sets: 4 }
+                ]
+            }
+        ]
+    };
+
+    it('should accept a valid plan schema', () => {
+        expect(DataStore.validatePlanSchema(validPlan)).toBe(true);
+    });
+
+    it('should reject non-object or null plan data', () => {
+        expect(() => DataStore.validatePlanSchema(null)).toThrow("JSON-object");
+        expect(() => DataStore.validatePlanSchema("invalid")).toThrow("JSON-object");
+        expect(() => DataStore.validatePlanSchema([])).toThrow("JSON-object");
+    });
+
+    it('should reject plan data with missing or empty name', () => {
+        expect(() => DataStore.validatePlanSchema({ sessions: validPlan.sessions })).toThrow("Schema-naam ('name') is verplicht");
+        expect(() => DataStore.validatePlanSchema({ name: '  ', sessions: validPlan.sessions })).toThrow("Schema-naam ('name') is verplicht");
+    });
+
+    it('should reject plan data with missing or empty sessions array', () => {
+        expect(() => DataStore.validatePlanSchema({ name: 'Plan' })).toThrow("minstens één sessie");
+        expect(() => DataStore.validatePlanSchema({ name: 'Plan', sessions: [] })).toThrow("minstens één sessie");
+    });
+
+    it('should reject session missing a valid name', () => {
+        const invalid = {
+            name: 'Plan',
+            sessions: [{ name: '', exercises: [{ name: 'Squat', sets: 3 }] }]
+        };
+        expect(() => DataStore.validatePlanSchema(invalid)).toThrow("Sessienaam ('name') is verplicht");
+    });
+
+    it('should reject session missing an exercises array or having empty exercises', () => {
+        const invalid1 = {
+            name: 'Plan',
+            sessions: [{ name: 'Sessie A' }]
+        };
+        const invalid2 = {
+            name: 'Plan',
+            sessions: [{ name: 'Sessie A', exercises: [] }]
+        };
+        expect(() => DataStore.validatePlanSchema(invalid1)).toThrow("minstens één oefening");
+        expect(() => DataStore.validatePlanSchema(invalid2)).toThrow("minstens één oefening");
+    });
+
+    it('should reject exercise missing a name', () => {
+        const invalid = {
+            name: 'Plan',
+            sessions: [{ name: 'Sessie A', exercises: [{ sets: 3 }] }]
+        };
+        expect(() => DataStore.validatePlanSchema(invalid)).toThrow("Oefeningnaam ('name') is verplicht");
+    });
+
+    it('should reject exercise with missing, non-numeric, or <= 0 sets', () => {
+        const invalid1 = {
+            name: 'Plan',
+            sessions: [{ name: 'Sessie A', exercises: [{ name: 'Squat' }] }]
+        };
+        const invalid2 = {
+            name: 'Plan',
+            sessions: [{ name: 'Sessie A', exercises: [{ name: 'Squat', sets: 0 }] }]
+        };
+        const invalid3 = {
+            name: 'Plan',
+            sessions: [{ name: 'Sessie A', exercises: [{ name: 'Squat', sets: 'vijf' }] }]
+        };
+        expect(() => DataStore.validatePlanSchema(invalid1)).toThrow("Aantal sets ('sets') moet een getal groter dan 0 zijn");
+        expect(() => DataStore.validatePlanSchema(invalid2)).toThrow("Aantal sets ('sets') moet een getal groter dan 0 zijn");
+        expect(() => DataStore.validatePlanSchema(invalid3)).toThrow("Aantal sets ('sets') moet een getal groter dan 0 zijn");
+    });
+
+    it('should prevent importing invalid plans into store.importPlan', () => {
+        expect(() => store.importPlan({ name: 'Kapot Plan' })).toThrow();
     });
 });
 
@@ -1056,4 +1672,599 @@ describe('app XSS Security', () => {
         expect(html).not.toContain('<svg');
         expect(html).toContain('&lt;script&gt;alert(2)&lt;/script&gt;');
     });
+
+    it('should escape HTML in toast messages', () => {
+        document.body.innerHTML = '<div id="toast-container"></div>';
+        app.showToast('<img src=x onerror=alert(1)> Foutmelding!', 'error');
+
+        const container = document.getElementById('toast-container');
+        expect(container.innerHTML).not.toContain('<img src=x');
+        expect(container.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    });
+
+    it('should escape achievement title and description when rendering achievements', () => {
+        document.body.innerHTML = '<div id="achievements-grid"></div>';
+        store.logs = [];
+
+        app.renderAchievements();
+
+        const cards = document.querySelectorAll('.achievement');
+        expect(cards.length).toBeGreaterThan(0);
+        cards.forEach(card => {
+            expect(card.innerHTML).not.toContain('<script>');
+            expect(card.innerHTML).not.toContain('<img src=x');
+        });
+    });
 });
+
+describe('PWA manifest', () => {
+    it('should have all required PWA manifest fields including id, scope, lang, categories and icons', () => {
+        const fs = require('fs');
+        const path = require('path');
+        const manifestPath = path.join(__dirname, 'manifest.json');
+        const manifestRaw = fs.readFileSync(manifestPath, 'utf8');
+        const manifest = JSON.parse(manifestRaw);
+
+        expect(manifest.id).toBe('./');
+        expect(manifest.scope).toBe('./');
+        expect(manifest.lang).toBe('nl');
+        expect(manifest.name).toBe('Go Fitness');
+        expect(manifest.start_url).toBe('./index.html');
+        expect(manifest.display).toBe('standalone');
+        expect(Array.isArray(manifest.categories)).toBe(true);
+        expect(manifest.categories).toContain('fitness');
+
+        expect(Array.isArray(manifest.icons)).toBe(true);
+        expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
+        const maskableIcon = manifest.icons.find(i => i.purpose === 'maskable');
+        expect(maskableIcon).toBeDefined();
+    });
+});
+
+describe('Hold Timer (Stopwatch)', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [];
+        app.activeWorkout = null;
+        if (app.holdTimerState && app.holdTimerState.intervalId) {
+            clearInterval(app.holdTimerState.intervalId);
+        }
+        app.holdTimerState = null;
+    });
+
+    afterEach(() => {
+        if (app.holdTimerState && app.holdTimerState.intervalId) {
+            clearInterval(app.holdTimerState.intervalId);
+        }
+        app.holdTimerState = null;
+    });
+
+    it('should correctly identify hold/isometric exercises', () => {
+        expect(app.isHoldExercise({ name: 'Side Plank' })).toBe(true);
+        expect(app.isHoldExercise({ name: 'Plank hold' })).toBe(true);
+        expect(app.isHoldExercise({ name: 'Side Raise' })).toBe(true);
+        expect(app.isHoldExercise({ name: 'Wall Sit' })).toBe(true);
+        expect(app.isHoldExercise({ name: 'Bench Press' })).toBe(false);
+        expect(app.isHoldExercise({ name: 'Custom', exerciseType: 'isometric' })).toBe(true);
+        expect(app.isHoldExercise({ name: 'Custom', trackMetrics: ['duration_seconds'] })).toBe(true);
+    });
+
+    it('should allow setting start delay seconds in DataStore', () => {
+        store.setHoldTimerDelaySeconds(5);
+        expect(store.holdTimerDelaySeconds).toBe(5);
+
+        store.setHoldTimerDelaySeconds(0);
+        expect(store.holdTimerDelaySeconds).toBe(0);
+    });
+
+    it('should calculate gross duration minus 1 second reaction time compensation on stop', () => {
+        const mockSession = {
+            id: 'sess_1',
+            name: 'Test Session',
+            exercises: [
+                { id: 'ex_1', name: 'Side Plank', sets: 2, actualReps: ['', ''], setsCompleted: [false, false] }
+            ]
+        };
+        app.activeWorkout = {
+            session: mockSession,
+            exercises: mockSession.exercises
+        };
+
+        store.holdTimerDelaySeconds = 0; // zero delay for immediate test
+        app.startHoldTimer(0, 0);
+
+        expect(app.holdTimerState).not.toBeNull();
+        expect(app.holdTimerState.status).toBe('running');
+
+        // Simulate 10 seconds elapsed time deterministically
+        app.holdTimerState.startTime = Date.now() - 10000;
+
+        // Stop timer
+        app.stopHoldTimer(true);
+
+        // Gross 10s minus 1s offset compensation = 9s
+        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('9');
+        expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(true);
+        expect(app.holdTimerState).toBeNull();
+    });
+
+    it('should adjust duration using adjustDuration (+1s, -1s)', () => {
+        const mockSession = {
+            id: 'sess_1',
+            name: 'Test Session',
+            exercises: [
+                { id: 'ex_1', name: 'Plank', sets: 1, actualReps: ['20'] }
+            ]
+        };
+        app.activeWorkout = {
+            session: mockSession,
+            exercises: mockSession.exercises
+        };
+
+        app.adjustDuration(0, 0, 1);
+        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('21');
+
+        app.adjustDuration(0, 0, -1);
+        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('20');
+
+        app.adjustDuration(0, 0, -30); // should not go below 0
+        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('0');
+    });
+
+    it('should auto-select the first uncompleted set when starting timer without setIndex', () => {
+        const mockSession = {
+            id: 'sess_1',
+            name: 'Test Session',
+            exercises: [
+                { id: 'ex_1', name: 'Plank', sets: 3, actualReps: ['30', '', ''], setsCompleted: [true, false, false] }
+            ]
+        };
+        app.activeWorkout = {
+            session: mockSession,
+            exercises: mockSession.exercises
+        };
+
+        store.holdTimerDelaySeconds = 0;
+        app.startHoldTimer(0);
+
+        expect(app.holdTimerState.setIndex).toBe(1); // auto-selected set 2 (index 1)
+    });
+
+    it('should auto-complete hold exercises when duration is entered via updateReps or adjustDuration', () => {
+        const mockSession = {
+            id: 'sess_1',
+            name: 'Test Session',
+            exercises: [
+                { id: 'ex_1', name: 'Plank Hold', sets: 2, actualReps: ['', ''], setsCompleted: [false, false] }
+            ]
+        };
+        app.activeWorkout = {
+            session: mockSession,
+            exercises: mockSession.exercises
+        };
+
+        app.updateReps(0, 0, '45');
+        expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(true);
+
+        app.adjustDuration(0, 1, 30);
+        expect(app.activeWorkout.exercises[0].setsCompleted[1]).toBe(true);
+    });
+
+    it('should sequentially complete sets in timed exercises on stopHoldTimer', () => {
+        const mockSession = {
+            id: 'sess_1',
+            name: 'Test Session',
+            exercises: [
+                { id: 'ex_1', name: 'Plank Hold', sets: 3, actualReps: ['', '', ''], setsCompleted: [false, false, false] }
+            ]
+        };
+        app.activeWorkout = {
+            session: mockSession,
+            exercises: mockSession.exercises
+        };
+        store.holdTimerDelaySeconds = 0;
+
+        // Run set 1 timer
+        app.startHoldTimer(0);
+        expect(app.holdTimerState.setIndex).toBe(0);
+        app.holdTimerState.startTime = Date.now() - 31000;
+        app.stopHoldTimer(true);
+
+        expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('30');
+        expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(true);
+
+        // Run set 2 timer (should automatically pick index 1)
+        app.startHoldTimer(0);
+        expect(app.holdTimerState.setIndex).toBe(1);
+        app.holdTimerState.startTime = Date.now() - 41000;
+        app.stopHoldTimer(true);
+
+        expect(app.activeWorkout.exercises[0].actualReps[1]).toBe('40');
+        expect(app.activeWorkout.exercises[0].setsCompleted[1]).toBe(true);
+    });
+});
+
+describe('clickable exercise web search', () => {
+    it('should split compound exercise names into individual clickable search targets', () => {
+        const html = app.formatClickableExerciseName('Leg Press of Squat');
+        expect(html).toContain('exercise-search-target');
+        expect(html).toContain('Leg Press');
+        expect(html).toContain('Squat');
+        expect(html).toContain('app.triggerExerciseSearch');
+    });
+
+    it('should handle single exercise names correctly', () => {
+        const html = app.formatClickableExerciseName('Bench Press');
+        expect(html).toContain('exercise-search-target');
+        expect(html).toContain('Bench Press');
+    });
+
+    it('should select text and open search window on triggerExerciseSearch', () => {
+        const openSpy = jest.spyOn(window, 'open').mockImplementation(() => {});
+        const mockEl = document.createElement('div');
+        mockEl.textContent = 'Leg Press';
+
+        app.triggerExerciseSearch('Leg Press', { stopPropagation: jest.fn() }, mockEl);
+
+        expect(openSpy).toHaveBeenCalledWith(
+            'https://www.google.com/search?q=Leg%20Press',
+            '_blank'
+        );
+
+        openSpy.mockRestore();
+    });
+});
+
+describe('Exercise Library & Custom Vrije Sessie', () => {
+    let mockLocalStorage;
+
+    beforeEach(() => {
+        store.customExercises = [];
+        mockLocalStorage = {
+            store: {},
+            getItem: jest.fn(key => mockLocalStorage.store[key] || null),
+            setItem: jest.fn((key, value) => {
+                mockLocalStorage.store[key] = value.toString();
+            }),
+            removeItem: jest.fn(key => {
+                delete mockLocalStorage.store[key];
+            }),
+            clear: jest.fn(() => {
+                mockLocalStorage.store = {};
+            })
+        };
+        Object.defineProperty(global, 'localStorage', {
+            value: mockLocalStorage,
+            configurable: true
+        });
+    });
+
+    it('should retrieve exercise library containing default and custom exercises', () => {
+        const store = new DataStore();
+        const library = store.getExerciseLibrary();
+
+        expect(library.length).toBeGreaterThan(15); // contains built-in exercises
+        expect(library.some(e => e.name === 'Barbell Bench Press')).toBe(true);
+
+        const customEx = store.addCustomExercise({
+            name: 'Bulgarian Split Squat',
+            muscleGroups: ['legs', 'glutes'],
+            exerciseType: 'weight_reps'
+        });
+
+        const updatedLib = store.getExerciseLibrary();
+        expect(updatedLib.some(e => e.name === 'Bulgarian Split Squat')).toBe(true);
+    });
+
+    it('should allow adding, updating and deleting custom exercises', () => {
+        const testStore = new DataStore();
+        testStore.customExercises = [];
+        const created = testStore.addCustomExercise({
+            name: 'Pike Push-Up',
+            muscleGroups: ['shoulders', 'triceps'],
+            exerciseType: 'bodyweight_reps'
+        });
+
+        expect(created.id).toBeDefined();
+        expect(testStore.customExercises.length).toBe(1);
+
+        testStore.updateCustomExercise(created.id, { name: 'Pike Pushup Modified' });
+        expect(testStore.customExercises[0].name).toBe('Pike Pushup Modified');
+
+        testStore.deleteCustomExercise(created.id);
+        expect(testStore.customExercises.length).toBe(0);
+    });
+
+    it('should detect exercise type based on exercise name keywords', () => {
+        expect(app.detectExerciseType('Plank Hold').exerciseType).toBe('duration');
+        expect(app.detectExerciseType('Hardlopen').exerciseType).toBe('duration');
+        expect(app.detectExerciseType('Pull-Up').exerciseType).toBe('bodyweight_reps');
+        expect(app.detectExerciseType('Dumbbell Bicep Curl').exerciseType).toBe('weight_reps');
+    });
+
+    it('should start a Vrije Sessie workout correctly', () => {
+        const navigateSpy = jest.spyOn(app, 'navigate').mockImplementation(() => {});
+
+        app.startCustomWorkout();
+
+        expect(app.activeWorkout).toBeDefined();
+        expect(app.activeWorkout.session.name).toBe('Vrije Sessie');
+        expect(app.activeWorkout.exercises).toEqual([]);
+
+        navigateSpy.mockRestore();
+    });
+
+    it('should add exercise to active workout and match previous exercise history', () => {
+        const navigateSpy = jest.spyOn(app, 'navigate').mockImplementation(() => {});
+
+        // Pre-populate previous log
+        store.logs = [
+            {
+                id: 'log_1',
+                date: new Date().toISOString(),
+                exercises: [
+                    {
+                        name: 'Barbell Bench Press',
+                        details: [{ setNumber: 1, weight: '80', reps: '10' }]
+                    }
+                ]
+            }
+        ];
+
+        app.startCustomWorkout();
+        app.addExerciseToActiveWorkout({
+            name: 'Barbell Bench Press',
+            muscleGroups: ['chest'],
+            exerciseType: 'weight_reps'
+        }, 3, '10');
+
+        expect(app.activeWorkout.exercises.length).toBe(1);
+        expect(app.activeWorkout.exercises[0].name).toBe('Barbell Bench Press');
+
+        const prevDetails = app.getPreviousExerciseDetails('Barbell Bench Press');
+        expect(prevDetails).toBeDefined();
+        expect(prevDetails[0].weight).toBe('80');
+
+        navigateSpy.mockRestore();
+    });
+
+    it('should split Seated Cable Row and Row Machine with duration and stand input', () => {
+        const lib = store.getExerciseLibrary();
+        const seatedRow = lib.find(e => e.name === 'Seated Cable Row');
+        const rowMachine = lib.find(e => e.name === 'Row Machine (Roeimachine)');
+
+        expect(seatedRow).toBeDefined();
+        expect(seatedRow.exerciseType).toBe('weight_reps');
+
+        expect(rowMachine).toBeDefined();
+        expect(rowMachine.exerciseType).toBe('duration');
+        expect(rowMachine.trackMetrics).toContain('level');
+
+        // Test exercise type detection
+        const detectedSeated = app.detectExerciseType('Seated Cable Row');
+        expect(detectedSeated.exerciseType).toBe('weight_reps');
+
+        const detectedMachine = app.detectExerciseType('Row Machine (Roeimachine)');
+        expect(detectedMachine.exerciseType).toBe('duration');
+
+        // Test hold timer check
+        expect(app.isHoldExercise(rowMachine)).toBe(true);
+
+        // Test updating level input and finishing workout
+        app.startCustomWorkout();
+        app.addExerciseToActiveWorkout(rowMachine, 2, '300');
+
+        const exIndex = 0;
+        app.updateLevel(exIndex, 0, 'Stand 6');
+        app.updateReps(exIndex, 0, '300');
+        app.activeWorkout.exercises[exIndex].setsCompleted[0] = true;
+
+        expect(app.activeWorkout.exercises[exIndex].levels[0]).toBe('Stand 6');
+
+        app.finishWorkout();
+
+        const latestLog = store.logs[store.logs.length - 1];
+        expect(latestLog).toBeDefined();
+        const loggedEx = latestLog.exercises.find(e => e.name === 'Row Machine (Roeimachine)');
+        expect(loggedEx).toBeDefined();
+        expect(loggedEx.details[0].level).toBe('Stand 6');
+    });
+});
+
+describe('editing logged session date & time', () => {
+    beforeEach(() => {
+        store.logs = [];
+        store.plans = [];
+    });
+
+    it('should format ISO dates into datetime-local string format', () => {
+        const iso = '2026-07-20T14:30:00.000Z';
+        const formatted = app.formatDateTimeLocal(iso);
+        expect(formatted).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    });
+
+    it('should update log date when updateEditLogDate is called', () => {
+        app.logToEdit = {
+            id: 'log_1',
+            date: '2026-07-01T10:00:00.000Z',
+            duration: 45,
+            exercises: []
+        };
+
+        app.updateEditLogDate('2026-07-15T18:45');
+
+        const newDate = new Date(app.logToEdit.date);
+        expect(newDate).toBeDefined();
+        expect(isNaN(newDate.getTime())).toBe(false);
+    });
+
+    it('should save edited session date and time to store.logs', () => {
+        const renderHomeSpy = jest.spyOn(app, 'renderHome').mockImplementation(() => {});
+        const renderProgressSpy = jest.spyOn(app, 'renderProgress').mockImplementation(() => {});
+
+        const originalLog = {
+            id: 'log_100',
+            sessionName: 'Push A',
+            date: '2026-07-01T10:00:00.000Z',
+            duration: 45,
+            exercisesCompleted: 1,
+            exercises: [
+                {
+                    name: 'Bench Press',
+                    setsCompleted: 1,
+                    details: [{ setNumber: 1, weight: '60', reps: '10' }]
+                }
+            ]
+        };
+        store.logs = [originalLog];
+
+        document.body.innerHTML = `
+            <div id="modal-edit-log" class="modal-overlay hidden"></div>
+            <div id="edit-log-container"></div>
+            <div id="toast-container"></div>
+            <div id="history-list"></div>
+        `;
+
+        app.showEditLogModal('log_100');
+        expect(app.logToEdit).toBeDefined();
+
+        app.updateEditLogDate('2026-07-25T14:30');
+        app.saveEditLog();
+
+        expect(store.logs[0].date).toBeDefined();
+        expect(isNaN(new Date(store.logs[0].date).getTime())).toBe(false);
+        expect(store.logs[0].updatedAt).toBeDefined();
+
+        renderHomeSpy.mockRestore();
+        renderProgressSpy.mockRestore();
+    });
+
+    it('should add extra exercise to logToEdit when addExerciseToEditLog is called', () => {
+        app.logToEdit = {
+            id: 'log_101',
+            sessionName: 'Push A',
+            exercises: [
+                { name: 'Bench Press', details: [{ setNumber: 1, weight: '60', reps: '10' }] }
+            ]
+        };
+
+        document.body.innerHTML = `
+            <div id="modal-edit-log" class="modal-overlay hidden"></div>
+            <div id="edit-log-container"></div>
+            <div id="toast-container"></div>
+        `;
+
+        app.addExerciseToEditLog({ name: 'Incline Dumbbell Press', muscleGroups: ['borst', 'schouders'] }, 3, '10');
+
+        expect(app.logToEdit.exercises.length).toBe(2);
+        expect(app.logToEdit.exercises[1].name).toBe('Incline Dumbbell Press');
+        expect(app.logToEdit.exercises[1].details.length).toBe(3);
+    });
+
+    it('should add set to exercise when addSetToEditLog is called', () => {
+        app.logToEdit = {
+            id: 'log_102',
+            exercises: [
+                { name: 'Squat', details: [{ setNumber: 1, weight: '80', reps: '8' }] }
+            ]
+        };
+
+        document.body.innerHTML = `
+            <div id="modal-edit-log" class="modal-overlay hidden"></div>
+            <div id="edit-log-container"></div>
+            <div id="toast-container"></div>
+        `;
+
+        app.addSetToEditLog(0);
+
+        expect(app.logToEdit.exercises[0].details.length).toBe(2);
+        expect(app.logToEdit.exercises[0].details[1].setNumber).toBe(2);
+        expect(app.logToEdit.exercises[0].details[1].weight).toBe('80');
+    });
+
+    it('should remove set and exercise from logToEdit', () => {
+        app.logToEdit = {
+            id: 'log_103',
+            exercises: [
+                { name: 'Squat', details: [{ setNumber: 1, weight: '80', reps: '8' }, { setNumber: 2, weight: '80', reps: '8' }] },
+                { name: 'Leg Press', details: [{ setNumber: 1, weight: '120', reps: '10' }] }
+            ]
+        };
+
+        document.body.innerHTML = `
+            <div id="modal-edit-log" class="modal-overlay hidden"></div>
+            <div id="edit-log-container"></div>
+            <div id="toast-container"></div>
+        `;
+
+        app.removeSetFromEditLog(0, 0);
+        expect(app.logToEdit.exercises[0].details.length).toBe(1);
+        expect(app.logToEdit.exercises[0].details[0].setNumber).toBe(1);
+
+        app.removeExerciseFromEditLog(1);
+        expect(app.logToEdit.exercises.length).toBe(1);
+        expect(app.logToEdit.exercises[0].name).toBe('Squat');
+    });
+});
+
+describe('add and remove sets during workout', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.logs = [];
+        app.activeWorkout = null;
+        document.body.innerHTML = '<div id="workout-exercise-list"></div><div id="toast-container"></div>';
+    });
+
+    it('should default Row Machine to 1 set when added to active workout', () => {
+        const rowMachine = store.getExerciseLibrary().find(e => e.name === 'Row Machine (Roeimachine)');
+        expect(rowMachine).toBeDefined();
+        expect(rowMachine.defaultSets).toBe(1);
+
+        app.startCustomWorkout();
+        app.addExerciseToActiveWorkout(rowMachine);
+
+        expect(app.activeWorkout.exercises[0].sets).toBe(1);
+        expect(app.activeWorkout.exercises[0].setsCompleted.length).toBe(1);
+    });
+
+    it('should allow adding a set to an exercise during workout and inherit last set values', () => {
+        app.startCustomWorkout();
+        app.addExerciseToActiveWorkout({ name: 'Bench Press', exerciseType: 'weight_reps' }, 2);
+
+        app.activeWorkout.exercises[0].weights = ['80', '85'];
+        app.activeWorkout.exercises[0].actualReps = ['10', '8'];
+
+        app.addSetToExercise(0);
+
+        expect(app.activeWorkout.exercises[0].sets).toBe(3);
+        expect(app.activeWorkout.exercises[0].setsCompleted.length).toBe(3);
+        expect(app.activeWorkout.exercises[0].setsCompleted[2]).toBe(false);
+        expect(app.activeWorkout.exercises[0].weights[2]).toBe('85');
+        expect(app.activeWorkout.exercises[0].actualReps[2]).toBe('8');
+    });
+
+    it('should allow removing a set from an exercise during workout', () => {
+        app.startCustomWorkout();
+        app.addExerciseToActiveWorkout({ name: 'Squat', exerciseType: 'weight_reps' }, 3);
+        app.activeWorkout.exercises[0].weights = ['100', '110', '120'];
+
+        app.removeSetFromExercise(0, 1);
+
+        expect(app.activeWorkout.exercises[0].sets).toBe(2);
+        expect(app.activeWorkout.exercises[0].weights).toEqual(['100', '120']);
+    });
+
+    it('should prevent reducing sets below 1', () => {
+        app.startCustomWorkout();
+        app.addExerciseToActiveWorkout({ name: 'Deadlift', exerciseType: 'weight_reps' }, 1);
+
+        app.removeSetFromExercise(0, 0);
+
+        expect(app.activeWorkout.exercises[0].sets).toBe(1);
+    });
+});
+
+
+
+

@@ -1,103 +1,51 @@
 {
-  "schemaVersion": 2,
-  "type": "training_plan",
+  "id": "plan_1781938748008",
   "planId": "beginner-gym-bodyweight-mix-v2",
+  "schemaVersion": "2.0",
   "name": "Beginner Gym + Lichaamsgewicht Mix",
-  "description": "Rustig en praktisch startschema voor een beginner. Gericht op basiskracht, consistentie en lage drempel. Mix van sportschool en lichaamsgewichtoefeningen.",
-  "goal": "Basiskracht en trainingsroutine opbouwen",
-  "level": "beginner",
-  "locationType": "gym",
-  "equipment": [
-    "leg press of squat rack",
-    "bench press of chest press machine",
-    "lat pulldown machine",
-    "row machine or cable row",
-    "dumbbells",
-    "mat"
-  ],
+  "description": "Gebalanceerd 2-daags full body schema voor beginners (3x per week in A-B-A / B-A-B rotatie). Combineert effectieve gym-oefeningen met lichaamsgewicht voor optimale basiskracht en mobiliteit.",
+  "author": "Antigravity Coach",
+  "version": "2.1.0",
+  "targetAudience": "beginner",
   "schedule": {
+    "frequencyType": "sessions_per_week",
     "targetSessionsPerWeek": 3,
-    "minRecoveryHours": 48,
-    "preferredDays": ["monday", "wednesday", "friday"],
-    "defaultSessionOrder": ["full-body-a", "full-body-b"],
-    "recommendedPattern": "A-B-A, volgende week B-A-B",
-    "estimatedWeeklyMinutes": 135,
-    "adaptiveScheduling": true
+    "defaultSessionOrder": [
+      "full-body-a",
+      "full-body-b"
+    ],
+    "minRecoveryHours": 48
+  },
+  "progressionGlobalRules": {
+    "primaryMethod": "double_progression",
+    "description": "Verhoog eerst herhalingen binnen de weergegeven range met goed gevoel en vorm. Pas zodra het maximale aantal herhalingen in alle sets gehaald is, verhoog je het gewicht met een kleine stap."
   },
   "recoveryRules": {
-    "trafficLightEnabled": true,
-    "green": {
-      "label": "goed moment om te trainen",
-      "rule": "48 uur of meer sinds vorige sessie"
-    },
-    "orange": {
-      "label": "kan, maar rustig aan",
-      "rule": "24 tot 48 uur sinds vorige sessie of lichte vermoeidheid"
-    },
-    "red": {
-      "label": "beter rust nemen",
-      "rule": "minder dan 24 uur sinds vorige sessie of duidelijke spierpijn/vermoeidheid"
+    "minGlobalRecoveryHours": 48,
+    "muscleGroupRecoveryHours": {
+      "chest": 48,
+      "back": 48,
+      "legs": 72,
+      "glutes": 48,
+      "shoulders": 48,
+      "biceps": 48,
+      "triceps": 48,
+      "core": 24
     }
   },
-  "progressionRules": {
-    "method": "double_progression",
-    "globalRule": "Als alle sets aan de bovenkant van de herhalingsrange gehaald worden met goede vorm, verhoog dan de volgende keer het gewicht licht.",
-    "weightIncreaseGuidance": {
-      "upperBodyKg": 2.0,
-      "lowerBodyKg": 5.0
-    },
-    "notes": [
-      "Techniek gaat voor gewicht",
-      "Train niet tot complete uitputting",
-      "Laatste 2 herhalingen mogen zwaar voelen maar moeten haalbaar blijven"
-    ]
-  },
-  "completionRules": {
-    "exerciseCompletionMode": "manual_check",
-    "allowDirectExerciseCompletion": true,
-    "sessionCompletionMode": "all_exercises_checked_or_manual_override",
-    "sessionStatuses": ["completed", "partial", "skipped"]
-  },
-  "successMilestones": [
-    {
-      "milestoneId": "first-workout",
-      "name": "Eerste training voltooid",
-      "condition": "completed_sessions >= 1"
-    },
-    {
-      "milestoneId": "five-workouts",
-      "name": "Vijf trainingen gehaald",
-      "condition": "completed_sessions >= 5"
-    },
-    {
-      "milestoneId": "first-full-session",
-      "name": "Eerste volledige sessie afgevinkt",
-      "condition": "completed_full_sessions >= 1"
-    },
-    {
-      "milestoneId": "weekly-goal-once",
-      "name": "Weekdoel gehaald",
-      "condition": "weeks_goal_met >= 1"
-    },
-    {
-      "milestoneId": "three-weeks-consistent",
-      "name": "Drie weken consistent",
-      "condition": "weeks_goal_met >= 3"
-    }
+  "equipmentRequired": [
+    "bodyweight",
+    "dumbbells",
+    "cable_machine",
+    "leg_press_machine",
+    "chest_press_machine",
+    "lat_pulldown_machine"
   ],
-  "homeScreenHints": {
-    "primaryAction": "start_now",
-    "showTodayStatus": true,
-    "showRecoveryTrafficLight": true,
-    "showRecommendedSession": true,
-    "showWeeklyProgress": true,
-    "showRecentSuccesses": true
-  },
   "sessions": [
     {
       "sessionId": "full-body-a",
       "name": "Full Body A",
-      "description": "Basissessie met nadruk op grote bewegingen, rugwerk en eenvoudige core.",
+      "description": "Basissessie met nadruk op grote bewegingen, rugwerk, schouders en biceps.",
       "estimatedDurationMinutes": 45,
       "dayOrderHint": 1,
       "repeatable": true,
@@ -136,16 +84,10 @@
           "restSeconds": 90,
           "weightMode": "working_weight",
           "trackMetrics": ["weight", "reps", "completed"],
-          "alternatives": [
-            "Leg Press",
-            "Barbell Squat",
-            "Goblet Squat"
-          ],
-          "notes": [
-            "Kies de variant die technisch veilig voelt",
-            "Rustig zakken, gecontroleerd omhoog"
-          ],
-          "progressionRuleOverride": null
+          "alternatives": ["Leg Press", "Barbell Squat", "Goblet Squat"],
+          "notes": ["Kies de variant die technisch veilig voelt", "Rustig zakken, gecontroleerd omhoog"],
+          "progressionRuleOverride": null,
+          "id": "a-leg-press-or-squat"
         },
         {
           "exerciseId": "a-bench-press-or-chest-press",
@@ -161,16 +103,10 @@
           "restSeconds": 90,
           "weightMode": "working_weight",
           "trackMetrics": ["weight", "reps", "completed"],
-          "alternatives": [
-            "Bench Press",
-            "Chest Press Machine",
-            "Dumbbell Bench Press"
-          ],
-          "notes": [
-            "Schouders stabiel houden",
-            "Gecontroleerde beweging"
-          ],
-          "progressionRuleOverride": null
+          "alternatives": ["Bench Press", "Chest Press Machine", "Dumbbell Bench Press"],
+          "notes": ["Schouders stabiel houden", "Gecontroleerde beweging"],
+          "progressionRuleOverride": null,
+          "id": "a-bench-press-or-chest-press"
         },
         {
           "exerciseId": "a-lat-pulldown-or-assisted-pullup",
@@ -186,15 +122,10 @@
           "restSeconds": 90,
           "weightMode": "working_weight",
           "trackMetrics": ["weight", "reps", "completed"],
-          "alternatives": [
-            "Lat Pulldown",
-            "Assisted Pull-up"
-          ],
-          "notes": [
-            "Niet trekken met momentum",
-            "Volledige controle houden"
-          ],
-          "progressionRuleOverride": null
+          "alternatives": ["Lat Pulldown", "Assisted Pull-up"],
+          "notes": ["Niet trekken met momentum", "Volledige controle houden"],
+          "progressionRuleOverride": null,
+          "id": "a-lat-pulldown-or-assisted-pullup"
         },
         {
           "exerciseId": "a-seated-row",
@@ -210,16 +141,10 @@
           "restSeconds": 75,
           "weightMode": "working_weight",
           "trackMetrics": ["weight", "reps", "completed"],
-          "alternatives": [
-            "Seated Row Machine",
-            "Cable Row",
-            "Chest Supported Row"
-          ],
-          "notes": [
-            "Gecontroleerd terug laten komen",
-            "Geen gehaaste herhalingen"
-          ],
-          "progressionRuleOverride": null
+          "alternatives": ["Seated Row Machine", "Cable Row", "Chest Supported Row"],
+          "notes": ["Gecontroleerd terug laten komen", "Geen gehaaste herhalingen"],
+          "progressionRuleOverride": null,
+          "id": "a-seated-row"
         },
         {
           "exerciseId": "a-pushups",
@@ -233,19 +158,13 @@
           "repMode": "near_failure",
           "restSeconds": 60,
           "trackMetrics": ["reps", "completed"],
-          "alternatives": [
-            "Push-ups",
-            "Knee Push-ups",
-            "Incline Push-ups"
-          ],
-          "notes": [
-            "Stop net voor volledige mislukking",
-            "Kwaliteit belangrijker dan aantal"
-          ],
+          "alternatives": ["Push-ups", "Knee Push-ups", "Incline Push-ups"],
+          "notes": ["Stop net voor volledige mislukking", "Kwaliteit belangrijker dan aantal"],
           "progressionRuleOverride": {
             "method": "bodyweight_progression",
             "rule": "Verhoog eerst nette herhalingen, stap daarna over op zwaardere variant"
-          }
+          },
+          "id": "a-pushups"
         },
         {
           "exerciseId": "a-dumbbell-shoulder-press",
@@ -261,15 +180,10 @@
           "restSeconds": 75,
           "weightMode": "working_weight",
           "trackMetrics": ["weight", "reps", "completed"],
-          "alternatives": [
-            "Dumbbell Shoulder Press",
-            "Machine Shoulder Press"
-          ],
-          "notes": [
-            "Niet te zwaar starten",
-            "Volledige controle boven het hoofd"
-          ],
-          "progressionRuleOverride": null
+          "alternatives": ["Dumbbell Shoulder Press", "Machine Shoulder Press"],
+          "notes": ["Niet te zwaar starten", "Volledige controle boven het hoofd"],
+          "progressionRuleOverride": null,
+          "id": "a-dumbbell-shoulder-press"
         },
         {
           "exerciseId": "a-plank",
@@ -284,18 +198,13 @@
           "durationSecondsMax": 40,
           "restSeconds": 45,
           "trackMetrics": ["duration_seconds", "completed"],
-          "alternatives": [
-            "Plank",
-            "Knee Plank"
-          ],
-          "notes": [
-            "Lichaam recht houden",
-            "Stop als vorm inzakt"
-          ],
+          "alternatives": ["Plank", "Knee Plank"],
+          "notes": ["Lichaam recht houden", "Stop als vorm inzakt"],
           "progressionRuleOverride": {
             "method": "time_progression",
             "rule": "Verleng de tijd binnen de range voordat je een zwaardere variant kiest"
-          }
+          },
+          "id": "a-plank"
         },
         {
           "exerciseId": "a-dumbbell-bicep-curls",
@@ -303,38 +212,26 @@
           "name": "Dumbbell Bicep Curls",
           "category": "supporting",
           "exerciseType": "strength",
-          "muscleGroups": [
-            "biceps"
-          ],
+          "muscleGroups": ["biceps"],
           "movementPattern": "bicep_curl",
           "sets": 3,
           "repsMin": 10,
           "repsMax": 12,
           "restSeconds": 60,
           "weightMode": "working_weight",
-          "trackMetrics": [
-            "weight",
-            "reps",
-            "completed"
-          ],
-          "alternatives": [
-            "Dumbbell Bicep Curls",
-            "Hammer Curls",
-            "Cable Bicep Curl"
-          ],
-          "notes": [
-            "Houd bovenarmen stil langs het lichaam",
-            "Geen momentum of zwaaien met de rug"
-          ],
+          "trackMetrics": ["weight", "reps", "completed"],
+          "alternatives": ["Dumbbell Bicep Curls", "Hammer Curls", "Cable Bicep Curl"],
+          "notes": ["Houd bovenarmen stil langs het lichaam", "Geen momentum of zwaaien met de rug"],
           "progressionRuleOverride": null,
           "id": "a-dumbbell-bicep-curls"
         }
-      ]
+      ],
+      "id": "full-body-a"
     },
     {
       "sessionId": "full-body-b",
       "name": "Full Body B",
-      "description": "Lichte variatie voor afwisseling en gelijkmatige opbouw.",
+      "description": "Lichte variatie voor afwisseling, benen, lunges en biceps.",
       "estimatedDurationMinutes": 45,
       "dayOrderHint": 2,
       "repeatable": true,
@@ -344,16 +241,16 @@
           {
             "stepId": "warmup-b-1",
             "type": "cardio",
-            "name": "Fietsen of crosstrainer",
+            "name": "Roeitrainer of crosstrainer",
             "durationMinutes": 5,
-            "notes": "Rustig tempo"
+            "notes": "Licht tempo"
           },
           {
             "stepId": "warmup-b-2",
             "type": "activation",
-            "name": "Lichte opwarmsets van de eerste 2 oefeningen",
+            "name": "Dynamisch rekken (heupen en borst)",
             "durationMinutes": 3,
-            "notes": "1 lichte set per oefening"
+            "notes": "Losmaken van gewrichten"
           }
         ]
       },
@@ -373,14 +270,10 @@
           "restSeconds": 90,
           "weightMode": "working_weight",
           "trackMetrics": ["weight", "reps", "completed"],
-          "alternatives": [
-            "Goblet Squat",
-            "Leg Press"
-          ],
-          "notes": [
-            "Kies de variant die prettig en stabiel voelt"
-          ],
-          "progressionRuleOverride": null
+          "alternatives": ["Goblet Squat", "Leg Press"],
+          "notes": ["Houd borst op en rug recht"],
+          "progressionRuleOverride": null,
+          "id": "b-goblet-squat-or-leg-press"
         },
         {
           "exerciseId": "b-incline-press",
@@ -396,14 +289,10 @@
           "restSeconds": 90,
           "weightMode": "working_weight",
           "trackMetrics": ["weight", "reps", "completed"],
-          "alternatives": [
-            "Incline Dumbbell Press",
-            "Chest Press Machine"
-          ],
-          "notes": [
-            "Rustige, gecontroleerde herhalingen"
-          ],
-          "progressionRuleOverride": null
+          "alternatives": ["Incline Dumbbell Press", "Chest Press Machine"],
+          "notes": ["Bankje op ongeveer 30 graden"],
+          "progressionRuleOverride": null,
+          "id": "b-incline-press"
         },
         {
           "exerciseId": "b-lat-pulldown",
@@ -419,16 +308,13 @@
           "restSeconds": 90,
           "weightMode": "working_weight",
           "trackMetrics": ["weight", "reps", "completed"],
-          "alternatives": [
-            "Lat Pulldown"
-          ],
-          "notes": [
-            "Focus op controle en volledige range"
-          ],
-          "progressionRuleOverride": null
+          "alternatives": ["Lat Pulldown", "Cable Pulldown"],
+          "notes": ["Trek de stang naar de bovenkant van je borst"],
+          "progressionRuleOverride": null,
+          "id": "b-lat-pulldown"
         },
         {
-          "exerciseId": "b-row-variation",
+          "exerciseId": "b-chest-supported-row",
           "order": 4,
           "name": "Chest Supported Row of Cable Row",
           "category": "compound",
@@ -441,14 +327,10 @@
           "restSeconds": 75,
           "weightMode": "working_weight",
           "trackMetrics": ["weight", "reps", "completed"],
-          "alternatives": [
-            "Chest Supported Row",
-            "Cable Row"
-          ],
-          "notes": [
-            "Niet smijten met gewicht"
-          ],
-          "progressionRuleOverride": null
+          "alternatives": ["Chest Supported Row", "Cable Row"],
+          "notes": ["Niet smijten met gewicht"],
+          "progressionRuleOverride": null,
+          "id": "b-chest-supported-row"
         },
         {
           "exerciseId": "b-lunges",
@@ -463,14 +345,10 @@
           "restSeconds": 75,
           "weightMode": "bodyweight_or_working_weight",
           "trackMetrics": ["weight", "reps", "completed"],
-          "alternatives": [
-            "Walking Lunges",
-            "Static Lunges"
-          ],
-          "notes": [
-            "Begin zonder gewicht als nodig"
-          ],
-          "progressionRuleOverride": null
+          "alternatives": ["Walking Lunges", "Static Lunges"],
+          "notes": ["Begin zonder gewicht als nodig"],
+          "progressionRuleOverride": null,
+          "id": "b-lunges"
         },
         {
           "exerciseId": "b-incline-pushups",
@@ -484,17 +362,13 @@
           "repMode": "near_failure",
           "restSeconds": 60,
           "trackMetrics": ["reps", "completed"],
-          "alternatives": [
-            "Incline Push-ups",
-            "Push-ups"
-          ],
-          "notes": [
-            "Techniek blijft leidend"
-          ],
+          "alternatives": ["Incline Push-ups", "Push-ups"],
+          "notes": ["Techniek blijft leidend"],
           "progressionRuleOverride": {
             "method": "bodyweight_progression",
             "rule": "Verhoog eerst nette herhalingen, stap daarna over op zwaardere variant"
-          }
+          },
+          "id": "b-incline-pushups"
         },
         {
           "exerciseId": "b-side-plank",
@@ -508,16 +382,13 @@
           "durationText": "20-30 sec per kant",
           "restSeconds": 45,
           "trackMetrics": ["duration_seconds", "completed"],
-          "alternatives": [
-            "Side Plank"
-          ],
-          "notes": [
-            "Houd heupen stabiel"
-          ],
+          "alternatives": ["Side Plank"],
+          "notes": ["Houd heupen stabiel"],
           "progressionRuleOverride": {
             "method": "time_progression",
             "rule": "Verleng de tijd binnen de range voordat je een zwaardere variant kiest"
-          }
+          },
+          "id": "b-side-plank"
         },
         {
           "exerciseId": "b-dumbbell-bicep-curls",
@@ -525,33 +396,21 @@
           "name": "Dumbbell Bicep Curls",
           "category": "supporting",
           "exerciseType": "strength",
-          "muscleGroups": [
-            "biceps"
-          ],
+          "muscleGroups": ["biceps"],
           "movementPattern": "bicep_curl",
           "sets": 3,
           "repsMin": 10,
           "repsMax": 12,
           "restSeconds": 60,
           "weightMode": "working_weight",
-          "trackMetrics": [
-            "weight",
-            "reps",
-            "completed"
-          ],
-          "alternatives": [
-            "Dumbbell Bicep Curls",
-            "Cable Bicep Curl",
-            "Barbell Bicep Curl"
-          ],
-          "notes": [
-            "Houd bovenarmen stil langs het lichaam",
-            "Geen momentum of zwaaien met de rug"
-          ],
+          "trackMetrics": ["weight", "reps", "completed"],
+          "alternatives": ["Dumbbell Bicep Curls", "Cable Bicep Curl", "Barbell Bicep Curl"],
+          "notes": ["Houd bovenarmen stil langs het lichaam", "Geen momentum of zwaaien met de rug"],
           "progressionRuleOverride": null,
           "id": "b-dumbbell-bicep-curls"
         }
-      ]
+      ],
+      "id": "full-body-b"
     }
   ]
 }

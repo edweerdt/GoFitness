@@ -1,11 +1,13 @@
 // Versienummer ophogen bij wijzigingen aan de assets, zodat oude caches opgeruimd worden
-const CACHE_NAME = 'go-fitness-cache-v3';
+const CACHE_NAME = 'go-fitness-cache-v17';
 const ASSETS = [
     './',
     './index.html',
     './style.css',
     './app.js',
     './sync.js',
+    './firebase-config.js',
+    './friends.js',
     './manifest.json',
     './fonts/fonts.css',
     './fonts/inter-latin.woff2',
@@ -16,6 +18,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
+    self.skipWaiting();
     e.waitUntil(
         caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
     );

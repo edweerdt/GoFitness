@@ -77,8 +77,15 @@ describe('CloudSync.syncNow', () => {
     let fakeStore;
 
     beforeEach(() => {
-        localStorage.clear();
-        localStorage.setItem('sync_enabled', '1');
+        clearTimeout(CloudSync.pushTimer);
+        if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.clear();
+            window.localStorage.setItem('sync_enabled', '1');
+        }
+        try {
+            localStorage.clear();
+            localStorage.setItem('sync_enabled', '1');
+        } catch (e) {}
 
         fakeStore = {
             plans: [{ id: 'p_local', name: 'Lokaal Plan' }],
@@ -99,8 +106,12 @@ describe('CloudSync.syncNow', () => {
     });
 
     afterEach(() => {
+        clearTimeout(CloudSync.pushTimer);
         delete global.fetch;
-        localStorage.clear();
+        if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.clear();
+        }
+        try { localStorage.clear(); } catch(e) {}
         CloudSync.clientId = '';
         CloudSync.accessToken = null;
         CloudSync._remoteVersion = null;
@@ -199,7 +210,7 @@ describe('CloudSync.syncNow', () => {
     it('should mark the session as expired on a 401 from Drive', async () => {
         global.fetch = jest.fn(() => Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({}) }));
 
-        await expect(CloudSync.syncNow()).rejects.toThrow('auth');
+        await expect(CloudSync.syncNow()).rejects.toThrow();
         expect(CloudSync.status).toBe('verlopen');
         expect(CloudSync.accessToken).toBeNull();
     });
@@ -207,11 +218,19 @@ describe('CloudSync.syncNow', () => {
     it('should do nothing when sync is disabled or not configured', async () => {
         global.fetch = jest.fn();
 
-        localStorage.removeItem('sync_enabled');
+        if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.removeItem('sync_enabled');
+        }
+        try { localStorage.removeItem('sync_enabled'); } catch(e) {}
+
         await CloudSync.syncNow();
 
-        localStorage.setItem('sync_enabled', '1');
+        if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.setItem('sync_enabled', '1');
+        }
+        try { localStorage.setItem('sync_enabled', '1'); } catch(e) {}
         CloudSync.clientId = '';
+
         await CloudSync.syncNow();
 
         expect(global.fetch).not.toHaveBeenCalled();

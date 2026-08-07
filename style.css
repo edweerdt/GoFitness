@@ -100,27 +100,59 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
 }
 
 .status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 6px;
+    padding: 6px 14px;
     border-radius: 999px;
     font-weight: 500;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    width: auto !important;
+    max-width: 100%;
+    box-sizing: border-box;
+    align-self: flex-start;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
-.status-badge .material-icons-round { font-size: 1.2rem; }
+.status-badge .material-icons-round {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.status-badge #recovery-text {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
 
 .status-badge.green { background: var(--status-green-bg); color: var(--status-green); }
 .status-badge.orange { background: var(--status-orange-bg); color: var(--status-orange); }
 .status-badge.red { background: var(--status-red-bg); color: var(--status-red); }
 
+.status-badge .recovery-hours-text {
+    font-size: 0.85em;
+    opacity: 0.85;
+    font-weight: normal;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Headers */
 .home-header {
-    padding: 40px 20px 20px;
+    padding: 40px 20px 16px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.home-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
 }
 
 .workout-header, .top-nav {
@@ -203,11 +235,48 @@ button:disabled {
     font-size: 1.15rem;
 }
 
-/* Stat Boxes */
+/* Stat Boxes & Grids */
 .stats-mini, .stats-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+}
+
+.muscle-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+/* Progressie Grafieken op Desktop: 2x breedte van een Spiergroepen card (minmax(332px, 1fr)) */
+.exercise-progress-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(332px, 1fr));
+    gap: 12px;
+}
+
+.progress-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.progress-card:hover {
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 480px) {
+    .exercise-progress-grid {
+        grid-template-columns: 1fr;
+    }
+    .muscle-stats-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+}
+
+@media (min-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
 
 .stat-box {
@@ -248,28 +317,41 @@ button:disabled {
     right: 0;
     display: flex;
     justify-content: space-around;
-    padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+    align-items: center;
+    padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
     background: rgba(26, 29, 36, 0.85);
     backdrop-filter: blur(16px);
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     z-index: 100;
     border-radius: 24px 24px 0 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+#bottom-nav::-webkit-scrollbar {
+    display: none;
 }
 
 .nav-item {
+    flex: 1;
+    min-width: 62px;
     background: transparent;
     color: var(--text-muted);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    padding: 8px 16px;
+    padding: 6px 4px;
     border-radius: 12px;
+    white-space: nowrap;
+    text-align: center;
 }
 
 .nav-item span:last-child {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 500;
+    white-space: nowrap;
 }
 
 .nav-item.active {
@@ -278,7 +360,7 @@ button:disabled {
 
 .nav-item.active .material-icons-round {
     background: rgba(59, 130, 246, 0.15);
-    padding: 4px 16px;
+    padding: 4px 12px;
     border-radius: 12px;
 }
 
@@ -528,4 +610,340 @@ button:disabled {
 .progression-hint {
     color: var(--status-green);
     font-weight: 500;
+}
+
+/* Hold Timer Controls & Touch Adjustments */
+.hold-delay-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.04);
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-top: 8px;
+}
+
+.delay-pills {
+    display: flex;
+    gap: 6px;
+}
+
+.delay-pill {
+    background: var(--surface-light);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.delay-pill.active {
+    background: var(--accent-color);
+    color: white;
+    font-weight: 600;
+    border-color: var(--accent-color);
+}
+
+.hold-timer-container {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.hold-timer-container .hold-timer-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 16px;
+    font-size: 0.92rem;
+}
+
+.hold-timer-btn {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent-color);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.hold-timer-btn:active {
+    transform: scale(0.96);
+}
+
+.hold-timer-btn.starting {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border-color: #f59e0b;
+    animation: pulse-delay 1s infinite alternate;
+}
+
+.hold-timer-btn.running {
+    background: rgba(239, 68, 68, 0.25);
+    color: #ef4444;
+    border-color: #ef4444;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+    animation: pulse-running 1.2s infinite alternate;
+}
+
+@keyframes pulse-delay {
+    from { opacity: 0.8; }
+    to { opacity: 1; transform: scale(1.02); }
+}
+
+@keyframes pulse-running {
+    from { box-shadow: 0 0 4px rgba(239, 68, 68, 0.3); }
+    to { box-shadow: 0 0 14px rgba(239, 68, 68, 0.7); }
+}
+
+.step-btn-group {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+}
+
+.step-btn {
+    background: var(--surface-light);
+    color: var(--text-primary);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 6px 8px;
+    border-radius: 6px;
+    min-width: 26px;
+    text-align: center;
+}
+
+.step-btn:active {
+    background: var(--accent-color);
+    color: white;
+    transform: scale(0.94);
+}
+
+/* Clickable exercise names for web search */
+.exercise-search-target {
+    cursor: pointer;
+    text-decoration: underline dotted rgba(255, 255, 255, 0.35);
+    text-underline-offset: 3px;
+    transition: var(--transition);
+    user-select: text;
+}
+
+.exercise-search-target:hover {
+    color: var(--accent-color);
+    text-decoration: underline solid var(--accent-color);
+}
+
+.theme-light .exercise-search-target {
+    text-decoration: underline dotted rgba(0, 0, 0, 0.35);
+}
+
+.theme-light .exercise-search-target:hover {
+    color: var(--accent-color);
+    text-decoration: underline solid var(--accent-color);
+}
+
+/* Chip Checkbox */
+.chip-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+    transition: var(--transition);
+}
+
+.chip-checkbox input[type="checkbox"] {
+    accent-color: var(--accent-color);
+}
+
+.chip-checkbox:has(input:checked) {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: var(--accent-color);
+    color: var(--text-primary);
+}
+
+/* Variation Pill Selector */
+.variation-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0 4px 0;
+}
+
+.variation-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition);
+    user-select: none;
+}
+
+.variation-pill:hover {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.3);
+    color: var(--text-primary);
+}
+
+.variation-pill.active {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
+    font-weight: 600;
+}
+
+.theme-light .variation-pill {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.12);
+}
+
+.theme-light .variation-pill:hover {
+    background: rgba(37, 99, 235, 0.08);
+    border-color: rgba(37, 99, 235, 0.3);
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark) .variation-pill {
+        background: rgba(0, 0, 0, 0.04);
+        border-color: rgba(0, 0, 0, 0.12);
+    }
+    :root:not(.theme-dark) .variation-pill:hover {
+        background: rgba(37, 99, 235, 0.08);
+        border-color: rgba(37, 99, 235, 0.3);
+    }
+}
+
+/* Friends Exercise Comparison */
+.muscle-group-section {
+    margin-bottom: 20px;
+}
+
+.muscle-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0 8px 0;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-primary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 10px;
+}
+
+.exercise-compare-card {
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.theme-light .exercise-compare-card,
+.theme-light .muscle-group-header {
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark) .exercise-compare-card,
+    :root:not(.theme-dark) .muscle-group-header {
+        border-color: rgba(0, 0, 0, 0.06);
+    }
+}
+
+/* Progress Weeks Stepper Widget */
+.weeks-stepper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.weeks-stepper-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 500;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: var(--transition);
+    user-select: none;
+}
+
+.weeks-stepper-btn:hover {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
+.weeks-stepper-val,
+.weeks-stepper-input {
+    width: 52px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1.5px solid var(--status-green);
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--status-green);
+    font-weight: 700;
+    font-size: 0.95rem;
+    font-family: inherit;
+    text-align: center;
+    padding: 0 4px;
+    outline: none;
+    -moz-appearance: textfield;
+}
+
+.weeks-stepper-input::-webkit-outer-spin-button,
+.weeks-stepper-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.weeks-stepper-btn.all-btn {
+    font-size: 0.8rem;
+    font-weight: 600;
+    width: auto;
+    padding: 0 10px;
+}
+
+.weeks-stepper-btn.all-btn.active {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: var(--status-green);
+    color: var(--status-green);
+    font-weight: 700;
+}
+
+.theme-light .weeks-stepper-btn {
+    border-color: rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.03);
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark) .weeks-stepper-btn {
+        border-color: rgba(0, 0, 0, 0.15);
+        background: rgba(0, 0, 0, 0.03);
+    }
 }

@@ -11,6 +11,10 @@
     <meta name="theme-color" content="#121212">
     <!-- Self-hosted fonts (Inter + Material Icons Round) voor betrouwbaar offline gebruik -->
     <link rel="stylesheet" href="fonts/fonts.css">
+    <!-- Firebase SDK (Compat voor Vanilla JS) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
     <!-- App Container -->
@@ -20,17 +24,16 @@
             <!-- Home View -->
             <section id="view-home" class="view active">
                 <header class="home-header">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                        <div>
-                            <h1 id="home-date">Vandaag</h1>
-                            <div id="recovery-status" class="status-badge green mt-2">
-                                <span class="material-icons-round">battery_charging_full</span>
-                                <span id="recovery-text">Klaar om te trainen</span>
-                            </div>
-                        </div>
+                    <div class="home-header-row">
+                        <h1 id="home-date">Vandaag</h1>
                         <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen">
                             <span class="material-icons-round">brightness_auto</span>
                         </button>
+                    </div>
+                    <div id="recovery-status" class="status-badge green">
+                        <span class="material-icons-round">battery_charging_full</span>
+                        <span id="recovery-text">Klaar om te trainen</span>
+                        <span id="recovery-hours" class="recovery-hours-text"></span>
                     </div>
                 </header>
                 <div class="content-padded">
@@ -38,6 +41,10 @@
                         <h3 id="recommended-card-title">Aanbevolen Sessie</h3>
                         <h2 id="recommended-session-name">Geen schema actief</h2>
                         <p id="recommended-reason" class="text-muted">Importeer eerst een trainingsschema.</p>
+                        <div id="session-picker-wrapper" class="hidden mt-3">
+                            <label for="home-session-select" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Kies een andere sessie uit je schema:</label>
+                            <select id="home-session-select" class="input-field" style="font-family:inherit; font-size:0.9rem; padding:8px 12px;"></select>
+                        </div>
                         <button id="btn-start-session" class="btn-primary mt-4" disabled>Start Nu</button>
                     </div>
                     
@@ -67,7 +74,7 @@
             <!-- Workout View -->
             <section id="view-workout" class="view">
                 <header class="workout-header">
-                    <button class="icon-btn" onclick="app.navigate('home')"><span class="material-icons-round">close</span></button>
+                    <button class="icon-btn" onclick="app.showCancelWorkoutModal()" title="Training annuleren"><span class="material-icons-round">close</span></button>
                     <h2 id="workout-title">Training</h2>
                     <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen">
                         <span class="material-icons-round">brightness_auto</span>
@@ -112,6 +119,25 @@
                     <div id="plans-list" class="mt-4 flex-col gap-3">
                         <!-- Plans injected here -->
                     </div>
+
+                    <!-- Oefeningenbibliotheek -->
+                    <div class="glass-panel mt-6">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Oefeningenbibliotheek</h3>
+                                <p class="text-sm text-muted mt-1">Beheer ingebouwde en eigen oefeningen</p>
+                            </div>
+                            <button class="btn-primary" onclick="app.showAddExerciseModal()" style="padding:6px 12px; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:1.1rem;">add</span> Nieuw
+                            </button>
+                        </div>
+                        <div style="margin-top:12px;">
+                            <input type="text" id="library-search" class="input-field" placeholder="Zoek op naam of spiergroep..." style="width:100%;" oninput="app.renderExerciseLibrary()">
+                        </div>
+                        <div id="exercise-library-list" class="mt-3 flex-col gap-2" style="max-height: 400px; overflow-y: auto;">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -126,13 +152,21 @@
                         <!-- Stats injected here -->
                     </div>
 
-                    <h3 class="mt-6">Progressie</h3>
-                    <div id="exercise-progress-list" class="mt-2 flex-col gap-3">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px; margin-bottom:8px;">
+                        <h3 style="margin:0;">Progressie</h3>
+                        <div class="weeks-stepper">
+                            <button class="weeks-stepper-btn" onclick="app.adjustProgressWeeks(-1)" title="1 week minder">-</button>
+                            <input type="number" id="progress-weeks-input" class="weeks-stepper-input" min="1" max="999" value="1" onchange="app.setProgressWeeks(this.value)" onkeydown="if(event.key==='Enter'){this.blur();}">
+                            <button class="weeks-stepper-btn" onclick="app.adjustProgressWeeks(1)" title="1 week extra">+</button>
+                            <button id="btn-progress-all" class="weeks-stepper-btn all-btn" onclick="app.setProgressWeeks('all')" title="Alle weken tonen">All</button>
+                        </div>
+                    </div>
+                    <div id="exercise-progress-list" class="mt-2 exercise-progress-grid">
                         <!-- Exercise progress injected here -->
                     </div>
 
                     <h3 class="mt-6">Spiergroepen</h3>
-                    <div id="muscle-stats-grid" class="mt-2" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px;">
+                    <div id="muscle-stats-grid" class="mt-2 muscle-stats-grid">
                         <!-- Muscle stats injected here -->
                     </div>
 
@@ -154,6 +188,16 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Friends View -->
+            <section id="view-friends" class="view">
+                <header class="top-nav">
+                    <h2>Vrienden</h2>
+                </header>
+                <div class="content-padded pb-32" id="friends-container">
+                    <!-- Injected by JS (FriendsManager / app.renderFriends) -->
+                </div>
+            </section>
         </main>
 
         <!-- Bottom Navigation -->
@@ -169,6 +213,10 @@
             <button class="nav-item" data-target="progress">
                 <span class="material-icons-round">bar_chart</span>
                 <span>Statistieken</span>
+            </button>
+            <button class="nav-item" data-target="friends">
+                <span class="material-icons-round">group</span>
+                <span>Vrienden</span>
             </button>
             <button class="nav-item" data-target="achievements">
                 <span class="material-icons-round">emoji_events</span>
@@ -209,6 +257,21 @@
                 </div>
             </div>
         </div>
+        <!-- Cancel Workout Modal -->
+        <div id="modal-cancel-workout" class="modal-overlay hidden">
+            <div class="modal-content glass-panel" style="text-align: center;">
+                <div class="stat-icon-wrapper" style="margin: 0 auto 16px auto; width: 64px; height: 64px; font-size: 32px; background: rgba(255, 82, 82, 0.1); color: #ff5252;">
+                    <span class="material-icons-round" style="font-size: 32px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">cancel</span>
+                </div>
+                <h3>Training Annuleren?</h3>
+                <p class="text-sm text-muted mt-2">Weet je zeker dat je deze training wilt annuleren? Niet-opgeslagen sets gaan verloren en de sessie wordt niet opgeslagen.</p>
+                <div class="modal-actions mt-6">
+                    <button class="btn-secondary flex-1" onclick="app.hideCancelWorkoutModal()">Verder Trainen</button>
+                    <button class="btn-primary flex-1" style="background: #ff5252; color: white;" onclick="app.cancelWorkout()">Ja, Annuleren</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Delete Log Modal -->
         <div id="modal-delete-log" class="modal-overlay hidden">
             <div class="modal-content glass-panel" style="text-align: center;">
@@ -235,6 +298,111 @@
                 <div class="modal-actions mt-6">
                     <button class="btn-secondary flex-1" onclick="app.hideDeleteModal('plan')">Annuleren</button>
                     <button class="btn-primary flex-1" style="background: #ff5252; color: white;" onclick="app.confirmDelete('plan')">Verwijderen</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Exercise Modal -->
+        <div id="modal-delete-exercise" class="modal-overlay hidden">
+            <div class="modal-content glass-panel" style="text-align: center;">
+                <div class="stat-icon-wrapper" style="margin: 0 auto 16px auto; width: 64px; height: 64px; font-size: 32px; background: rgba(255, 82, 82, 0.1); color: #ff5252;">
+                    <span class="material-icons-round" style="font-size: 32px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">delete_outline</span>
+                </div>
+                <h3>Oefening Verwijderen?</h3>
+                <p class="text-sm text-muted mt-2">Weet je zeker dat je deze oefening uit je bibliotheek wilt verwijderen?</p>
+                <div class="modal-actions mt-6">
+                    <button class="btn-secondary flex-1" onclick="app.hideDeleteModal('exercise')">Annuleren</button>
+                    <button class="btn-primary flex-1" style="background: #ff5252; color: white;" onclick="app.confirmDelete('exercise')">Verwijderen</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add / Edit Exercise Modal -->
+        <div id="modal-add-exercise" class="modal-overlay hidden">
+            <div class="modal-content glass-panel" style="max-width: 480px; width: 100%;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h3 id="modal-add-exercise-title" style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Oefening Toevoegen</h3>
+                    <button class="icon-btn" onclick="app.hideAddExerciseModal()"><span class="material-icons-round">close</span></button>
+                </div>
+                <input type="hidden" id="ex-edit-id">
+                <div class="flex-col gap-3">
+                    <div>
+                        <label for="new-ex-name" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Naam oefening *</label>
+                        <input type="text" id="new-ex-name" class="input-field" placeholder="bijv. Bulgarian Split Squat" oninput="app.handleExerciseNameInput(this.value)">
+                    </div>
+
+                    <div>
+                        <label class="text-sm text-muted" style="display:block; margin-bottom:6px;">Spiergroepen</label>
+                        <div id="new-ex-muscles" style="display:flex; flex-wrap:wrap; gap:6px;">
+                            <label class="chip-checkbox"><input type="checkbox" value="chest"> Borst</label>
+                            <label class="chip-checkbox"><input type="checkbox" value="back"> Rug</label>
+                            <label class="chip-checkbox"><input type="checkbox" value="legs"> Benen</label>
+                            <label class="chip-checkbox"><input type="checkbox" value="glutes"> Billen</label>
+                            <label class="chip-checkbox"><input type="checkbox" value="shoulders"> Schouders</label>
+                            <label class="chip-checkbox"><input type="checkbox" value="biceps"> Biceps</label>
+                            <label class="chip-checkbox"><input type="checkbox" value="triceps"> Triceps</label>
+                            <label class="chip-checkbox"><input type="checkbox" value="core"> Core</label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="new-ex-type" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Type Invoervelden (Herkenning)</label>
+                        <select id="new-ex-type" class="input-field" onchange="app.markTypeManuallySelected()">
+                            <option value="weight_reps">Gewicht & Reps (bijv. Bench Press, Squat)</option>
+                            <option value="bodyweight_reps">Lichaamsgewicht & Reps (bijv. Push-up, Pull-up)</option>
+                            <option value="duration">Duur in Seconden (bijv. Plank Hold, Statisch)</option>
+                        </select>
+                        <div id="new-ex-type-hint" class="text-sm text-accent mt-1" style="font-size:0.8rem;"></div>
+                    </div>
+
+                    <div>
+                        <label for="new-ex-category" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Categorie</label>
+                        <select id="new-ex-category" class="input-field">
+                            <option value="compound">Compound (samengesteld)</option>
+                            <option value="isolation">Isolatie</option>
+                            <option value="bodyweight">Lichaamsgewicht</option>
+                            <option value="isometric">Statisch / Isometric</option>
+                            <option value="cardio">Cardio / Duur</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-actions mt-6">
+                    <button class="btn-secondary flex-1" onclick="app.hideAddExerciseModal()">Annuleren</button>
+                    <button class="btn-primary flex-1" onclick="app.saveCustomExercise()">Opslaan</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Select Exercise for Workout Modal -->
+        <div id="modal-select-exercise-for-workout" class="modal-overlay hidden">
+            <div class="modal-content glass-panel" style="max-width: 480px; width: 100%; max-height: 85vh; display: flex; flex-direction: column;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Oefening Toevoegen aan Sessie</h3>
+                    <button class="icon-btn" onclick="app.hideSelectExerciseForWorkoutModal()"><span class="material-icons-round">close</span></button>
+                </div>
+                
+                <div style="margin-bottom: 12px; display:flex; gap:8px;">
+                    <input type="text" id="workout-ex-search" class="input-field" placeholder="Zoek in bibliotheek..." style="flex:1;" oninput="app.renderWorkoutExerciseSelectList()">
+                    <button class="btn-secondary" onclick="app.showAddExerciseModalFromWorkout()" style="padding:0 10px; font-size:0.8rem; white-space:nowrap;">+ Nieuw</button>
+                </div>
+
+                <div id="workout-ex-select-list" class="flex-col gap-2" style="flex:1; overflow-y:auto; min-height: 150px; margin-bottom: 12px; max-height: 300px;">
+                    <!-- Injected by JS -->
+                </div>
+
+                <div id="workout-ex-configure" class="glass-panel hidden" style="padding:12px; background: rgba(0,0,0,0.15); border-radius:12px;">
+                    <div style="font-weight:600; font-size:0.9rem;" id="selected-ex-name-display">Gekozen Oefening</div>
+                    <div style="display:flex; gap:12px; margin-top:8px;">
+                        <div style="flex:1;">
+                            <label class="text-sm text-muted" style="display:block; margin-bottom:2px;">Aantal Sets</label>
+                            <input type="number" id="workout-ex-sets" class="input-field" value="3" min="1" max="20" style="text-align:center;">
+                        </div>
+                        <div style="flex:1;">
+                            <label class="text-sm text-muted" style="display:block; margin-bottom:2px;" id="workout-ex-reps-label">Standaard Reps</label>
+                            <input type="text" id="workout-ex-reps" class="input-field" value="10" style="text-align:center;">
+                        </div>
+                    </div>
+                    <button class="btn-primary w-full mt-3" onclick="app.confirmAddExerciseToWorkout()">Voeg Toe Aan Sessie</button>
                 </div>
             </div>
         </div>
@@ -277,18 +445,38 @@
     
     <script src="app.js"></script>
     <script src="sync.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="friends.js"></script>
     <script>
         // Service worker eerst: offline-functionaliteit mag nooit sneuvelen
-        // door een fout in de (optionele) cloud-sync
+        // door een fout in de (optionele) cloud-sync of friends-integratie
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('SW geregistreerd!'))
+                .then(reg => {
+                    console.log('SW geregistreerd!');
+                    reg.update();
+                })
                 .catch(err => console.log('SW registratie faalde', err));
+
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!refreshing) {
+                    refreshing = true;
+                    window.location.reload();
+                }
+            });
         }
         try {
             CloudSync.init({ store: store, app: app });
         } catch (e) {
             console.error('Cloud-sync initialisatie faalde', e);
+        }
+        try {
+            if (typeof FriendsManager !== 'undefined') {
+                FriendsManager.init({ store: store, app: app });
+            }
+        } catch (e) {
+            console.error('Friends initialisatie faalde', e);
         }
     </script>
 </body>

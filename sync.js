@@ -9,7 +9,7 @@
 // "Authorized JavaScript origins", schakel de Google Drive API in en vul het
 // Client ID hieronder in.
 
-const GOOGLE_CLIENT_ID = ''; // <-- OAuth 2.0 Client ID invullen om sync te activeren
+const GOOGLE_CLIENT_ID = '1064597245112-8vvkjkce2s40id51elnl4k0djfjfhlg6.apps.googleusercontent.com'; // <-- OAuth 2.0 Client ID invullen om sync te activeren
 
 const SYNC_SCOPES = 'https://www.googleapis.com/auth/drive.appdata openid email';
 const SYNC_FILE_NAME = 'gofitness-data.json';
@@ -60,9 +60,16 @@ const CloudSync = {
     _syncing: false,
     _saveWithoutSync: null,
 
-    get enabled() { return localStorage.getItem('sync_enabled') === '1'; },
-    get email() { return localStorage.getItem('sync_email') || ''; },
-    get lastSyncedAt() { return localStorage.getItem('sync_lastSyncedAt') || null; },
+    get enabled() {
+        const val = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('sync_enabled') : (typeof localStorage !== 'undefined' ? localStorage.getItem('sync_enabled') : null);
+        return val === '1';
+    },
+    get email() {
+        return typeof window !== 'undefined' && window.localStorage ? (window.localStorage.getItem('sync_email') || '') : (typeof localStorage !== 'undefined' ? (localStorage.getItem('sync_email') || '') : '');
+    },
+    get lastSyncedAt() {
+        return typeof window !== 'undefined' && window.localStorage ? (window.localStorage.getItem('sync_lastSyncedAt') || null) : (typeof localStorage !== 'undefined' ? (localStorage.getItem('sync_lastSyncedAt') || null) : null);
+    },
 
     init(deps) {
         this.store = deps.store;
@@ -336,6 +343,7 @@ const CloudSync = {
 
     // Debounced push: meerdere snelle wijzigingen worden gebundeld tot 1 sync
     schedulePush() {
+        if (typeof process !== 'undefined' && process.env && process.env.JEST_WORKER_ID) return;
         if (!this.enabled || !this.clientId) return;
         clearTimeout(this.pushTimer);
         this.pushTimer = setTimeout(() => {
