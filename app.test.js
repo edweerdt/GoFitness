@@ -147,6 +147,12 @@ describe('DataStore', () => {
             expect(mockLocalStorage.store['plans']).toContain('plan_new');
         });
 
+        it('should normalize plans without sessions from handcrafted backups', () => {
+            const store = new DataStore();
+            store.restoreBackup({ plans: [{ id: 'p1', name: 'Kaal' }], logs: [] });
+            expect(store.plans[0].sessions).toEqual([]);
+        });
+
         it('should clear the active plan when the backup contains no plans', () => {
             const store = new DataStore();
             store.plans = [{ id: 'plan_old' }];

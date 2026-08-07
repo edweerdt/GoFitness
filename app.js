@@ -106,6 +106,10 @@ class DataStore {
     restoreBackup(backup) {
         this.plans = backup.plans;
         this.logs = backup.logs;
+        // Handgemaakte of oude backups normaliseren zodat het renderen niet breekt
+        this.plans.forEach(p => {
+            if (!Array.isArray(p.sessions)) p.sessions = [];
+        });
         // De backup bevat geen activePlanId; kies een geldig plan als het huidige niet (meer) bestaat
         if (!this.plans.find(p => p.id === this.activePlanId)) {
             this.activePlanId = this.plans.length > 0 ? this.plans[0].id : null;
