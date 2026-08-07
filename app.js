@@ -1057,7 +1057,7 @@ const app = {
                     <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
                         <div>
                             <div style="font-weight:600;">${app.escapeHTML(log.sessionName || 'Sessie')}</div>
-                            <div class="text-sm text-muted">${dateStr} • ${log.duration} min • ${log.exercisesCompleted} oefeningen</div>
+                            <div class="text-sm text-muted">${dateStr} • ${log.duration != null ? log.duration : '?'} min • ${log.exercisesCompleted != null ? log.exercisesCompleted : '?'} oefeningen</div>
                         </div>
                         <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
                     </div>
