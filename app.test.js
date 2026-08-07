@@ -1,4 +1,4 @@
-const { DataStore, app, store } = require('./app');
+const { DataStore, app, store, html, rawHtml } = require('./app');
 
 describe('DataStore', () => {
     let mockLocalStorage;
@@ -199,11 +199,17 @@ describe('DataStore', () => {
                 logs: [{ id: 'log_new' }, { id: 'log_new2' }]
             });
 
-            expect(store.plans).toEqual([{ id: 'plan_new', name: 'Nieuw' }]);
+            expect(store.plans).toEqual([{ id: 'plan_new', name: 'Nieuw', sessions: [] }]);
             expect(store.logs).toHaveLength(2);
             // Oude activePlanId bestaat niet meer -> eerste plan uit de backup wordt actief
             expect(store.activePlanId).toBe('plan_new');
             expect(mockLocalStorage.store['plans']).toContain('plan_new');
+        });
+
+        it('should normalize plans without sessions from handcrafted backups', () => {
+            const store = new DataStore();
+            store.restoreBackup({ plans: [{ id: 'p1', name: 'Kaal' }], logs: [] });
+            expect(store.plans[0].sessions).toEqual([]);
         });
 
         it('should clear the active plan when the backup contains no plans', () => {
@@ -825,7 +831,8 @@ describe('workout flow', () => {
         const pickerWrapper = document.getElementById('session-picker-wrapper');
         const sessionSelect = document.getElementById('home-session-select');
         expect(pickerWrapper.classList.contains('hidden')).toBe(false);
-        expect(sessionSelect.children.length).toBe(2);
+        // 2 sessies uit het plan + de vaste 'Vrije Sessie'-optie
+        expect(sessionSelect.children.length).toBe(3);
 
         // Change dropdown to session 2
         sessionSelect.value = 's2';
@@ -904,6 +911,47 @@ describe('editing session duration', () => {
         expect(store.logs[0].updatedAt).toBeDefined();
     });
 
+    it('should keep checkbox-only sets when only the duration is edited', () => {
+        // Sets die zijn afgevinkt zonder kg/reps mogen niet verdwijnen door een bewerking
+        store.logs = [{
+            id: 'log2', planId: null, planName: 'Overige Sessies', sessionName: 'Bodyweight',
+            duration: 30, exercisesCompleted: 1,
+            exercises: [{
+                name: 'Push-up', totalSets: 3, setsCompleted: 3,
+                details: [
+                    { setNumber: 1, weight: '', reps: '' },
+                    { setNumber: 2, weight: '', reps: '' },
+                    { setNumber: 3, weight: '', reps: '' }
+                ]
+            }]
+        }];
+
+        app.showEditLogModal('log2');
+        app.updateEditLogDuration('45');
+        app.saveEditLog();
+
+        expect(store.logs[0].duration).toBe(45);
+        expect(store.logs[0].exercises).toHaveLength(1);
+        expect(store.logs[0].exercises[0].setsCompleted).toBe(3);
+        expect(store.logs[0].exercisesCompleted).toBe(1);
+        // De interne markering lekt niet mee het log in
+        expect(store.logs[0].exercises[0].details[0].completed).toBeUndefined();
+    });
+
+    it('should remove a set via the explicit remove button', () => {
+        app.showEditLogModal('log1');
+
+        // De verwijder-knop staat bij elke set
+        expect(document.getElementById('edit-log-container').innerHTML).toContain('removeSetFromEditLog');
+
+        app.removeSetFromEditLog(0, 0);
+        app.saveEditLog();
+
+        // Enige set verwijderd -> hele oefening weg uit het log
+        expect(store.logs[0].exercises).toHaveLength(0);
+        expect(store.logs[0].exercisesCompleted).toBe(0);
+    });
+
     it('should ignore invalid or negative duration input', () => {
         app.logToEdit = JSON.parse(JSON.stringify(store.logs[0]));
         app.updateEditLogDuration('abc');
@@ -935,13 +983,28 @@ describe('import flow', () => {
         expect(plan.schedule).toBeDefined();
     });
 
-    it('should keep the existing active plan when importing another plan', () => {
-        store.importPlan({ name: 'Plan A', sessions: [{ name: 'S1', exercises: [{ name: 'E1', sets: 3 }] }] });
+    it('should reject sessions without exercises with a clear validation error', () => {
+        // Schema-validatie geeft een duidelijke fout in plaats van een crash
+        expect(() => store.importPlan({ name: 'Kaal Plan', sessions: [{ name: 'Rustdag-instructies' }] }))
+            .toThrow(/oefening/i);
+        expect(store.plans).toHaveLength(0);
+    });
+
+    it('should activate the imported plan and upsert on re-import by name', () => {
+        store.importPlan({ name: 'Plan A', sessions: [{ name: 'S1', exercises: [{ name: 'Squat', sets: 3 }] }] });
         const firstId = store.activePlanId;
-        store.importPlan({ name: 'Plan B', sessions: [{ name: 'S1', exercises: [{ name: 'E1', sets: 3 }] }] });
+        store.importPlan({ name: 'Plan B', sessions: [{ name: 'S1', exercises: [{ name: 'Bench Press', sets: 3 }] }] });
 
         expect(store.plans).toHaveLength(2);
-        expect(store.activePlanId).toBe(firstId);
+        // Het zojuist geïmporteerde plan wordt actief
+        expect(store.activePlanId).toBe(store.plans[1].id);
+        // Ids botsen niet, ook niet bij imports binnen dezelfde milliseconde
+        expect(store.plans[0].id).not.toBe(store.plans[1].id);
+
+        // Re-import met dezelfde naam vervangt het plan en behoudt het id (logs blijven gekoppeld)
+        store.importPlan({ name: 'Plan A', sessions: [{ name: 'S2', exercises: [{ name: 'Row', sets: 3 }] }] });
+        expect(store.plans).toHaveLength(2);
+        expect(store.plans.find(p => p.name === 'Plan A').id).toBe(firstId);
     });
 
     it('should reject JSON without name or sessions in the import preview', () => {
@@ -995,7 +1058,8 @@ describe('getOverloadSuggestion', () => {
         const ex = { name: 'Bench Press', repsMax: 12, muscleGroups: ['chest'], sets: 3 };
         const prev = [
             { setNumber: 1, weight: '40', reps: '12' },
-            { setNumber: 2, weight: '40', reps: '13' }
+            { setNumber: 2, weight: '40', reps: '13' },
+            { setNumber: 3, weight: '40', reps: '12' }
         ];
         const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 2.0, lowerBodyKg: 5.0 } } };
 
@@ -1050,7 +1114,7 @@ describe('getOverloadSuggestion', () => {
     });
 
     it('should use the lower body increment for leg exercises', () => {
-        const ex = { name: 'Squat', repsMax: 10, muscleGroups: ['legs'], sets: 3 };
+        const ex = { name: 'Squat', repsMax: 10, muscleGroups: ['legs'], sets: 1 };
         const prev = [{ setNumber: 1, weight: '80', reps: '10' }];
         const plan = { progressionRules: { weightIncreaseGuidance: { upperBodyKg: 2.0, lowerBodyKg: 5.0 } } };
 
@@ -1062,6 +1126,14 @@ describe('getOverloadSuggestion', () => {
             newWeight: 85,
             increment: 5
         });
+    });
+
+    it('should not suggest anything when the previous session was incomplete', () => {
+        const ex = { name: 'Bench Press', repsMax: 12, muscleGroups: ['chest'], sets: 3 };
+        // Slechts 1 van de 3 geplande sets gedaan, ook al haalde die de bovenkant
+        const prev = [{ setNumber: 1, weight: '40', reps: '12' }];
+
+        expect(app.getOverloadSuggestion(ex, prev, null)).toBeNull();
     });
 
     it('should not suggest anything when a set stayed below the top of the rep range', () => {
@@ -1098,6 +1170,8 @@ describe('exercise progress', () => {
         store.plans = [];
         store.activePlanId = null;
         store.logs = [];
+        // Testdata heeft vaste datums: het weken-filter uitzetten
+        app.progressWeeks = 'all';
         document.body.innerHTML = '<div id="exercise-progress-list"></div>';
     });
 
@@ -1140,7 +1214,7 @@ describe('exercise progress', () => {
 
     it('should show a hint when there is not enough data', () => {
         app.renderExerciseProgress();
-        expect(document.getElementById('exercise-progress-list').innerHTML).toContain('minimaal twee sessies');
+        expect(document.getElementById('exercise-progress-list').innerHTML).toContain('Geen trainingen met gewichten');
     });
 
     it('should show the estimated 1RM based on the best set (Epley)', () => {
@@ -1230,6 +1304,79 @@ describe('wake lock', () => {
     it('should not crash when wake lock is unsupported', async () => {
         await app.requestWakeLock();
         expect(app.wakeLock).toBeNull();
+    });
+});
+
+describe('renderWorkoutExercises', () => {
+    beforeEach(() => {
+        store.plans = [];
+        store.activePlanId = null;
+        store.logs = [];
+        document.body.innerHTML = '<div id="workout-exercise-list"></div>';
+    });
+
+    it('should render sets, inputs, meta and placeholders from the previous session', () => {
+        store.logs = [{ id: 'l1', date: '2026-07-01T10:00:00.000Z', exercises: [{ name: 'Bench Press', details: [{ setNumber: 1, weight: '40', reps: '10' }] }] }];
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Push' },
+            startTime: new Date(),
+            exercises: [{
+                id: 'e1', name: 'Bench Press', sets: 2, repsMin: 8, repsMax: 12, restSeconds: 90,
+                category: 'compound', trackMetrics: ['weight', 'reps'],
+                notes: ['Rustig zakken'], alternatives: ['Dumbbell Press'],
+                setsCompleted: [true, false], weights: ['42.5', ''], actualReps: ['10', '']
+            }]
+        };
+
+        app.renderWorkoutExercises();
+
+        const html = document.getElementById('workout-exercise-list').innerHTML;
+        expect(html).toContain('Bench Press');
+        expect(html).toContain('2 sets');
+        expect(html).toContain('8-12 reps');
+        expect(html).toContain('90s rust');
+        expect(html).toContain('compound');
+        expect(html).toContain('Rustig zakken');
+        expect(html).toContain('Dumbbell Press');
+        expect((html.match(/class="set-row"/g) || []).length).toBe(2);
+        // Ingevulde waarde en placeholder uit de vorige sessie
+        expect(html).toContain('value="42.5"');
+        expect(html).toContain('placeholder="40"');
+        // Eerste set is afgevinkt
+        expect(html).toContain('check-btn checked');
+    });
+
+    it('should escape malicious exercise fields', () => {
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Push' },
+            startTime: new Date(),
+            exercises: [{
+                id: 'e1', name: '<img src=x onerror=alert(1)>', sets: 1,
+                category: '<script>x</script>', notes: '<b onmouseover=x>notitie</b>',
+                setsCompleted: [false], weights: [''], actualReps: ['']
+            }]
+        };
+
+        app.renderWorkoutExercises();
+
+        // Geen daadwerkelijke element-injectie: kwaadaardige namen worden data, geen DOM
+        expect(document.querySelector('#workout-exercise-list img')).toBeNull();
+        expect(document.querySelector('#workout-exercise-list script')).toBeNull();
+        expect(document.getElementById('workout-exercise-list').innerHTML).toContain('&lt;img');
+    });
+
+    it('should not allow quote-injection into inline handlers via exercise names', () => {
+        // Een naam met quotes mag nooit uit de JS-string van een onclick breken
+        // (geen '/' in de payload: daar splitst de functie bewust op als alternatieven-scheiding)
+        const evil = "x');window.__pwned=true;('";
+        const markup = app.formatClickableExerciseName(evil);
+        document.body.innerHTML = `<div id="wrap">${markup}</div>`;
+
+        const span = document.querySelector('#wrap .exercise-search-target');
+        expect(span.dataset.exerciseName).toBe(evil);
+        // De handler haalt de naam uit het data-attribuut, niet uit een letterlijke string
+        expect(span.getAttribute('onclick')).toContain('this.dataset.exerciseName');
+        expect(span.getAttribute('onclick')).not.toContain('window.__pwned');
     });
 });
 
@@ -1442,6 +1589,24 @@ describe('app achievements', () => {
     });
 });
 
+describe('html template helper', () => {
+    it('should escape interpolated values automatically', () => {
+        const result = String(html`<div>${'<script>alert(1)</script>'}</div>`);
+        expect(result).toBe('<div>&lt;script&gt;alert(1)&lt;/script&gt;</div>');
+    });
+
+    it('should insert nested html results and arrays as HTML', () => {
+        const item = html`<li>${'<b>x</b>'}</li>`;
+        const result = String(html`<ul>${[item, item]}</ul>`);
+        expect(result).toBe('<ul><li>&lt;b&gt;x&lt;/b&gt;</li><li>&lt;b&gt;x&lt;/b&gt;</li></ul>');
+    });
+
+    it('should render null, undefined and rawHtml correctly', () => {
+        expect(String(html`<p>${null}${undefined}</p>`)).toBe('<p></p>');
+        expect(String(html`<p>${rawHtml('<em>ok</em>')}</p>`)).toBe('<p><em>ok</em></p>');
+    });
+});
+
 describe('app XSS Security', () => {
     it('should escape HTML characters using escapeHTML to prevent XSS', () => {
         expect(app.escapeHTML('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
@@ -1455,6 +1620,34 @@ describe('app XSS Security', () => {
         expect(result).toContain('&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;');
         expect(result).not.toContain('<style>');
         expect(result).toContain('&lt;style&gt;body{display:none}&lt;/style&gt;');
+    });
+
+    it('should escape markup in toast messages', () => {
+        // Foutmeldingen (bijv. JSON.parse-fouten) bevatten ruwe bestandsinhoud
+        document.body.innerHTML = '<div id="toast-container"></div>';
+        app.showToast('Herstellen mislukt: Unexpected token \'<\', "<img src=x onerror=alert(1)>" is not valid JSON', 'error');
+
+        const html = document.getElementById('toast-container').innerHTML;
+        expect(html).not.toContain('<img');
+        expect(html).toContain('&lt;img');
+    });
+
+    it('should only strip legacy description sections that start on their own line', () => {
+        document.body.innerHTML = '<div id="plans-list"></div>';
+        store.plans = [{
+            id: 'p1', name: 'Plan',
+            description: 'Werk in kleine mijlpalen naar je doel.\nHerstelregels: minimaal 48 uur rust.',
+            sessions: []
+        }];
+        store.activePlanId = 'p1';
+
+        app.renderPlans();
+
+        const listHtml = document.getElementById('plans-list').innerHTML;
+        // Het woord 'mijlpalen' midden in een zin blijft staan
+        expect(listHtml).toContain('Werk in kleine mijlpalen naar je doel.');
+        // De sectie op een eigen regel wordt wel weggeknipt
+        expect(listHtml).not.toContain('minimaal 48 uur rust');
     });
 
     it('should escape malicious imported plan fields when rendering plans', () => {

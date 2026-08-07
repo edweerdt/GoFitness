@@ -102,6 +102,7 @@ describe('CloudSync.syncNow', () => {
         CloudSync.accessToken = 'test-token';
         CloudSync.tokenExpiry = Date.now() + 3600 * 1000;
         CloudSync.fileId = null;
+        CloudSync._remoteVersion = null;
     });
 
     afterEach(() => {
@@ -113,6 +114,7 @@ describe('CloudSync.syncNow', () => {
         try { localStorage.clear(); } catch(e) {}
         CloudSync.clientId = '';
         CloudSync.accessToken = null;
+        CloudSync._remoteVersion = null;
     });
 
     it('should pull remote data, merge it into the store and push the union', async () => {
@@ -172,6 +174,39 @@ describe('CloudSync.syncNow', () => {
         expect(CloudSync.fileId).toBe('newfile1');
     });
 
+    it('should retry the full sync when another device wrote in between', async () => {
+        let versionCall = 0;
+        let mediaCalls = 0;
+        let patchCalls = 0;
+        const ok = data => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) });
+
+        global.fetch = jest.fn((url, options = {}) => {
+            if (url.includes('www.googleapis.com/drive/v3/files?')) return ok({ files: [{ id: 'f1' }] });
+            if (url.includes('alt=media')) {
+                mediaCalls++;
+                return ok({ plans: [], logs: [], deleted: { plans: [], logs: [] } });
+            }
+            if (options.method === 'PATCH') {
+                patchCalls++;
+                return ok({ id: 'f1', version: '3' });
+            }
+            if (url.includes('fields=version')) {
+                versionCall++;
+                // 1: pull-meta v1, 2: push-check v2 (conflict!), 3: pull-meta v2, 4: push-check v2 (ok)
+                return ok({ version: versionCall === 1 ? '1' : '2' });
+            }
+            return ok({});
+        });
+
+        await CloudSync.syncNow();
+
+        // Na het conflict is de remote data opnieuw opgehaald en alsnog 1x gepusht
+        expect(mediaCalls).toBe(2);
+        expect(patchCalls).toBe(1);
+        expect(CloudSync.status).toBe('actief');
+        expect(CloudSync._remoteVersion).toBe('3');
+    });
+
     it('should mark the session as expired on a 401 from Drive', async () => {
         global.fetch = jest.fn(() => Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({}) }));
 
@@ -199,6 +234,64 @@ describe('CloudSync.syncNow', () => {
         await CloudSync.syncNow();
 
         expect(global.fetch).not.toHaveBeenCalled();
+    });
+});
+
+describe('CloudSync.overwriteRemote', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        localStorage.setItem('sync_enabled', '1');
+        CloudSync.clientId = 'test-client-id';
+        CloudSync.store = {
+            plans: [{ id: 'p_backup' }],
+            logs: [{ id: 'l_backup', date: '2026-07-01T10:00:00.000Z' }],
+            deleted: { plans: [], logs: [] },
+            save: jest.fn()
+        };
+        CloudSync.accessToken = 'test-token';
+        CloudSync.tokenExpiry = Date.now() + 3600 * 1000;
+        CloudSync.fileId = 'file123';
+        CloudSync._remoteVersion = '7';
+    });
+
+    afterEach(() => {
+        delete global.fetch;
+        localStorage.clear();
+        CloudSync.clientId = '';
+        CloudSync.accessToken = null;
+        CloudSync.fileId = null;
+    });
+
+    it('should push local data without pulling or merging remote data', async () => {
+        const calls = [];
+        global.fetch = jest.fn((url, options = {}) => {
+            calls.push({ url, options });
+            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) });
+        });
+
+        await CloudSync.overwriteRemote();
+
+        // Geen download van remote data (alt=media), alleen een upload
+        expect(calls.some(c => c.url.includes('alt=media'))).toBe(false);
+        const pushCall = calls.find(c => c.options.method === 'PATCH');
+        expect(pushCall).toBeDefined();
+        expect(pushCall.options.body).toContain('p_backup');
+        expect(CloudSync.status).toBe('actief');
+    });
+
+    it('should cancel a pending debounced push', async () => {
+        jest.useFakeTimers();
+        global.fetch = jest.fn(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) }));
+
+        CloudSync.schedulePush();
+        expect(CloudSync.pushTimer).toBeDefined();
+        await CloudSync.overwriteRemote();
+
+        // De geplande merge-sync mag niet meer afgaan na de overwrite
+        const fetchCount = global.fetch.mock.calls.length;
+        jest.advanceTimersByTime(10000);
+        expect(global.fetch.mock.calls.length).toBe(fetchCount);
+        jest.useRealTimers();
     });
 });
 

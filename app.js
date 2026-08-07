@@ -152,6 +152,10 @@ class DataStore {
     getActivePlan() {
         return this.plans.find(p => p.id === this.activePlanId) || null;
     }
+    // Uniek over devices heen: sync merget op id, dus een botsing zou data laten verdwijnen
+    generateId(prefix) {
+        return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    }
     getExerciseLibrary() {
         const list = [...DEFAULT_EXERCISES];
 
@@ -287,7 +291,7 @@ class DataStore {
             // Behoud het bestaande plan.id zodat de historie/logs 100% gekoppeld blijven!
             planData.id = this.plans[existingIndex].id;
         } else if (!planData.id) {
-            planData.id = 'plan_' + Date.now();
+            planData.id = this.generateId('plan');
         }
 
         // Normalize top-level rich schema fields
@@ -306,7 +310,10 @@ class DataStore {
         planData.sessions.forEach(s => {
             if (!s.id && !s.sessionId) s.id = 'sess_' + Math.random().toString(36).slice(2, 11);
             else if (s.sessionId) s.id = s.sessionId;
-            
+
+            // Sessies zonder oefeningen (de preview laat ze door) mogen de import niet breken
+            if (!Array.isArray(s.exercises)) s.exercises = [];
+
             s.exercises.forEach(e => {
                 if (!e.id && !e.exerciseId) e.id = 'ex_' + Math.random().toString(36).slice(2, 11);
                 else if (e.exerciseId) e.id = e.exerciseId;
@@ -323,12 +330,16 @@ class DataStore {
         this.save();
     }
     saveWorkoutLog(log) {
-        this.logs.push({ ...log, id: 'log_' + Date.now(), date: new Date().toISOString() });
+        this.logs.push({ ...log, id: this.generateId('log'), date: new Date().toISOString() });
         this.save();
     }
     restoreBackup(backup) {
         this.plans = backup.plans;
         this.logs = backup.logs;
+        // Handgemaakte of oude backups normaliseren zodat het renderen niet breekt
+        this.plans.forEach(p => {
+            if (!Array.isArray(p.sessions)) p.sessions = [];
+        });
         // De backup bevat geen activePlanId; kies een geldig plan als het huidige niet (meer) bestaat
         if (!this.plans.find(p => p.id === this.activePlanId)) {
             this.activePlanId = this.plans.length > 0 ? this.plans[0].id : null;
@@ -340,6 +351,34 @@ class DataStore {
 }
 
 const store = new DataStore();
+
+// --- VEILIG RENDEREN ---
+
+// Resultaat van html`` dat bij hergebruik in een volgende template als HTML geldt
+class HtmlString {
+    constructor(value) { this.value = value; }
+    toString() { return this.value; }
+}
+
+// Markeert een string expliciet als bedoelde HTML (spaarzaam gebruiken,
+// alleen voor output die zelf al veilig is opgebouwd)
+const rawHtml = value => new HtmlString(String(value));
+
+// Tagged template die alle interpolaties automatisch escapet, zodat vergeten
+// escaping structureel onmogelijk wordt. Geneste html``-resultaten en arrays
+// daarvan worden wel als HTML ingevoegd.
+function html(strings, ...values) {
+    const escape = str => String(str).replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[tag] || tag));
+    const render = v => {
+        if (v === null || v === undefined) return '';
+        if (v instanceof HtmlString) return v.value;
+        if (Array.isArray(v)) return v.map(render).join('');
+        return escape(v);
+    };
+    return new HtmlString(strings.reduce((out, s, i) => (i === 0 ? s : out + render(values[i - 1]) + s), ''));
+}
 
 const app = {
     currentView: 'home',
@@ -387,9 +426,9 @@ const app = {
         const iconName = type === 'success' ? 'check_circle' : 'error_outline';
         const iconColor = type === 'success' ? 'var(--status-green)' : 'var(--status-red)';
 
-        toast.innerHTML = `
+        toast.innerHTML = html`
             <span class="material-icons-round" style="color: ${iconColor};">${iconName}</span>
-            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${this.escapeHTML(String(message))}</div>
+            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${message}</div>
         `;
 
         container.appendChild(toast);
@@ -432,15 +471,20 @@ const app = {
     navigate(viewId) {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        
-        document.getElementById(`view-${viewId}`).classList.add('active');
+
+        // DOM-tolerant: ontbrekende elementen (bijv. in tests) mogen navigatie niet breken
+        const viewEl = document.getElementById(`view-${viewId}`);
+        if (viewEl) viewEl.classList.add('active');
         const navBtn = document.querySelector(`.nav-item[data-target="${viewId}"]`);
         if(navBtn) navBtn.classList.add('active');
-        
-        if (viewId === 'workout') {
-            document.getElementById('bottom-nav').classList.add('hidden');
-        } else {
-            document.getElementById('bottom-nav').classList.remove('hidden');
+
+        const bottomNav = document.getElementById('bottom-nav');
+        if (bottomNav) {
+            if (viewId === 'workout') {
+                bottomNav.classList.add('hidden');
+            } else {
+                bottomNav.classList.remove('hidden');
+            }
         }
 
         this.currentView = viewId;
@@ -684,9 +728,10 @@ const app = {
             }
             if (!trimmed) return '';
 
+            // Naam als data-attribuut meegeven i.p.v. in een inline JS-string:
+            // een naam met een quote kan dan nooit uit de string breken (XSS)
             const safeName = this.escapeHTML(trimmed);
-            const escapedAttr = safeName.replace(/'/g, "\\'");
-            return `<span class="exercise-search-target" onclick="app.triggerExerciseSearch('${escapedAttr}', event, this)" title="Zoek uitvoering van ${safeName}">${safeName} <span class="material-icons-round text-muted" style="font-size:0.85rem; vertical-align:middle; opacity:0.6;">search</span></span>`;
+            return `<span class="exercise-search-target" data-exercise-name="${safeName}" onclick="app.triggerExerciseSearch(this.dataset.exerciseName, event, this)" title="Zoek uitvoering van ${safeName}">${safeName} <span class="material-icons-round text-muted" style="font-size:0.85rem; vertical-align:middle; opacity:0.6;">search</span></span>`;
         }).join('');
     },
 
@@ -936,11 +981,11 @@ const app = {
                 
                 const sched = p.schedule || {};
                 const targetSessions = sched.targetSessionsPerWeek || p.targetSessionsPerWeek || '?';
-                let descriptionText = p.description || '';
-                descriptionText = descriptionText.split(/Herstelregels/i)[0];
-                descriptionText = descriptionText.split(/Voltooiingsregels/i)[0];
-                descriptionText = descriptionText.split(/Mijlpalen/i)[0];
-                descriptionText = descriptionText.trim();
+                // Oude platte beschrijvingen hadden secties als "Herstelregels: ..." achteraan;
+                // alleen knippen als zo'n kopje op een eigen regel begint, zodat een zin
+                // die toevallig het woord 'mijlpalen' bevat niet wordt afgekapt
+                let descriptionText = String(p.description || '');
+                descriptionText = descriptionText.split(/\n\s*(?:Herstelregels|Voltooiingsregels|Mijlpalen)/i)[0].trim();
                 const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${this.escapeHTML(descriptionText)}</p>` : '';
                 const recPattern = sched.recommendedPattern || p.recommendedPattern ?
                     `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${this.escapeHTML(String(sched.recommendedPattern || p.recommendedPattern))}</div>` : '';
@@ -1601,65 +1646,57 @@ const app = {
                 const timeRange = app.formatLogTimeRange(log);
                 const timeRangeStr = timeRange ? ` (${timeRange})` : '';
                 
-                let summaryHtml = '';
+                const summaryParts = [];
                 if (log.exercises && log.exercises.length > 0) {
                     log.exercises.forEach(ex => {
-                        let exDetails = [];
-                        if (ex.details) {
-                            ex.details.forEach(d => {
-                                let text = `Set ${d.setNumber}:`;
-                                const hasW = d.weight !== null && d.weight !== undefined && String(d.weight).trim() !== '';
-                                const hasR = d.reps !== null && d.reps !== undefined && String(d.reps).trim() !== '';
-                                const hasL = d.level !== null && d.level !== undefined && String(d.level).trim() !== '';
-                                if (hasW) text += ` ${d.weight}kg`;
-                                if (hasR) text += ` x ${d.reps}`;
-                                if (hasL) text += ` • Stand ${d.level}`;
-                                if (!hasW && !hasR && !hasL) text += ` Afgevinkt`;
-                                exDetails.push(app.escapeHTML(text));
-                            });
-                        }
-                        
-                        summaryHtml += `
+                        // Per set: gewicht, reps en/of stand tonen; kaal afgevinkte sets ook benoemen
+                        const exDetails = (ex.details || []).map(d => {
+                            let text = `Set ${d.setNumber}:`;
+                            const hasW = d.weight !== null && d.weight !== undefined && String(d.weight).trim() !== '';
+                            const hasR = d.reps !== null && d.reps !== undefined && String(d.reps).trim() !== '';
+                            const hasL = d.level !== null && d.level !== undefined && String(d.level).trim() !== '';
+                            if (hasW) text += ` ${d.weight}kg`;
+                            if (hasR) text += ` x ${d.reps}`;
+                            if (hasL) text += ` • Stand ${d.level}`;
+                            if (!hasW && !hasR && !hasL) text += ` Afgevinkt`;
+                            return text;
+                        });
+
+                        summaryParts.push(html`
                             <div class="mt-2 pt-2" style="border-top: 1px solid rgba(0,0,0,0.05);">
-                                <div style="font-weight:600; font-size:0.9rem;">${app.escapeHTML(ex.name)} (${ex.setsCompleted}/${ex.totalSets} sets)</div>
+                                <div style="font-weight:600; font-size:0.9rem;">${ex.name} (${ex.setsCompleted}/${ex.totalSets} sets)</div>
                                 <div class="text-sm text-muted" style="margin-top:2px;">
                                     ${exDetails.length > 0 ? exDetails.join(', ') : 'Afgevinkt (geen details)'}
                                 </div>
                             </div>
-                        `;
+                        `);
                     });
                 } else {
-                    summaryHtml = '<div class="text-sm text-muted mt-2">Geen details beschikbaar (oude sessie).</div>';
+                    summaryParts.push(html`<div class="text-sm text-muted mt-2">Geen details beschikbaar (oude sessie).</div>`);
                 }
 
-                const safeLogId = app.escapeHTML(log.id);
-                if (log.exercises && log.exercises.length > 0) {
-                    summaryHtml += `
-                        <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal('${safeLogId}')">edit_note</span>
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${safeLogId}')">delete_outline</span>
-                        </div>
-                    `;
-                } else {
-                    summaryHtml += `
-                        <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${safeLogId}')">delete_outline</span>
-                        </div>
-                    `;
-                }
+                const editIcon = (log.exercises && log.exercises.length > 0)
+                    ? html`<span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal('${log.id}')">edit_note</span>`
+                    : '';
+                summaryParts.push(html`
+                    <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
+                        ${editIcon}
+                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${log.id}')">delete_outline</span>
+                    </div>
+                `);
 
                 const el = document.createElement('div');
                 el.className = 'glass-panel';
-                el.innerHTML = `
+                el.innerHTML = html`
                     <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
                         <div>
-                            <div style="font-weight:600;">${app.escapeHTML(log.sessionName || 'Sessie')}</div>
-                            <div class="text-sm text-muted">${dateStr}${timeRangeStr} • ${log.duration} min • ${log.exercisesCompleted} oefeningen</div>
+                            <div style="font-weight:600;">${log.sessionName || 'Sessie'}</div>
+                            <div class="text-sm text-muted">${dateStr}${timeRangeStr} • ${log.duration != null ? log.duration : '?'} min • ${log.exercisesCompleted != null ? log.exercisesCompleted : '?'} oefeningen</div>
                         </div>
                         <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
                     </div>
                     <div class="hidden history-details">
-                        ${summaryHtml}
+                        ${summaryParts}
                     </div>
                 `;
                 listWrapper.appendChild(el);
@@ -2253,6 +2290,10 @@ const app = {
     getOverloadSuggestion(ex, prevDetails, plan) {
         if (!prevDetails || prevDetails.length === 0 || !ex.repsMax) return null;
 
+        // Alleen adviseren als de vorige sessie alle geplande sets heeft afgerond;
+        // 1 van de 3 sets aan de bovenkant halen is geen reden om zwaarder te gaan
+        if (ex.sets && prevDetails.length < ex.sets) return null;
+
         let maxWeight = 0;
         let minWeight = Infinity;
         for (const d of prevDetails) {
@@ -2533,7 +2574,7 @@ const app = {
                 variations.forEach(v => {
                     const isActive = chosen === v;
                     const safeV = app.escapeHTML(v);
-                    variationHtml += `<button class="variation-pill ${isActive ? 'active' : ''}" onclick="app.selectVariation(${exIndex}, '${safeV.replace(/'/g, "\\'")}')"><span class="material-icons-round" style="font-size:0.85rem;">${isActive ? 'check_circle' : 'radio_button_unchecked'}</span> ${safeV}</button>`;
+                    variationHtml += `<button class="variation-pill ${isActive ? 'active' : ''}" data-variation="${safeV}" onclick="app.selectVariation(${exIndex}, this.dataset.variation)"><span class="material-icons-round" style="font-size:0.85rem;">${isActive ? 'check_circle' : 'radio_button_unchecked'}</span> ${safeV}</button>`;
                 });
                 variationHtml += `</div>`;
             }
@@ -3226,7 +3267,8 @@ const app = {
             FriendsManager.pushStats().catch(e => console.warn("Friends pushStats fout:", e));
         }
 
-        document.getElementById('bottom-nav').classList.remove('hidden');
+        const bottomNavEl = document.getElementById('bottom-nav');
+        if (bottomNavEl) bottomNavEl.classList.remove('hidden');
         this.navigate('home');
     },
 
@@ -3255,7 +3297,9 @@ const app = {
                     const dObj = {
                         setNumber: i,
                         weight: loggedSet && loggedSet.weight !== undefined && loggedSet.weight !== null ? loggedSet.weight : '',
-                        reps: loggedSet && loggedSet.reps !== undefined && loggedSet.reps !== null ? loggedSet.reps : ''
+                        reps: loggedSet && loggedSet.reps !== undefined && loggedSet.reps !== null ? loggedSet.reps : '',
+                        // Afgevinkte sets zonder kg/reps moeten bij opslaan behouden blijven
+                        completed: !!loggedSet
                     };
                     if (loggedSet && loggedSet.level !== undefined && loggedSet.level !== null) {
                         dObj.level = loggedSet.level;
@@ -3286,11 +3330,13 @@ const app = {
             this.logToEdit.exercises = fullExercises;
         } else {
             this.logToEdit.exercises.forEach(ex => {
+                // Bestaande details zijn oorspronkelijk voltooide sets
+                ex.details.forEach(d => { d.completed = true; });
                 ex.availableVariations = this.getExerciseVariations(ex);
                 if (ex.totalSets > ex.details.length) {
                     for (let i = 1; i <= ex.totalSets; i++) {
                         if (!ex.details.find(d => d.setNumber === i)) {
-                            ex.details.push({ setNumber: i, weight: '', reps: '' });
+                            ex.details.push({ setNumber: i, weight: '', reps: '', completed: false });
                         }
                     }
                     ex.details.sort((a,b) => a.setNumber - b.setNumber);
@@ -3461,7 +3507,7 @@ const app = {
             <div class="set-row" style="justify-content: space-between; align-items:center; margin-top:8px;">
                 <div style="font-weight:600;">Duur (minuten)</div>
                 <input type="number" min="0" class="input-field" style="width:90px; text-align:center;"
-                    value="${app.escapeHTML(String(this.logToEdit.duration != null ? this.logToEdit.duration : ''))}"
+                    value="${this.logToEdit.duration != null ? this.logToEdit.duration : ''}"
                     onchange="app.updateEditLogDuration(this.value)">
             </div>
         `;
@@ -3517,7 +3563,7 @@ const app = {
                     variations.forEach(v => {
                         const isActive = ex.name === v;
                         const safeV = app.escapeHTML(v);
-                        variationHtml += `<button class="variation-pill ${isActive ? 'active' : ''}" onclick="app.updateEditLogVariation(${exIndex}, '${safeV.replace(/'/g, "\\'")}')"><span class="material-icons-round" style="font-size:0.85rem;">${isActive ? 'check_circle' : 'radio_button_unchecked'}</span> ${safeV}</button>`;
+                        variationHtml += `<button class="variation-pill ${isActive ? 'active' : ''}" data-variation="${safeV}" onclick="app.updateEditLogVariation(${exIndex}, this.dataset.variation)"><span class="material-icons-round" style="font-size:0.85rem;">${isActive ? 'check_circle' : 'radio_button_unchecked'}</span> ${safeV}</button>`;
                     });
                     variationHtml += `</div>`;
                 }
@@ -3560,11 +3606,18 @@ const app = {
         const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
         let totalExercisesCompleted = 0;
         this.logToEdit.exercises.forEach(ex => {
-            const completedDetails = ex.details.filter(d => 
-                isNonEmpty(d.weight) || isNonEmpty(d.reps) || isNonEmpty(d.level)
+            // Een set telt mee als hij oorspronkelijk was afgevinkt (ook zonder waardes)
+            // of als er nu waardes zijn ingevuld
+            const completedDetails = ex.details.filter(d =>
+                d.completed || isNonEmpty(d.weight) || isNonEmpty(d.reps) || isNonEmpty(d.level)
             );
             ex.setsCompleted = completedDetails.length;
-            ex.details = completedDetails;
+            // Interne 'completed'-markering niet mee opslaan in het log
+            ex.details = completedDetails.map(d => {
+                const clean = { setNumber: d.setNumber, weight: d.weight, reps: d.reps };
+                if (d.level !== undefined && d.level !== null && String(d.level).trim() !== '') clean.level = d.level;
+                return clean;
+            });
             if (ex.setsCompleted > 0) totalExercisesCompleted++;
             delete ex.availableVariations;
             delete ex.originalName;
@@ -3792,6 +3845,10 @@ const app = {
     confirmRestore() {
         if (!this.backupToRestore) return;
         store.restoreBackup(this.backupToRestore);
+        // Met sync actief moet de backup de cloud-versie vervangen, niet ermee mergen
+        if (typeof CloudSync !== 'undefined' && CloudSync.enabled) {
+            CloudSync.overwriteRemote().catch(() => {});
+        }
         this.hideRestoreModal();
         this.renderPlans();
         this.renderHome();
@@ -4220,5 +4277,5 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !(typeof
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { DataStore, app, store };
+    module.exports = { DataStore, app, store, html, rawHtml };
 }

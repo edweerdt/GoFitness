@@ -448,10 +448,8 @@
     <script src="firebase-config.js"></script>
     <script src="friends.js"></script>
     <script>
-        CloudSync.init({ store: store, app: app });
-        if (typeof FriendsManager !== 'undefined') {
-            FriendsManager.init({ store: store, app: app });
-        }
+        // Service worker eerst: offline-functionaliteit mag nooit sneuvelen
+        // door een fout in de (optionele) cloud-sync of friends-integratie
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(reg => {
@@ -467,6 +465,18 @@
                     window.location.reload();
                 }
             });
+        }
+        try {
+            CloudSync.init({ store: store, app: app });
+        } catch (e) {
+            console.error('Cloud-sync initialisatie faalde', e);
+        }
+        try {
+            if (typeof FriendsManager !== 'undefined') {
+                FriendsManager.init({ store: store, app: app });
+            }
+        } catch (e) {
+            console.error('Friends initialisatie faalde', e);
         }
     </script>
 </body>
