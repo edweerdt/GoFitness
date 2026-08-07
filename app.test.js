@@ -1365,6 +1365,37 @@ describe('renderWorkoutExercises', () => {
         expect(document.getElementById('workout-exercise-list').innerHTML).toContain('&lt;img');
     });
 
+    it('should not steal focus while typing reps: auto-complete only on change', () => {
+        app.activeWorkout = {
+            session: { id: 's1', name: 'Push' },
+            startTime: new Date(),
+            exercises: [{
+                id: 'e1', name: 'Bench Press', sets: 1, trackMetrics: ['weight', 'reps'],
+                setsCompleted: [false], weights: ['40'], actualReps: ['']
+            }]
+        };
+        app.renderWorkoutExercises();
+
+        const repsInput = document.querySelector('#workout-exercise-list input[data-type="reps"]');
+        expect(repsInput).not.toBeNull();
+        // De onchange-handler finaliseert, de oninput-handler niet
+        expect(repsInput.getAttribute('onchange')).toContain('this.value, true');
+        expect(repsInput.getAttribute('oninput')).not.toContain('this.value, true');
+
+        // Typen (oninput): het eerste cijfer mag de set niet afvinken of de lijst re-renderen
+        app.updateReps(0, 0, '1');
+        expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(false);
+        expect(document.contains(repsInput)).toBe(true);
+
+        // Veld verlaten (onchange): set wordt afgevinkt, maar zonder re-render
+        app.updateReps(0, 0, '12', true);
+        expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(true);
+        // Het input-element is niet vervangen -> focus/scroll blijven intact
+        expect(document.contains(repsInput)).toBe(true);
+        const checkBtn = repsInput.closest('.set-row').querySelector('.check-btn');
+        expect(checkBtn.classList.contains('checked')).toBe(true);
+    });
+
     it('should not allow quote-injection into inline handlers via exercise names', () => {
         // Een naam met quotes mag nooit uit de JS-string van een onclick breken
         // (geen '/' in de payload: daar splitst de functie bewust op als alternatieven-scheiding)
@@ -1844,7 +1875,9 @@ describe('Hold Timer (Stopwatch)', () => {
             exercises: mockSession.exercises
         };
 
-        app.updateReps(0, 0, '45');
+        // finalize=true: pas afvinken wanneer de invoer af is (change/Enter),
+        // niet tijdens het typen — anders wordt '450' al na '45' afgevinkt
+        app.updateReps(0, 0, '45', true);
         expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(true);
 
         app.adjustDuration(0, 1, 30);
