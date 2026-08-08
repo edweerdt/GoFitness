@@ -2060,6 +2060,17 @@ describe('Exercise Library & Custom Vrije Sessie', () => {
         expect(prevDetails).toBeDefined();
         expect(prevDetails[0].weight).toBe('80');
 
+        // Composite name matching: 'Bench Press of Chest Press Machine' -> 'Barbell Bench Press' or 'Bench Press'
+        const compositeDetails = app.getPreviousExerciseDetails('Barbell Bench Press of Chest Press Machine');
+        expect(compositeDetails).toBeDefined();
+        expect(compositeDetails[0].weight).toBe('80');
+
+        // Exercise object matching with chosen variation
+        const exObj = { name: 'Leg Press of Squat', chosenVariation: 'Barbell Bench Press' };
+        const objectDetails = app.getPreviousExerciseDetails(exObj.name, exObj);
+        expect(objectDetails).toBeDefined();
+        expect(objectDetails[0].weight).toBe('80');
+
         navigateSpy.mockRestore();
     });
 

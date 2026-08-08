@@ -2221,16 +2221,66 @@ const app = {
         this.navigate('workout');
     },
 
-    getPreviousExerciseDetails(exerciseName) {
-        if (!exerciseName) return null;
-        const targetName = exerciseName.toLowerCase().trim();
+    getPreviousExerciseDetails(exerciseName, exObj = null) {
+        if (!exerciseName && !exObj) return null;
+        if (typeof exerciseName === 'object' && exerciseName !== null) {
+            exObj = exerciseName;
+            exerciseName = exObj.name;
+        }
+
+        const targetNames = new Set();
+        const addNamesToSet = (str) => {
+            if (!str || typeof str !== 'string') return;
+            const normalized = str.toLowerCase().trim();
+            if (!normalized) return;
+            targetNames.add(normalized);
+            const parts = str.split(/(\s+of\s+|\s*\/\s*|\s+or\s+|\s*,\s*)/i);
+            parts.forEach(p => {
+                const trimmed = p.toLowerCase().trim();
+                if (trimmed && trimmed !== 'of' && trimmed !== '/' && trimmed !== 'or' && trimmed !== ',') {
+                    targetNames.add(trimmed);
+                }
+            });
+        };
+
+        if (typeof exerciseName === 'string') addNamesToSet(exerciseName);
+        if (exObj) {
+            if (exObj.name) addNamesToSet(exObj.name);
+            if (exObj.originalName) addNamesToSet(exObj.originalName);
+            if (exObj.chosenVariation) addNamesToSet(exObj.chosenVariation);
+            if (Array.isArray(exObj.alternatives)) exObj.alternatives.forEach(addNamesToSet);
+            if (Array.isArray(exObj.optionalAlternatives)) exObj.optionalAlternatives.forEach(addNamesToSet);
+            if (Array.isArray(exObj.availableVariations)) exObj.availableVariations.forEach(addNamesToSet);
+        }
+
+        if (targetNames.size === 0) return null;
+
+        const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
+
         for (let i = store.logs.length - 1; i >= 0; i--) {
             const log = store.logs[i];
-            if (!log.exercises) continue;
+            if (!log || !log.exercises) continue;
             
-            const ex = log.exercises.find(e => e.name && e.name.toLowerCase().trim() === targetName);
-            if (ex && ex.details && ex.details.length > 0) {
-                return ex.details;
+            const matchedEx = log.exercises.find(e => {
+                if (!e || !e.name) return false;
+                const logNames = new Set();
+                addNamesToSet(e.name, logNames);
+                if (e.originalName) addNamesToSet(e.originalName, logNames);
+                if (e.chosenVariation) addNamesToSet(e.chosenVariation, logNames);
+                if (Array.isArray(e.alternatives)) e.alternatives.forEach(a => addNamesToSet(a, logNames));
+                if (Array.isArray(e.optionalAlternatives)) e.optionalAlternatives.forEach(a => addNamesToSet(a, logNames));
+
+                for (const name of logNames) {
+                    if (targetNames.has(name)) return true;
+                }
+                return false;
+            });
+
+            if (matchedEx && matchedEx.details && matchedEx.details.length > 0) {
+                const hasData = matchedEx.details.some(d => isNonEmpty(d.weight) || isNonEmpty(d.reps) || isNonEmpty(d.level));
+                if (hasData) {
+                    return matchedEx.details;
+                }
             }
         }
         return null;
@@ -2356,7 +2406,7 @@ const app = {
 
         sortedExercises.forEach((ex) => {
             const exIndex = this.activeWorkout.exercises.findIndex(e => e.id === ex.id);
-            const prevDetails = this.getPreviousExerciseDetails(ex.name) || [];
+            const prevDetails = this.getPreviousExerciseDetails(ex.name, ex) || [];
 
             if (!ex.setsCompleted) ex.setsCompleted = Array(ex.sets || 1).fill(false);
             if (!ex.weights) ex.weights = Array(ex.sets || 1).fill('');
@@ -2429,9 +2479,9 @@ const app = {
             for(let i=0; i<ex.sets; i++) {
                 const checked = ex.setsCompleted[i] ? 'checked' : '';
                 
-                const prevSet = prevDetails[i] || {};
-                const weightPlaceholder = prevSet.weight || 'kg';
-                const repsPlaceholder = prevSet.reps || 'reps';
+                const prevSet = (prevDetails[i] && (prevDetails[i].weight || prevDetails[i].reps)) ? prevDetails[i] : (prevDetails[0] || {});
+                const weightPlaceholder = prevSet.weight || (prevDetails[0] ? prevDetails[0].weight : '') || 'kg';
+                const repsPlaceholder = prevSet.reps || (prevDetails[0] ? prevDetails[0].reps : '') || 'reps';
 
                 // TrackMetrics check for dynamic inputs
                 const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
@@ -2665,7 +2715,7 @@ const app = {
 
         if (isTurningOn) {
             const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
-            const prevDetails = this.getPreviousExerciseDetails(ex.name) || [];
+            const prevDetails = this.getPreviousExerciseDetails(ex.name, ex) || [];
 
             // Auto-fill missing weight if empty
             if (!ex.weights) ex.weights = Array(ex.sets).fill('');
@@ -3169,7 +3219,7 @@ const app = {
         const exerciseLogs = [];
 
         this.activeWorkout.exercises.forEach(ex => {
-            const prevDetails = this.getPreviousExerciseDetails(ex.name) || [];
+            const prevDetails = this.getPreviousExerciseDetails(ex.name, ex) || [];
 
             if (!ex.setsCompleted) ex.setsCompleted = Array(ex.sets || 1).fill(false);
             if (!ex.weights) ex.weights = Array(ex.sets || 1).fill('');
