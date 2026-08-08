@@ -2232,6 +2232,11 @@ const app = {
 
     extractExerciseNameTokens(input, exObj = null) {
         const tokens = new Set();
+
+        if (input && typeof input === 'object') {
+            exObj = input;
+            input = null;
+        }
         
         const processStr = (str) => {
             if (!str || typeof str !== 'string') return;
@@ -2283,9 +2288,6 @@ const app = {
             });
         };
 
-        if (typeof input === 'string') processStr(input);
-        else if (input && typeof input === 'object') exObj = input;
-
         if (exObj) {
             const variations = this.getExerciseVariations(exObj);
             // Als er meerdere variaties mogelijk zijn (bijv. "Goblet Squat of Leg Press"),
@@ -2294,7 +2296,7 @@ const app = {
                 if (exObj.chosenVariation && String(exObj.chosenVariation).trim() !== '') {
                     processStr(exObj.chosenVariation);
                 } else {
-                    return tokens; // Lege set -> wacht op variatieselectie
+                    return tokens; // Wacht op variatieselectie -> lege set!
                 }
             } else {
                 if (exObj.chosenVariation && String(exObj.chosenVariation).trim() !== '') {
@@ -2306,6 +2308,8 @@ const app = {
                 if (Array.isArray(exObj.optionalAlternatives)) exObj.optionalAlternatives.forEach(processStr);
                 if (Array.isArray(exObj.availableVariations)) exObj.availableVariations.forEach(processStr);
             }
+        } else if (typeof input === 'string') {
+            processStr(input);
         }
 
         return tokens;
