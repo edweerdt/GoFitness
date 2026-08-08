@@ -2278,11 +2278,19 @@ const app = {
         else if (input && typeof input === 'object') exObj = input;
 
         if (exObj) {
-            // Als er expliciet een variatie gekozen is (bijv. "Goblet Squat" uit "Goblet Squat of Leg Press"),
-            // halen we de historie specifiek en uitsluitend voor die gekozen variatie op!
-            if (exObj.chosenVariation && String(exObj.chosenVariation).trim() !== '') {
-                processStr(exObj.chosenVariation);
+            const variations = this.getExerciseVariations(exObj);
+            // Als er meerdere variaties mogelijk zijn (bijv. "Goblet Squat of Leg Press"),
+            // tonen we pas historie zodra de gebruiker expliciet een variatie kiest!
+            if (variations && variations.length > 1) {
+                if (exObj.chosenVariation && String(exObj.chosenVariation).trim() !== '') {
+                    processStr(exObj.chosenVariation);
+                } else {
+                    return tokens; // Lege set -> wacht op variatieselectie
+                }
             } else {
+                if (exObj.chosenVariation && String(exObj.chosenVariation).trim() !== '') {
+                    processStr(exObj.chosenVariation);
+                }
                 if (exObj.name) processStr(exObj.name);
                 if (exObj.originalName) processStr(exObj.originalName);
                 if (Array.isArray(exObj.alternatives)) exObj.alternatives.forEach(processStr);
@@ -2775,7 +2783,16 @@ const app = {
             const safeExName = app.escapeHTML(chosenName || ex.name);
             const varLabel = chosenName ? ` (${app.escapeHTML(chosenName)})` : '';
 
-            if (prevSummaryText) {
+            if (variations && variations.length > 1 && !chosenName) {
+                prevSummaryHtml = `
+                    <div class="text-sm mt-2" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; background:rgba(255,255,255,0.04); padding:6px 10px; border-radius:8px; border:1px dashed rgba(255,255,255,0.15);">
+                        <div style="display:flex; align-items:center; gap:6px; color:var(--text-muted); font-size:0.85rem;">
+                            <span class="material-icons-round" style="font-size:1rem; color:var(--accent-color);">touch_app</span>
+                            <span>Kies een variatie hierboven om de historie en gewichten te zien</span>
+                        </div>
+                    </div>
+                `;
+            } else if (prevSummaryText) {
                 prevSummaryHtml = `
                     <div class="text-sm mt-2" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; background:rgba(255,255,255,0.06); padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
                         <div style="display:flex; align-items:center; gap:4px; color:var(--text-muted); font-size:0.85rem; min-width:0; flex:1;">

@@ -2094,6 +2094,10 @@ describe('Exercise Library & Custom Vrije Sessie', () => {
         expect(legPressTokens.has('leg press')).toBe(true);
         expect(legPressTokens.has('goblet squat')).toBe(false);
 
+        const unchosenEx = { name: 'Goblet Squat of Leg Press', chosenVariation: '' };
+        const unchosenTokens = app.extractExerciseNameTokens(unchosenEx.name, unchosenEx);
+        expect(unchosenTokens.size).toBe(0);
+
         navigateSpy.mockRestore();
     });
 
