@@ -2776,47 +2776,8 @@ const app = {
                 variationHtml += `</div>`;
             }
 
-            // Formatteer de vorige prestatie als een duidelijke samenvattingsbalk
-            let prevSummaryHtml = '';
-            const prevSummaryText = app.formatPreviousDetailsSummary(prevDetails);
             const chosenName = ex.chosenVariation || '';
             const safeExName = app.escapeHTML(chosenName || ex.name);
-            const varLabel = chosenName ? ` (${app.escapeHTML(chosenName)})` : '';
-
-            if (variations && variations.length > 1 && !chosenName) {
-                prevSummaryHtml = `
-                    <div class="text-sm mt-2" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; background:rgba(255,255,255,0.04); padding:6px 10px; border-radius:8px; border:1px dashed rgba(255,255,255,0.15);">
-                        <div style="display:flex; align-items:center; gap:6px; color:var(--text-muted); font-size:0.85rem;">
-                            <span class="material-icons-round" style="font-size:1rem; color:var(--accent-color);">touch_app</span>
-                            <span>Kies een variatie hierboven om de historie en gewichten te zien</span>
-                        </div>
-                    </div>
-                `;
-            } else if (prevSummaryText) {
-                prevSummaryHtml = `
-                    <div class="text-sm mt-2" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; background:rgba(255,255,255,0.06); padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
-                        <div style="display:flex; align-items:center; gap:4px; color:var(--text-muted); font-size:0.85rem; min-width:0; flex:1;">
-                            <span class="material-icons-round" style="font-size:1rem; color:var(--accent-color); flex-shrink:0;">history</span>
-                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Vorige keer${varLabel}: <strong style="color:var(--text-primary); font-weight:600;">${prevSummaryText}</strong></span>
-                        </div>
-                        <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;" onclick="app.showExerciseHistoryModal('${safeExName}')">
-                            <span class="material-icons-round" style="font-size:0.85rem;">read_more</span> Alle Historie
-                        </button>
-                    </div>
-                `;
-            } else {
-                prevSummaryHtml = `
-                    <div class="text-sm mt-2" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; background:rgba(255,255,255,0.03); padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
-                        <div style="display:flex; align-items:center; gap:4px; color:var(--text-muted); font-size:0.85rem; flex:1; min-width:0;">
-                            <span class="material-icons-round" style="font-size:0.95rem; opacity:0.6; flex-shrink:0;">info</span>
-                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Geen eerdere gegevens gelogd voor ${app.escapeHTML(chosenName || ex.name)}</span>
-                        </div>
-                        <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;" onclick="app.showExerciseHistoryModal('${safeExName}')">
-                            <span class="material-icons-round" style="font-size:0.85rem;">read_more</span> Alle Historie
-                        </button>
-                    </div>
-                `;
-            }
 
             const card = document.createElement('div');
             card.className = 'glass-panel exercise-card';
@@ -2828,8 +2789,12 @@ const app = {
                         </div>
                         ${variationHtml}
                         <div style="margin-bottom:4px;">${badgesHtml}</div>
-                        <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
-                        ${prevSummaryHtml}
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-top:2px;">
+                            <div class="exercise-meta" style="margin:0;">${app.escapeHTML(metaString)}</div>
+                            <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;" onclick="app.showExerciseHistoryModal('${safeExName}')">
+                                <span class="material-icons-round" style="font-size:0.85rem;">history</span> Alle Historie
+                            </button>
+                        </div>
                         ${notesHtml}
                         ${delayBarHtml}
                     </div>
