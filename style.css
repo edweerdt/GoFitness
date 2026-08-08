@@ -467,6 +467,10 @@ button:disabled {
     z-index: 1100;
 }
 
+#modal-exercise-history {
+    z-index: 1150;
+}
+
 #modal-add-exercise {
     z-index: 1200;
 }

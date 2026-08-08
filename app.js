@@ -2286,6 +2286,124 @@ const app = {
         return null;
     },
 
+    formatPreviousDetailsSummary(prevDetails) {
+        if (!prevDetails || !Array.isArray(prevDetails) || prevDetails.length === 0) return null;
+        const parts = prevDetails.map(d => {
+            if (!d) return null;
+            const w = (d.weight !== undefined && d.weight !== null && String(d.weight).trim() !== '') ? `${this.escapeHTML(String(d.weight))}kg` : '';
+            const r = (d.reps !== undefined && d.reps !== null && String(d.reps).trim() !== '') ? `${this.escapeHTML(String(d.reps))} reps` : '';
+            const l = (d.level !== undefined && d.level !== null && String(d.level).trim() !== '') ? `stand ${this.escapeHTML(String(d.level))}` : '';
+            const combined = [w, r, l].filter(Boolean).join(' × ');
+            return combined;
+        }).filter(Boolean);
+
+        if (parts.length === 0) return null;
+
+        const first = parts[0];
+        const allSame = parts.every(p => p === first);
+        if (allSame && parts.length > 1) {
+            return `${parts.length}× (${first})`;
+        }
+        return parts.join(' • ');
+    },
+
+    showExerciseHistoryModal(exerciseName) {
+        const modal = document.getElementById('modal-exercise-history');
+        const container = document.getElementById('exercise-history-modal-content');
+        const titleEl = document.getElementById('exercise-history-modal-title');
+        if (!modal || !container) return;
+
+        const safeName = this.escapeHTML(exerciseName);
+        if (titleEl) titleEl.textContent = `Geschiedenis: ${exerciseName}`;
+
+        const entries = [];
+        const targetNames = new Set();
+        const addNamesToSet = (str) => {
+            if (!str || typeof str !== 'string') return;
+            const normalized = str.toLowerCase().trim();
+            if (!normalized) return;
+            targetNames.add(normalized);
+            const parts = str.split(/(\s+of\s+|\s*\/\s*|\s+or\s+|\s*,\s*)/i);
+            parts.forEach(p => {
+                const trimmed = p.toLowerCase().trim();
+                if (trimmed && trimmed !== 'of' && trimmed !== '/' && trimmed !== 'or' && trimmed !== ',') {
+                    targetNames.add(trimmed);
+                }
+            });
+        };
+        addNamesToSet(exerciseName);
+
+        for (let i = store.logs.length - 1; i >= 0; i--) {
+            const log = store.logs[i];
+            if (!log || !log.exercises) continue;
+
+            const matchedEx = log.exercises.find(e => {
+                if (!e || !e.name) return false;
+                const logNames = new Set();
+                addNamesToSet(e.name, logNames);
+                if (e.originalName) addNamesToSet(e.originalName, logNames);
+                if (e.chosenVariation) addNamesToSet(e.chosenVariation, logNames);
+                if (Array.isArray(e.alternatives)) e.alternatives.forEach(a => addNamesToSet(a, logNames));
+                for (const name of logNames) {
+                    if (targetNames.has(name)) return true;
+                }
+                return false;
+            });
+
+            if (matchedEx && matchedEx.details && matchedEx.details.length > 0) {
+                const hasData = matchedEx.details.some(d => (d.weight && String(d.weight).trim() !== '') || (d.reps && String(d.reps).trim() !== '') || (d.level && String(d.level).trim() !== ''));
+                if (hasData) {
+                    entries.push({
+                        date: log.date,
+                        sessionName: log.sessionName || 'Sessie',
+                        planName: log.planName || '',
+                        matchedName: matchedEx.name,
+                        details: matchedEx.details
+                    });
+                }
+            }
+        }
+
+        if (entries.length === 0) {
+            container.innerHTML = `<p class="text-muted text-sm text-center py-4">Nog geen gelogde trainingen gevonden voor ${safeName}.</p>`;
+        } else {
+            let html = '';
+            entries.forEach(entry => {
+                const dateFormatted = entry.date ? app.formatShortDate(entry.date) : 'Onbekende datum';
+                const detailStr = entry.details.map((d, idx) => {
+                    const parts = [];
+                    if (d.weight && String(d.weight).trim() !== '') parts.push(`${app.escapeHTML(String(d.weight))} kg`);
+                    if (d.reps && String(d.reps).trim() !== '') parts.push(`${app.escapeHTML(String(d.reps))} reps`);
+                    if (d.level && String(d.level).trim() !== '') parts.push(`stand ${app.escapeHTML(String(d.level))}`);
+                    return `<div class="text-sm" style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <span class="text-muted">Set ${d.setNumber || (idx + 1)}:</span>
+                        <span style="font-weight:500;">${parts.join(' × ')}</span>
+                    </div>`;
+                }).join('');
+
+                html += `
+                    <div class="glass-panel" style="padding:12px; margin-bottom:8px; background:rgba(255,255,255,0.03); border-radius:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <span style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">${app.escapeHTML(dateFormatted)}</span>
+                            <span class="status-badge" style="font-size:0.75rem; padding:2px 8px;">${app.escapeHTML(entry.sessionName)}</span>
+                        </div>
+                        <div class="flex-col gap-1 mt-1">
+                            ${detailStr}
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        modal.classList.remove('hidden');
+    },
+
+    hideExerciseHistoryModal() {
+        const modal = document.getElementById('modal-exercise-history');
+        if (modal) modal.classList.add('hidden');
+    },
+
     getRealisticIncrement(ex, plan) {
         if (!ex) return 2.5;
 
@@ -2630,6 +2748,33 @@ const app = {
                 variationHtml += `</div>`;
             }
 
+            // Formatteer de vorige prestatie als een duidelijke samenvattingsbalk
+            let prevSummaryHtml = '';
+            const prevSummaryText = app.formatPreviousDetailsSummary(prevDetails);
+            const safeExName = app.escapeHTML(ex.chosenVariation || ex.name);
+            if (prevSummaryText) {
+                prevSummaryHtml = `
+                    <div class="text-sm mt-2" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; background:rgba(255,255,255,0.06); padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
+                        <div style="display:flex; align-items:center; gap:4px; color:var(--text-muted); font-size:0.85rem; min-width:0; flex:1;">
+                            <span class="material-icons-round" style="font-size:1rem; color:var(--accent-color); flex-shrink:0;">history</span>
+                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Vorige keer: <strong style="color:var(--text-primary); font-weight:600;">${prevSummaryText}</strong></span>
+                        </div>
+                        <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;" onclick="app.showExerciseHistoryModal('${safeExName}')">
+                            <span class="material-icons-round" style="font-size:0.85rem;">read_more</span> Alle Historie
+                        </button>
+                    </div>
+                `;
+            } else {
+                prevSummaryHtml = `
+                    <div class="text-sm mt-2" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; background:rgba(255,255,255,0.03); padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                        <div style="display:flex; align-items:center; gap:4px; color:var(--text-muted); font-size:0.85rem;">
+                            <span class="material-icons-round" style="font-size:0.95rem; opacity:0.6;">info</span>
+                            <span>Eerste keer gelogd voor deze oefening</span>
+                        </div>
+                    </div>
+                `;
+            }
+
             const card = document.createElement('div');
             card.className = 'glass-panel exercise-card';
             card.innerHTML = `
@@ -2641,6 +2786,7 @@ const app = {
                         ${variationHtml}
                         <div style="margin-bottom:4px;">${badgesHtml}</div>
                         <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
+                        ${prevSummaryHtml}
                         ${notesHtml}
                         ${delayBarHtml}
                     </div>

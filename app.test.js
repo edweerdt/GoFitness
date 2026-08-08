@@ -2071,6 +2071,9 @@ describe('Exercise Library & Custom Vrije Sessie', () => {
         expect(objectDetails).toBeDefined();
         expect(objectDetails[0].weight).toBe('80');
 
+        const summaryText = app.formatPreviousDetailsSummary(prevDetails);
+        expect(summaryText).toBe('3× (80kg × 10 reps)');
+
         navigateSpy.mockRestore();
     });
 

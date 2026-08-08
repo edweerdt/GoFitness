@@ -439,6 +439,19 @@
             </div>
         </div>
 
+        <!-- Exercise History Modal -->
+        <div id="modal-exercise-history" class="modal-overlay hidden">
+            <div class="modal-content glass-panel" style="max-width: 480px; width: 100%; max-height: 80vh; display: flex; flex-direction: column;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 id="exercise-history-modal-title" style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Oefening Geschiedenis</h3>
+                    <button class="icon-btn" onclick="app.hideExerciseHistoryModal()"><span class="material-icons-round">close</span></button>
+                </div>
+                <div id="exercise-history-modal-content" class="flex-col gap-2" style="flex:1; overflow-y:auto; padding-right:4px;">
+                    <!-- Injected by JS -->
+                </div>
+            </div>
+        </div>
+
         <!-- Toast Container -->
         <div id="toast-container" class="toast-container"></div>
     </div>
