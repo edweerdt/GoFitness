@@ -2561,6 +2561,7 @@ const app = {
 
         sortedExercises.forEach((ex) => {
             const exIndex = this.activeWorkout.exercises.findIndex(e => e.id === ex.id);
+            const variations = app.getExerciseVariations(ex);
             const prevDetails = this.getPreviousExerciseDetails(ex.name, ex) || [];
 
             if (!ex.setsCompleted) ex.setsCompleted = Array(ex.sets || 1).fill(false);
@@ -2787,8 +2788,7 @@ const app = {
             
             // --- Variation Pill Selector ---
             let variationHtml = '';
-            const variations = app.getExerciseVariations(ex);
-            if (variations.length > 1) {
+            if (variations && variations.length > 1) {
                 const chosen = ex.chosenVariation || '';
                 variationHtml = `<div class="variation-selector">`;
                 variations.forEach(v => {
