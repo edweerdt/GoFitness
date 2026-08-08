@@ -2449,7 +2449,7 @@ const app = {
                         data-ex="${exIndex}" data-set="${i}" data-type="weight"
                         value="${app.escapeHTML(String(ex.weights ? ex.weights[i] : ''))}"
                         oninput="app.updateWeight(${exIndex}, ${i}, this.value)"
-                        onchange="app.updateWeight(${exIndex}, ${i}, this.value)"
+                        onchange="app.updateWeight(${exIndex}, ${i}, this.value, true)"
                         onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'weight');}">`;
                 }
                 if (wantsReps && !isHold) {
@@ -2458,7 +2458,7 @@ const app = {
                         data-ex="${exIndex}" data-set="${i}" data-type="reps"
                         value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}"
                         oninput="app.updateReps(${exIndex}, ${i}, this.value)"
-                        onchange="app.updateReps(${exIndex}, ${i}, this.value)"
+                        onchange="app.updateReps(${exIndex}, ${i}, this.value, true)"
                         onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'reps');}">`;
                 }
                 if (wantsDuration || isHold) {
@@ -2467,7 +2467,7 @@ const app = {
                         data-ex="${exIndex}" data-set="${i}" data-type="reps"
                         value="${app.escapeHTML(String(ex.actualReps ? ex.actualReps[i] : ''))}"
                         oninput="app.updateReps(${exIndex}, ${i}, this.value)"
-                        onchange="app.updateReps(${exIndex}, ${i}, this.value)"
+                        onchange="app.updateReps(${exIndex}, ${i}, this.value, true)"
                         onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'reps');}">`;
 
                      inputsHtml += `
@@ -2487,7 +2487,7 @@ const app = {
                         data-ex="${exIndex}" data-set="${i}" data-type="level"
                         value="${app.escapeHTML(String(ex.levels ? ex.levels[i] : ''))}"
                         oninput="app.updateLevel(${exIndex}, ${i}, this.value)"
-                        onchange="app.updateLevel(${exIndex}, ${i}, this.value)"
+                        onchange="app.updateLevel(${exIndex}, ${i}, this.value, true)"
                         onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'level');}">`;
                 }
 
@@ -2981,37 +2981,49 @@ const app = {
             ex.setsCompleted[setIndex] = true;
             if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
             if (ex.restSeconds) this.startRestTimer(ex.restSeconds);
+
+            // Gericht alleen de check-knop van deze set bijwerken: een volledige
+            // re-render zou de focus (en daarmee de scrollpositie/het toetsenbord
+            // op mobiel) slopen terwijl de gebruiker aan het invoeren is
             if (typeof document !== 'undefined' && document.getElementById('workout-exercise-list')) {
-                this.renderWorkoutExercises();
+                const anchor = document.querySelector(`#workout-exercise-list input[data-ex="${exIndex}"][data-set="${setIndex}"]`);
+                const checkBtn = anchor && anchor.closest('.set-row') ? anchor.closest('.set-row').querySelector('.check-btn') : null;
+                if (checkBtn) {
+                    checkBtn.classList.add('checked');
+                } else {
+                    this.renderWorkoutExercises();
+                }
             }
         }
     },
 
-    updateWeight(exIndex, setIndex, val) {
+    // finalize=true alleen als de invoer af is (change/Enter): tijdens het typen
+    // (oninput) mag de set niet al afgevinkt worden na het eerste cijfer
+    updateWeight(exIndex, setIndex, val, finalize = false) {
         if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
         const ex = this.activeWorkout.exercises[exIndex];
         if (!ex.weights) ex.weights = Array(ex.sets).fill('');
         ex.weights[setIndex] = val;
         if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
-        this.checkAutoCompleteSet(exIndex, setIndex);
+        if (finalize) this.checkAutoCompleteSet(exIndex, setIndex);
     },
 
-    updateReps(exIndex, setIndex, val) {
+    updateReps(exIndex, setIndex, val, finalize = false) {
         if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
         const ex = this.activeWorkout.exercises[exIndex];
         if (!ex.actualReps) ex.actualReps = Array(ex.sets).fill('');
         ex.actualReps[setIndex] = val;
         if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
-        this.checkAutoCompleteSet(exIndex, setIndex);
+        if (finalize) this.checkAutoCompleteSet(exIndex, setIndex);
     },
 
-    updateLevel(exIndex, setIndex, val) {
+    updateLevel(exIndex, setIndex, val, finalize = false) {
         if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
         const ex = this.activeWorkout.exercises[exIndex];
         if (!ex.levels) ex.levels = Array(ex.sets).fill('');
         ex.levels[setIndex] = val;
         if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
-        this.checkAutoCompleteSet(exIndex, setIndex);
+        if (finalize) this.checkAutoCompleteSet(exIndex, setIndex);
     },
 
     handleInputEnter(event, exIndex, setIndex, inputType) {
