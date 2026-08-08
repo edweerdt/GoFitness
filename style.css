@@ -463,6 +463,14 @@ button:disabled {
     padding: 20px;
 }
 
+#modal-select-exercise-for-workout {
+    z-index: 1100;
+}
+
+#modal-add-exercise {
+    z-index: 1200;
+}
+
 .modal-content {
     width: 100%;
     max-width: 400px;
