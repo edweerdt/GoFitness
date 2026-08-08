@@ -1846,24 +1846,22 @@ const app = {
             const safeId = this.escapeHTML(ex.id);
             const musclesStr = (ex.muscleGroups || []).map(m => this.escapeHTML(m)).join(', ') || 'Algemeen';
             const typeBadge = ex.exerciseType === 'duration' ? 'Tijd / Sec' : (ex.exerciseType === 'bodyweight_reps' ? 'Lichaamsgewicht' : 'Gewicht & Reps');
+            const altsStr = (ex.alternatives || ex.optionalAlternatives || []).map(a => this.escapeHTML(a)).join(', ');
+            const altsHtml = altsStr ? `<div class="text-sm text-muted" style="font-size:0.75rem; opacity:0.8; margin-top:2px;">Alternatieven: ${altsStr}</div>` : '';
             
-            let actions = '';
-            if (ex.isCustom) {
-                actions = `
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:var(--text-muted);" onclick="app.showAddExerciseModal('${safeId}')" title="Bewerken">edit</span>
-                        <span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('exercise', '${safeId}')" title="Verwijderen">delete_outline</span>
-                    </div>
-                `;
-            } else {
-                actions = `<span class="status-badge" style="padding:2px 6px; font-size:0.65rem; background:rgba(255,255,255,0.06); color:var(--text-muted);">Ingebouwd</span>`;
-            }
+            let actions = `
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:var(--text-muted);" onclick="app.showAddExerciseModal('${safeId}')" title="Bewerken">edit</span>
+                    ${ex.isCustom ? `<span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('exercise', '${safeId}')" title="Verwijderen">delete_outline</span>` : ''}
+                </div>
+            `;
 
             return `
                 <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.03); padding:8px 12px; border-radius:8px;">
                     <div style="min-width:0; flex:1; margin-right:8px;">
                         <div style="font-weight:500; font-size:0.9rem; color:var(--text-primary);">${safeName}</div>
                         <div class="text-sm text-muted">${typeBadge} • ${musclesStr}</div>
+                        ${altsHtml}
                     </div>
                     ${actions}
                 </div>
@@ -1879,6 +1877,7 @@ const app = {
         const nameInput = document.getElementById('new-ex-name');
         const typeSelect = document.getElementById('new-ex-type');
         const catSelect = document.getElementById('new-ex-category');
+        const altInput = document.getElementById('new-ex-alternatives');
         const idInput = document.getElementById('ex-edit-id');
         const hintEl = document.getElementById('new-ex-type-hint');
 
@@ -1895,6 +1894,7 @@ const app = {
                 if (nameInput) nameInput.value = ex.name;
                 if (typeSelect) typeSelect.value = ex.exerciseType || 'weight_reps';
                 if (catSelect) catSelect.value = ex.category || 'compound';
+                if (altInput) altInput.value = (ex.alternatives || ex.optionalAlternatives || []).join(', ');
                 (ex.muscleGroups || []).forEach(m => {
                     const cb = document.querySelector(`#new-ex-muscles input[value="${m}"]`);
                     if (cb) cb.checked = true;
@@ -1906,6 +1906,7 @@ const app = {
             if (nameInput) nameInput.value = '';
             if (typeSelect) typeSelect.value = 'weight_reps';
             if (catSelect) catSelect.value = 'compound';
+            if (altInput) altInput.value = '';
         }
 
         const modal = document.getElementById('modal-add-exercise');
@@ -1921,6 +1922,7 @@ const app = {
         const nameInput = document.getElementById('new-ex-name');
         const typeSelect = document.getElementById('new-ex-type');
         const catSelect = document.getElementById('new-ex-category');
+        const altInput = document.getElementById('new-ex-alternatives');
         const editId = document.getElementById('ex-edit-id') ? document.getElementById('ex-edit-id').value : null;
 
         const name = nameInput ? nameInput.value.trim() : '';
@@ -1932,6 +1934,11 @@ const app = {
         const selectedMuscles = Array.from(document.querySelectorAll('#new-ex-muscles input[type="checkbox"]:checked')).map(cb => cb.value);
         const exerciseType = typeSelect ? typeSelect.value : 'weight_reps';
         const category = catSelect ? catSelect.value : 'compound';
+        const rawAlts = altInput ? altInput.value : '';
+        const alternatives = rawAlts
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
 
         const trackMetrics = (exerciseType === 'duration' || category === 'isometric')
             ? ['duration_seconds']
@@ -1942,7 +1949,8 @@ const app = {
             muscleGroups: selectedMuscles,
             exerciseType,
             trackMetrics,
-            category
+            category,
+            alternatives
         };
 
         if (editId) {
@@ -2119,6 +2127,7 @@ const app = {
             exerciseType: exerciseData.exerciseType || 'weight_reps',
             trackMetrics: trackMetrics,
             category: exerciseData.category || 'custom',
+            alternatives: exerciseData.alternatives || exerciseData.optionalAlternatives || [],
             sets: determinedSets,
             reps: defaultReps,
             setsCompleted: Array(determinedSets).fill(false),

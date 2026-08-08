@@ -2101,6 +2101,29 @@ describe('Exercise Library & Custom Vrije Sessie', () => {
         navigateSpy.mockRestore();
     });
 
+    it('should save and update custom exercise with alternatives', () => {
+        const customEx = store.addCustomExercise({
+            name: 'Bulgarian Split Squat Test',
+            muscleGroups: ['legs', 'glutes'],
+            exerciseType: 'weight_reps',
+            category: 'compound',
+            alternatives: ['Leg Press', 'Dumbbell Lunge']
+        });
+
+        expect(customEx.alternatives).toEqual(['Leg Press', 'Dumbbell Lunge']);
+
+        const updated = store.updateCustomExercise(customEx.id, {
+            alternatives: ['Barbell Squat', 'Leg Press']
+        });
+
+        expect(updated.alternatives).toEqual(['Barbell Squat', 'Leg Press']);
+
+        const lib = store.getExerciseLibrary();
+        const found = lib.find(e => e.id === customEx.id);
+        expect(found).toBeDefined();
+        expect(found.alternatives).toEqual(['Barbell Squat', 'Leg Press']);
+    });
+
     it('should split Seated Cable Row and Row Machine with duration and stand input', () => {
         const lib = store.getExerciseLibrary();
         const seatedRow = lib.find(e => e.name === 'Seated Cable Row');
