@@ -1979,6 +1979,7 @@ describe('Exercise Library & Custom Vrije Sessie', () => {
 
         expect(library.length).toBeGreaterThan(15); // contains built-in exercises
         expect(library.some(e => e.name === 'Barbell Bench Press')).toBe(true);
+        expect(library.some(e => e.name === 'Incline Bench Press')).toBe(true);
 
         const customEx = store.addCustomExercise({
             name: 'Bulgarian Split Squat',

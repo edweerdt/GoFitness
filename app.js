@@ -2,6 +2,7 @@
 
 const DEFAULT_EXERCISES = [
     { id: 'def_bench_press', name: 'Barbell Bench Press', muscleGroups: ['chest', 'triceps', 'shoulders'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_incline_bench_press', name: 'Incline Bench Press', muscleGroups: ['chest', 'shoulders', 'triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_incline_db_press', name: 'Incline Dumbbell Press', muscleGroups: ['chest', 'shoulders', 'triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_chest_fly', name: 'Dumbbell Chest Fly', muscleGroups: ['chest'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_pushup', name: 'Push-Up', muscleGroups: ['chest', 'triceps', 'core'], exerciseType: 'bodyweight_reps', trackMetrics: ['reps'], category: 'bodyweight' },
