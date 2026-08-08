@@ -2074,6 +2074,15 @@ describe('Exercise Library & Custom Vrije Sessie', () => {
         const summaryText = app.formatPreviousDetailsSummary(prevDetails);
         expect(summaryText).toBe('3× (80kg × 10 reps)');
 
+        // Deep token extraction test: parentheses & modifiers
+        const tokensRow = app.extractExerciseNameTokens('Row Machine (Roeimachine)');
+        expect(tokensRow.has('roeimachine')).toBe(true);
+        expect(tokensRow.has('row machine')).toBe(true);
+
+        const tokensRDL = app.extractExerciseNameTokens('Romanian Deadlift (RDL)');
+        expect(tokensRDL.has('rdl')).toBe(true);
+        expect(tokensRDL.has('romanian deadlift')).toBe(true);
+
         navigateSpy.mockRestore();
     });
 

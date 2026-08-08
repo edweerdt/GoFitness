@@ -2221,39 +2221,78 @@ const app = {
         this.navigate('workout');
     },
 
-    getPreviousExerciseDetails(exerciseName, exObj = null) {
-        if (!exerciseName && !exObj) return null;
-        if (typeof exerciseName === 'object' && exerciseName !== null) {
-            exObj = exerciseName;
-            exerciseName = exObj.name;
-        }
-
-        const targetNames = new Set();
-        const addNamesToSet = (str) => {
+    extractExerciseNameTokens(input, exObj = null) {
+        const tokens = new Set();
+        
+        const processStr = (str) => {
             if (!str || typeof str !== 'string') return;
-            const normalized = str.toLowerCase().trim();
-            if (!normalized) return;
-            targetNames.add(normalized);
-            const parts = str.split(/(\s+of\s+|\s*\/\s*|\s+or\s+|\s*,\s*)/i);
-            parts.forEach(p => {
-                const trimmed = p.toLowerCase().trim();
-                if (trimmed && trimmed !== 'of' && trimmed !== '/' && trimmed !== 'or' && trimmed !== ',') {
-                    targetNames.add(trimmed);
+            const raw = str.toLowerCase().trim();
+            if (!raw) return;
+            tokens.add(raw);
+
+            // Strip quotes/punctuation
+            const cleanPunct = raw.replace(/['"`]/g, '');
+            tokens.add(cleanPunct);
+
+            // Extract content inside parentheses e.g. "Row Machine (Roeimachine)" -> "roeimachine" & "row machine"
+            const parenRegex = /\(([^)]+)\)/g;
+            let match;
+            while ((match = parenRegex.exec(raw)) !== null) {
+                if (match[1] && match[1].trim()) {
+                    tokens.add(match[1].trim());
+                }
+            }
+            const withoutParen = raw.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+            if (withoutParen) tokens.add(withoutParen);
+
+            // Split by separators: " of ", "/", " or ", ",", "&", "+", " - "
+            const splitRegex = /(\s+of\s+|\s*\/\s*|\s+or\s+|\s*,\s*|\s*&\s*|\s*\+\s*|\s+-\s+)/i;
+            const currentList = Array.from(tokens);
+            currentList.forEach(s => {
+                const parts = s.split(splitRegex);
+                parts.forEach(p => {
+                    const t = p.trim();
+                    if (t && !['of', '/', 'or', ',', '&', '+', '-'].includes(t)) {
+                        tokens.add(t);
+                    }
+                });
+            });
+
+            // Strip equipment/modifier prefixes
+            const modifiers = ['barbell', 'dumbbell', 'cable', 'machine', 'seated', 'lying', 'standing', 'single-arm', 'single arm', 'kettlebell'];
+            Array.from(tokens).forEach(s => {
+                modifiers.forEach(mod => {
+                    if (s.startsWith(mod + ' ')) {
+                        const stripped = s.slice(mod.length + 1).trim();
+                        if (stripped.length > 2) tokens.add(stripped);
+                    }
+                });
+                if (s.includes('-')) {
+                    tokens.add(s.replace(/-/g, ' ').replace(/\s+/g, ' ').trim());
+                    tokens.add(s.replace(/-/g, '').trim());
                 }
             });
         };
 
-        if (typeof exerciseName === 'string') addNamesToSet(exerciseName);
+        if (typeof input === 'string') processStr(input);
+        else if (input && typeof input === 'object') exObj = input;
+
         if (exObj) {
-            if (exObj.name) addNamesToSet(exObj.name);
-            if (exObj.originalName) addNamesToSet(exObj.originalName);
-            if (exObj.chosenVariation) addNamesToSet(exObj.chosenVariation);
-            if (Array.isArray(exObj.alternatives)) exObj.alternatives.forEach(addNamesToSet);
-            if (Array.isArray(exObj.optionalAlternatives)) exObj.optionalAlternatives.forEach(addNamesToSet);
-            if (Array.isArray(exObj.availableVariations)) exObj.availableVariations.forEach(addNamesToSet);
+            if (exObj.name) processStr(exObj.name);
+            if (exObj.originalName) processStr(exObj.originalName);
+            if (exObj.chosenVariation) processStr(exObj.chosenVariation);
+            if (Array.isArray(exObj.alternatives)) exObj.alternatives.forEach(processStr);
+            if (Array.isArray(exObj.optionalAlternatives)) exObj.optionalAlternatives.forEach(processStr);
+            if (Array.isArray(exObj.availableVariations)) exObj.availableVariations.forEach(processStr);
         }
 
-        if (targetNames.size === 0) return null;
+        return tokens;
+    },
+
+    getPreviousExerciseDetails(exerciseName, exObj = null) {
+        if (!exerciseName && !exObj) return null;
+        const targetTokens = this.extractExerciseNameTokens(exerciseName, exObj);
+        if (targetTokens.size === 0) return null;
 
         const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
 
@@ -2263,15 +2302,9 @@ const app = {
             
             const matchedEx = log.exercises.find(e => {
                 if (!e || !e.name) return false;
-                const logNames = new Set();
-                addNamesToSet(e.name, logNames);
-                if (e.originalName) addNamesToSet(e.originalName, logNames);
-                if (e.chosenVariation) addNamesToSet(e.chosenVariation, logNames);
-                if (Array.isArray(e.alternatives)) e.alternatives.forEach(a => addNamesToSet(a, logNames));
-                if (Array.isArray(e.optionalAlternatives)) e.optionalAlternatives.forEach(a => addNamesToSet(a, logNames));
-
-                for (const name of logNames) {
-                    if (targetNames.has(name)) return true;
+                const logTokens = this.extractExerciseNameTokens(e.name, e);
+                for (const t of logTokens) {
+                    if (targetTokens.has(t)) return true;
                 }
                 return false;
             });
@@ -2316,22 +2349,8 @@ const app = {
         const safeName = this.escapeHTML(exerciseName);
         if (titleEl) titleEl.textContent = `Geschiedenis: ${exerciseName}`;
 
+        const targetTokens = this.extractExerciseNameTokens(exerciseName);
         const entries = [];
-        const targetNames = new Set();
-        const addNamesToSet = (str) => {
-            if (!str || typeof str !== 'string') return;
-            const normalized = str.toLowerCase().trim();
-            if (!normalized) return;
-            targetNames.add(normalized);
-            const parts = str.split(/(\s+of\s+|\s*\/\s*|\s+or\s+|\s*,\s*)/i);
-            parts.forEach(p => {
-                const trimmed = p.toLowerCase().trim();
-                if (trimmed && trimmed !== 'of' && trimmed !== '/' && trimmed !== 'or' && trimmed !== ',') {
-                    targetNames.add(trimmed);
-                }
-            });
-        };
-        addNamesToSet(exerciseName);
 
         for (let i = store.logs.length - 1; i >= 0; i--) {
             const log = store.logs[i];
@@ -2339,13 +2358,9 @@ const app = {
 
             const matchedEx = log.exercises.find(e => {
                 if (!e || !e.name) return false;
-                const logNames = new Set();
-                addNamesToSet(e.name, logNames);
-                if (e.originalName) addNamesToSet(e.originalName, logNames);
-                if (e.chosenVariation) addNamesToSet(e.chosenVariation, logNames);
-                if (Array.isArray(e.alternatives)) e.alternatives.forEach(a => addNamesToSet(a, logNames));
-                for (const name of logNames) {
-                    if (targetNames.has(name)) return true;
+                const logTokens = this.extractExerciseNameTokens(e.name, e);
+                for (const t of logTokens) {
+                    if (targetTokens.has(t)) return true;
                 }
                 return false;
             });
@@ -3441,6 +3456,8 @@ const app = {
                 totalExercisesCompleted++;
                 exerciseLogs.push({
                     name: ex.chosenVariation || ex.name,
+                    originalName: ex.name,
+                    chosenVariation: ex.chosenVariation || '',
                     muscleGroups: ex.muscleGroups || [],
                     setsCompleted: setDetails.length,
                     totalSets: ex.sets,
