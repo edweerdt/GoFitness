@@ -2083,6 +2083,17 @@ describe('Exercise Library & Custom Vrije Sessie', () => {
         expect(tokensRDL.has('rdl')).toBe(true);
         expect(tokensRDL.has('romanian deadlift')).toBe(true);
 
+        // Specific variation isolation test
+        const gobletEx = { name: 'Goblet Squat of Leg Press', chosenVariation: 'Goblet Squat' };
+        const gobletTokens = app.extractExerciseNameTokens(gobletEx.name, gobletEx);
+        expect(gobletTokens.has('goblet squat')).toBe(true);
+        expect(gobletTokens.has('leg press')).toBe(false);
+
+        const legPressEx = { name: 'Goblet Squat of Leg Press', chosenVariation: 'Leg Press' };
+        const legPressTokens = app.extractExerciseNameTokens(legPressEx.name, legPressEx);
+        expect(legPressTokens.has('leg press')).toBe(true);
+        expect(legPressTokens.has('goblet squat')).toBe(false);
+
         navigateSpy.mockRestore();
     });
 

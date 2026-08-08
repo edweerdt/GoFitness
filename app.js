@@ -2278,12 +2278,17 @@ const app = {
         else if (input && typeof input === 'object') exObj = input;
 
         if (exObj) {
-            if (exObj.name) processStr(exObj.name);
-            if (exObj.originalName) processStr(exObj.originalName);
-            if (exObj.chosenVariation) processStr(exObj.chosenVariation);
-            if (Array.isArray(exObj.alternatives)) exObj.alternatives.forEach(processStr);
-            if (Array.isArray(exObj.optionalAlternatives)) exObj.optionalAlternatives.forEach(processStr);
-            if (Array.isArray(exObj.availableVariations)) exObj.availableVariations.forEach(processStr);
+            // Als er expliciet een variatie gekozen is (bijv. "Goblet Squat" uit "Goblet Squat of Leg Press"),
+            // halen we de historie specifiek en uitsluitend voor die gekozen variatie op!
+            if (exObj.chosenVariation && String(exObj.chosenVariation).trim() !== '') {
+                processStr(exObj.chosenVariation);
+            } else {
+                if (exObj.name) processStr(exObj.name);
+                if (exObj.originalName) processStr(exObj.originalName);
+                if (Array.isArray(exObj.alternatives)) exObj.alternatives.forEach(processStr);
+                if (Array.isArray(exObj.optionalAlternatives)) exObj.optionalAlternatives.forEach(processStr);
+                if (Array.isArray(exObj.availableVariations)) exObj.availableVariations.forEach(processStr);
+            }
         }
 
         return tokens;
@@ -2766,13 +2771,16 @@ const app = {
             // Formatteer de vorige prestatie als een duidelijke samenvattingsbalk
             let prevSummaryHtml = '';
             const prevSummaryText = app.formatPreviousDetailsSummary(prevDetails);
-            const safeExName = app.escapeHTML(ex.chosenVariation || ex.name);
+            const chosenName = ex.chosenVariation || '';
+            const safeExName = app.escapeHTML(chosenName || ex.name);
+            const varLabel = chosenName ? ` (${app.escapeHTML(chosenName)})` : '';
+
             if (prevSummaryText) {
                 prevSummaryHtml = `
                     <div class="text-sm mt-2" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; background:rgba(255,255,255,0.06); padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
                         <div style="display:flex; align-items:center; gap:4px; color:var(--text-muted); font-size:0.85rem; min-width:0; flex:1;">
                             <span class="material-icons-round" style="font-size:1rem; color:var(--accent-color); flex-shrink:0;">history</span>
-                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Vorige keer: <strong style="color:var(--text-primary); font-weight:600;">${prevSummaryText}</strong></span>
+                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Vorige keer${varLabel}: <strong style="color:var(--text-primary); font-weight:600;">${prevSummaryText}</strong></span>
                         </div>
                         <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;" onclick="app.showExerciseHistoryModal('${safeExName}')">
                             <span class="material-icons-round" style="font-size:0.85rem;">read_more</span> Alle Historie
@@ -2782,10 +2790,13 @@ const app = {
             } else {
                 prevSummaryHtml = `
                     <div class="text-sm mt-2" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; background:rgba(255,255,255,0.03); padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
-                        <div style="display:flex; align-items:center; gap:4px; color:var(--text-muted); font-size:0.85rem;">
-                            <span class="material-icons-round" style="font-size:0.95rem; opacity:0.6;">info</span>
-                            <span>Eerste keer gelogd voor deze oefening</span>
+                        <div style="display:flex; align-items:center; gap:4px; color:var(--text-muted); font-size:0.85rem; flex:1; min-width:0;">
+                            <span class="material-icons-round" style="font-size:0.95rem; opacity:0.6; flex-shrink:0;">info</span>
+                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Geen eerdere gegevens gelogd voor ${app.escapeHTML(chosenName || ex.name)}</span>
                         </div>
+                        <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;" onclick="app.showExerciseHistoryModal('${safeExName}')">
+                            <span class="material-icons-round" style="font-size:0.85rem;">read_more</span> Alle Historie
+                        </button>
                     </div>
                 `;
             }
