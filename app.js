@@ -2584,11 +2584,25 @@ const app = {
             }
 
             if (ex.alternatives && ex.alternatives.length > 0) {
-                const altLinks = ex.alternatives.map(a => app.formatClickableExerciseName(a)).join(', ');
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${altLinks}</div>`;
+                const variationTokens = new Set(variations.map(v => v.toLowerCase().trim()));
+                const uniqueAlts = ex.alternatives.filter(a => {
+                    const norm = String(a || '').toLowerCase().trim();
+                    return norm && !variationTokens.has(norm);
+                });
+                if (uniqueAlts.length > 0) {
+                    const altLinks = uniqueAlts.map(a => app.formatClickableExerciseName(a)).join(', ');
+                    notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${altLinks}</div>`;
+                }
             } else if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
-                const altLinks = ex.optionalAlternatives.map(a => app.formatClickableExerciseName(a)).join(', ');
-                notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${altLinks}</div>`;
+                const variationTokens = new Set(variations.map(v => v.toLowerCase().trim()));
+                const uniqueAlts = ex.optionalAlternatives.filter(a => {
+                    const norm = String(a || '').toLowerCase().trim();
+                    return norm && !variationTokens.has(norm);
+                });
+                if (uniqueAlts.length > 0) {
+                    const altLinks = uniqueAlts.map(a => app.formatClickableExerciseName(a)).join(', ');
+                    notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${altLinks}</div>`;
+                }
             }
 
             // Progressive-overload-advies op basis van de vorige sessie
