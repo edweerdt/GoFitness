@@ -147,7 +147,13 @@
                     <h2>Statistieken</h2>
                 </header>
                 <div class="content-padded pb-32">
-                    <h3>Statistieken</h3>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <h3 style="margin:0;">Statistieken</h3>
+                        <button id="btn-share-stats" class="weeks-stepper-btn" onclick="app.openShareStatsModal()" title="Statistieken delen" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; height:auto; width:auto; border-radius:12px; background: rgba(37, 99, 235, 0.15); color: var(--accent-color); border: 1px solid rgba(37, 99, 235, 0.3);">
+                            <span class="material-icons-round" style="font-size:18px;">share</span>
+                            <span style="font-size:13px; font-weight:600;">Delen</span>
+                        </button>
+                    </div>
                     <div class="stats-grid mt-2" id="full-stats-grid">
                         <!-- Stats injected here -->
                     </div>
@@ -453,6 +459,44 @@
                 </div>
                 <div id="exercise-history-modal-content" class="flex-col gap-2" style="flex:1; overflow-y:auto; padding-right:4px;">
                     <!-- Injected by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Share Statistics Modal -->
+        <div id="modal-share-stats" class="modal-overlay hidden">
+            <div class="modal-content glass-panel" style="max-width: 520px; width: 100%;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Statistieken Delen</h3>
+                    <button class="icon-btn" onclick="app.hideShareStatsModal()"><span class="material-icons-round">close</span></button>
+                </div>
+                <p class="text-sm text-muted" style="margin-bottom:12px;">Selecteer welke onderdelen je wilt opnemen in de afbeelding:</p>
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+                    <label class="chip-checkbox" style="font-size:0.9rem; padding:8px 12px; border-radius:10px;">
+                        <input type="checkbox" id="share-opt-stats" checked onchange="app.renderShareStatsPreview()"> Statistieken
+                    </label>
+                    <label class="chip-checkbox" style="font-size:0.9rem; padding:8px 12px; border-radius:10px;">
+                        <input type="checkbox" id="share-opt-progress" checked onchange="app.renderShareStatsPreview()"> Progressie
+                    </label>
+                    <label class="chip-checkbox" style="font-size:0.9rem; padding:8px 12px; border-radius:10px;">
+                        <input type="checkbox" id="share-opt-muscles" checked onchange="app.renderShareStatsPreview()"> Spiergroepen
+                    </label>
+                </div>
+                
+                <div id="share-preview-container" class="glass-panel" style="background: rgba(0,0,0,0.3); border-radius:12px; padding:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:180px; max-height:50vh; overflow-y:auto; margin-bottom:16px;">
+                    <canvas id="share-stats-canvas" style="display:none; max-width:100%; height:auto; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.4);"></canvas>
+                    <img id="share-stats-img-preview" style="max-width:100%; height:auto; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.4);" alt="Preview">
+                    <div id="share-stats-empty-msg" class="text-sm text-muted hidden" style="text-align:center; padding:24px;">Selecteer minimaal 1 onderdeel om te delen.</div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn-secondary flex-1" onclick="app.hideShareStatsModal()">Annuleren</button>
+                    <button class="btn-secondary flex-1" onclick="app.downloadStatsImage()" id="btn-download-share-img">
+                        <span class="material-icons-round" style="font-size:18px; vertical-align:middle; margin-right:4px;">download</span>Download
+                    </button>
+                    <button class="btn-primary flex-1" onclick="app.shareStatsImage()" id="btn-action-share-img">
+                        <span class="material-icons-round" style="font-size:18px; vertical-align:middle; margin-right:4px;">share</span>Delen
+                    </button>
                 </div>
             </div>
         </div>

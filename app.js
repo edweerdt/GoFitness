@@ -4121,6 +4121,407 @@ const app = {
         }
     },
 
+    openShareStatsModal() {
+        const modal = document.getElementById('modal-share-stats');
+        if (modal) {
+            modal.classList.remove('hidden');
+            this.renderShareStatsPreview();
+        }
+    },
+
+    hideShareStatsModal() {
+        const modal = document.getElementById('modal-share-stats');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    },
+
+    renderShareStatsPreview() {
+        const incStats = document.getElementById('share-opt-stats')?.checked || false;
+        const incProgress = document.getElementById('share-opt-progress')?.checked || false;
+        const incMuscles = document.getElementById('share-opt-muscles')?.checked || false;
+
+        const emptyMsg = document.getElementById('share-stats-empty-msg');
+        const imgPreview = document.getElementById('share-stats-img-preview');
+        const btnShare = document.getElementById('btn-action-share-img');
+        const btnDownload = document.getElementById('btn-download-share-img');
+        const canvas = document.getElementById('share-stats-canvas');
+
+        if (!incStats && !incProgress && !incMuscles) {
+            if (emptyMsg) emptyMsg.classList.remove('hidden');
+            if (imgPreview) imgPreview.style.display = 'none';
+            if (btnShare) btnShare.disabled = true;
+            if (btnDownload) btnDownload.disabled = true;
+            return;
+        }
+
+        if (emptyMsg) emptyMsg.classList.add('hidden');
+        if (btnShare) btnShare.disabled = false;
+        if (btnDownload) btnDownload.disabled = false;
+
+        if (canvas) {
+            this.generateStatsCanvas(canvas, incStats, incProgress, incMuscles);
+            if (imgPreview && typeof canvas.toDataURL === 'function') {
+                try {
+                    imgPreview.src = canvas.toDataURL('image/png');
+                    imgPreview.style.display = 'block';
+                } catch (e) {}
+            }
+        }
+    },
+
+    generateStatsCanvas(canvas, incStats, incProgress, incMuscles) {
+        if (!canvas) return;
+
+        let width = 800;
+        let height = 130;
+
+        let statsData = null;
+        if (incStats) {
+            const totalWorkouts = store.logs ? store.logs.length : 0;
+            let totalMinutes = 0;
+            let totalExercises = 0;
+            if (store.logs) {
+                store.logs.forEach(l => {
+                    totalMinutes += (l.duration || 45);
+                    totalExercises += (l.exercisesCompleted || 0);
+                });
+            }
+            const streak = typeof this.calculateStreak === 'function' ? this.calculateStreak() : 0;
+            statsData = { totalWorkouts, streak, totalMinutes, totalExercises };
+            height += 170;
+        }
+
+        let progressData = [];
+        if (incProgress) {
+            const series = typeof this.getExerciseProgressSeries === 'function' ? this.getExerciseProgressSeries() : {};
+            const keys = Object.keys(series);
+            progressData = keys
+                .map(k => series[k])
+                .filter(s => s && s.points && s.points.length > 0)
+                .sort((a, b) => b.points.length - a.points.length)
+                .slice(0, 5);
+
+            if (progressData.length > 0) {
+                height += 60 + (progressData.length * 62);
+            } else {
+                height += 90;
+            }
+        }
+
+        let muscleData = [];
+        if (incMuscles) {
+            const muscleMeta = {
+                'chest': { name: 'Borst', color: '#fca5a5' },
+                'back': { name: 'Rug', color: '#93c5fd' },
+                'legs': { name: 'Benen', color: '#86efac' },
+                'glutes': { name: 'Billen', color: '#fbcfe8' },
+                'shoulders': { name: 'Schouders', color: '#fde047' },
+                'biceps': { name: 'Biceps', color: '#c4b5fd' },
+                'triceps': { name: 'Triceps', color: '#a78bfa' },
+                'core': { name: 'Core', color: '#fdba74' },
+                'overig': { name: 'Overig', color: '#d1d5db' }
+            };
+
+            const stats = {};
+            const fallbackMap = {};
+            if (store.plans) {
+                store.plans.forEach(plan => {
+                    if (plan.sessions) {
+                        plan.sessions.forEach(session => {
+                            if (session.exercises) {
+                                session.exercises.forEach(ex => {
+                                    if (ex.muscleGroups && ex.muscleGroups.length > 0) {
+                                        fallbackMap[ex.name] = ex.muscleGroups;
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+
+            if (store.logs) {
+                store.logs.forEach(log => {
+                    const sessionMuscles = new Set();
+                    if (log.exercises) {
+                        log.exercises.forEach(ex => {
+                            let muscles = ex.muscleGroups;
+                            if (!muscles || muscles.length === 0) {
+                                muscles = fallbackMap[ex.name] || ['overig'];
+                            }
+                            if (typeof this.normalizeMuscleGroup === 'function') {
+                                muscles = [...new Set(muscles.map(m => this.normalizeMuscleGroup(m)))];
+                            }
+                            muscles.forEach(m => sessionMuscles.add(m));
+                        });
+                    }
+                    sessionMuscles.forEach(m => {
+                        if (!stats[m]) stats[m] = 0;
+                        stats[m]++;
+                    });
+                });
+            }
+
+            const keys = Object.keys(stats).sort((a, b) => stats[b] - stats[a]).slice(0, 6);
+            const totalSessions = Object.values(stats).reduce((a, b) => a + b, 0) || 1;
+            muscleData = keys.map(k => ({
+                key: k,
+                name: muscleMeta[k] ? muscleMeta[k].name : (k.charAt(0).toUpperCase() + k.slice(1)),
+                color: muscleMeta[k] ? muscleMeta[k].color : '#3b82f6',
+                count: stats[k],
+                pct: Math.round((stats[k] / totalSessions) * 100)
+            }));
+
+            if (muscleData.length > 0) {
+                height += 60 + (muscleData.length * 44);
+            } else {
+                height += 90;
+            }
+        }
+
+        height += 70;
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
+        if (!ctx) return;
+
+        // Background
+        const grad = ctx.createLinearGradient(0, 0, 0, height);
+        grad.addColorStop(0, '#0f172a');
+        grad.addColorStop(1, '#1e293b');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Accent glow
+        ctx.fillStyle = 'rgba(37, 99, 235, 0.12)';
+        ctx.beginPath();
+        ctx.arc(700, 100, 200, 0, Math.PI * 2);
+        ctx.fill();
+
+        let currentY = 40;
+
+        // Header Title
+        ctx.fillStyle = '#3b82f6';
+        ctx.font = '900 24px system-ui, -apple-system, sans-serif';
+        ctx.fillText('GOFITNESS', 40, currentY);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 28px system-ui, -apple-system, sans-serif';
+        ctx.fillText('Mijn Statistieken Overzicht', 40, currentY + 34);
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '500 15px system-ui, -apple-system, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(dateStr, width - 40, currentY + 34);
+        ctx.textAlign = 'left';
+
+        currentY += 80;
+
+        const drawRoundedRect = (x, y, w, h, r, fillColor, strokeColor) => {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            if (fillColor) {
+                ctx.fillStyle = fillColor;
+                ctx.fill();
+            }
+            if (strokeColor) {
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        };
+
+        const drawSectionHeader = (title) => {
+            ctx.fillStyle = '#64748b';
+            ctx.font = '700 13px system-ui, -apple-system, sans-serif';
+            ctx.fillText(title.toUpperCase(), 40, currentY);
+            currentY += 16;
+        };
+
+        // 1. STATISTIEKEN
+        if (incStats && statsData) {
+            drawSectionHeader('Algemene Statistieken');
+            const boxW = 168;
+            const boxH = 100;
+            const gap = 16;
+
+            const items = [
+                { label: 'TRAININGEN', value: statsData.totalWorkouts },
+                { label: 'WEKEN STREAK', value: `${statsData.streak} wk` },
+                { label: 'MINUTEN', value: statsData.totalMinutes },
+                { label: 'OEFENINGEN', value: statsData.totalExercises }
+            ];
+
+            items.forEach((item, idx) => {
+                const x = 40 + idx * (boxW + gap);
+                drawRoundedRect(x, currentY, boxW, boxH, 16, 'rgba(255, 255, 255, 0.05)', 'rgba(255, 255, 255, 0.1)');
+
+                ctx.fillStyle = '#3b82f6';
+                ctx.font = '900 32px system-ui, -apple-system, sans-serif';
+                ctx.fillText(String(item.value), x + 16, currentY + 50);
+
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+                ctx.fillText(item.label, x + 16, currentY + 76);
+            });
+
+            currentY += boxH + 36;
+        }
+
+        // 2. PROGRESSIE
+        if (incProgress) {
+            drawSectionHeader('Progressie per Oefening');
+            if (progressData.length === 0) {
+                drawRoundedRect(40, currentY, width - 80, 50, 12, 'rgba(255, 255, 255, 0.03)', 'rgba(255, 255, 255, 0.06)');
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '500 14px system-ui, -apple-system, sans-serif';
+                ctx.fillText('Geen voortgangsdata beschikbaar', 60, currentY + 30);
+                currentY += 70;
+            } else {
+                progressData.forEach((ex) => {
+                    const boxW = width - 80;
+                    const boxH = 50;
+                    drawRoundedRect(40, currentY, boxW, boxH, 12, 'rgba(255, 255, 255, 0.04)', 'rgba(255, 255, 255, 0.08)');
+
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.font = '600 16px system-ui, -apple-system, sans-serif';
+                    ctx.fillText(ex.name, 56, currentY + 30);
+
+                    const lastPt = ex.points[ex.points.length - 1];
+                    let valStr = '';
+                    if (lastPt) {
+                        if (ex.isHold) valStr = `${lastPt.weight} sec`;
+                        else if (ex.isBodyweightReps) valStr = `${lastPt.weight} reps`;
+                        else valStr = `${lastPt.weight} kg`;
+                    }
+
+                    ctx.fillStyle = '#60a5fa';
+                    ctx.font = '700 16px system-ui, -apple-system, sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(valStr, 40 + boxW - 16, currentY + 30);
+                    ctx.textAlign = 'left';
+
+                    currentY += boxH + 12;
+                });
+                currentY += 24;
+            }
+        }
+
+        // 3. SPIERGROEPEN
+        if (incMuscles) {
+            drawSectionHeader('Spiergroepen Verdeling');
+            if (muscleData.length === 0) {
+                drawRoundedRect(40, currentY, width - 80, 50, 12, 'rgba(255, 255, 255, 0.03)', 'rgba(255, 255, 255, 0.06)');
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '500 14px system-ui, -apple-system, sans-serif';
+                ctx.fillText('Geen spiergroep data beschikbaar', 60, currentY + 30);
+                currentY += 70;
+            } else {
+                muscleData.forEach((m) => {
+                    const rowW = width - 80;
+                    ctx.fillStyle = '#e2e8f0';
+                    ctx.font = '600 14px system-ui, -apple-system, sans-serif';
+                    ctx.fillText(m.name, 40, currentY + 16);
+
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.font = '500 13px system-ui, -apple-system, sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(`${m.count} sessies (${m.pct}%)`, 40 + rowW, currentY + 16);
+                    ctx.textAlign = 'left';
+
+                    const barY = currentY + 24;
+                    const barW = rowW;
+                    const barH = 8;
+                    drawRoundedRect(40, barY, barW, barH, 4, 'rgba(255, 255, 255, 0.08)', null);
+
+                    const fillW = Math.max(12, Math.round(barW * (m.pct / 100)));
+                    drawRoundedRect(40, barY, fillW, barH, 4, m.color, null);
+
+                    currentY += 44;
+                });
+                currentY += 20;
+            }
+        }
+
+        // Footer
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.fillRect(40, height - 50, width - 80, 1);
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '500 13px system-ui, -apple-system, sans-serif';
+        ctx.fillText('Gegenereerd door GoFitness • Jouw Slimme Krachttraining Coach', 40, height - 20);
+    },
+
+    downloadStatsImage() {
+        const canvas = document.getElementById('share-stats-canvas');
+        if (!canvas) return;
+
+        if (typeof canvas.toDataURL === 'function') {
+            try {
+                const dataUrl = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.download = `go_fitness_statistieken_${new Date().toISOString().slice(0, 10)}.png`;
+                link.href = dataUrl;
+                link.click();
+
+                if (this.showToast) this.showToast('Afbeelding gedownload!', 'success');
+            } catch (e) {
+                if (this.showToast) this.showToast('Download mislukt.', 'error');
+            }
+        }
+    },
+
+    async shareStatsImage() {
+        const canvas = document.getElementById('share-stats-canvas');
+        if (!canvas) return;
+
+        try {
+            if (typeof canvas.toBlob === 'function') {
+                canvas.toBlob(async (blob) => {
+                    if (!blob) return;
+                    let file = null;
+                    try {
+                        if (typeof File !== 'undefined') {
+                            file = new File([blob], 'statistieken.png', { type: 'image/png' });
+                        }
+                    } catch (fe) {}
+
+                    if (file && typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+                        await navigator.share({ files: [file], title: 'Mijn Fitness Statistieken' });
+                        return;
+                    }
+                    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+                        try {
+                            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                            if (this.showToast) this.showToast('Afbeelding gekopieerd naar klembord!', 'success');
+                            return;
+                        } catch (ce) {}
+                    }
+                    this.downloadStatsImage();
+                });
+            } else {
+                this.downloadStatsImage();
+            }
+        } catch (e) {
+            if (e && e.name === 'AbortError') return;
+            this.downloadStatsImage();
+        }
+    },
+
     validateBackup(data) {
         if (!data || !Array.isArray(data.plans) || !Array.isArray(data.logs)) {
             throw new Error("Ongeldig backup-bestand. Verwacht 'plans' en 'logs'.");
