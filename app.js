@@ -12,11 +12,12 @@ const DEFAULT_EXERCISES = [
     { id: 'def_barbell_squat', name: 'Barbell Back Squat', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_goblet_squat', name: 'Goblet Squat', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_leg_press', name: 'Leg Press', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
-    { id: 'def_romanian_deadlift', name: 'Romanian Deadlift (RDL)', muscleGroups: ['legs', 'glutes', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_romanian_deadlift', name: 'Romanian Deadlift (RDL)', muscleGroups: ['legs', 'glutes', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Dumbbell Romanian Deadlift', 'Conventional Deadlift', 'Single-Leg RDL', 'Stiff-Leg Deadlift'] },
+    { id: 'def_db_romanian_deadlift', name: 'Dumbbell Romanian Deadlift (DB RDL)', muscleGroups: ['legs', 'glutes', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Barbell Romanian Deadlift (RDL)', 'Single-Leg RDL'] },
     { id: 'def_bulgarian_split_squat', name: 'Bulgarian Split Squat', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_leg_extension', name: 'Leg Extension', muscleGroups: ['legs'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_leg_curl', name: 'Lying Leg Curl', muscleGroups: ['legs'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
-    { id: 'def_deadlift', name: 'Conventional Deadlift', muscleGroups: ['back', 'legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_deadlift', name: 'Conventional Deadlift', muscleGroups: ['back', 'legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Romanian Deadlift (RDL)', 'Sumo Deadlift'] },
     { id: 'def_barbell_row', name: 'Barbell Bent Over Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_lat_pulldown', name: 'Lat Pulldown', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_pullup', name: 'Pull-Up / Chin-Up', muscleGroups: ['back', 'biceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight' },
@@ -160,6 +161,8 @@ class DataStore {
     getExerciseLibrary() {
         const list = [...DEFAULT_EXERCISES];
 
+        const normalizeKey = str => String(str || '').toLowerCase().replace(/\([^)]*\)/g, '').replace(/[^a-z0-9]/gi, ' ').replace(/\s+/g, ' ').trim();
+
         // Oefeningen uit geïmporteerde schema's toevoegen indien nog niet in de lijst
         if (this.plans) {
             this.plans.forEach(p => {
@@ -167,16 +170,20 @@ class DataStore {
                     p.sessions.forEach(s => {
                         if (s.exercises) {
                             s.exercises.forEach(e => {
-                                if (e.name && !list.some(item => item.name.toLowerCase().trim() === e.name.toLowerCase().trim())) {
-                                    list.push({
-                                        id: e.id || ('plan_ex_' + Math.random().toString(36).slice(2, 9)),
-                                        name: e.name,
-                                        muscleGroups: e.muscleGroups || [],
-                                        exerciseType: e.exerciseType || (e.durationSeconds ? 'duration' : 'weight_reps'),
-                                        trackMetrics: e.trackMetrics || (e.durationSeconds ? ['duration_seconds'] : ['weight', 'reps']),
-                                        category: e.category || 'compound',
-                                        fromPlan: true
-                                    });
+                                if (e.name) {
+                                    const eKey = normalizeKey(e.name);
+                                    const exists = list.some(item => normalizeKey(item.name) === eKey);
+                                    if (!exists) {
+                                        list.push({
+                                            id: e.id || ('plan_ex_' + Math.random().toString(36).slice(2, 9)),
+                                            name: e.name,
+                                            muscleGroups: e.muscleGroups || [],
+                                            exerciseType: e.exerciseType || (e.durationSeconds ? 'duration' : 'weight_reps'),
+                                            trackMetrics: e.trackMetrics || (e.durationSeconds ? ['duration_seconds'] : ['weight', 'reps']),
+                                            category: e.category || 'compound',
+                                            fromPlan: true
+                                        });
+                                    }
                                 }
                             });
                         }
@@ -188,7 +195,8 @@ class DataStore {
         // Custom oefeningen van de gebruiker toevoegen / overschrijven
         if (this.customExercises) {
             this.customExercises.forEach(c => {
-                const idx = list.findIndex(item => item.name.toLowerCase().trim() === c.name.toLowerCase().trim());
+                const cKey = normalizeKey(c.name);
+                const idx = list.findIndex(item => normalizeKey(item.name) === cKey);
                 if (idx !== -1) {
                     list[idx] = { ...list[idx], ...c };
                 } else {
@@ -693,9 +701,9 @@ const app = {
             else if (n.includes('shoulder') || n.includes('overhead') || n.includes('pike')) groups.push('shoulders');
             else groups.push('chest');
         }
-        if (n.includes('pull') || n.includes('row') || n.includes('chin') || n.includes('deadlift')) groups.push('back');
-        if (n.includes('squat') || n.includes('lunge') || (n.includes('extension') && n.includes('leg')) || (n.includes('curl') && n.includes('leg'))) groups.push('legs');
-        if (n.includes('thrust') || n.includes('bridge') || n.includes('kickback')) groups.push('glutes');
+        if (n.includes('pull') || n.includes('row') || n.includes('chin') || n.includes('deadlift') || n.includes('rdl')) groups.push('back');
+        if (n.includes('squat') || n.includes('lunge') || n.includes('romanian') || n.includes('rdl') || (n.includes('extension') && n.includes('leg')) || (n.includes('curl') && n.includes('leg'))) groups.push('legs');
+        if (n.includes('thrust') || n.includes('bridge') || n.includes('kickback') || n.includes('romanian') || n.includes('rdl')) groups.push('glutes');
         if (n.includes('plank') || n.includes('crunch') || (n.includes('raise') && n.includes('leg'))) groups.push('core');
         if (n.includes('curl') && !n.includes('leg')) groups.push('biceps');
         if ((n.includes('tricep') || n.includes('pushdown') || n.includes('skull') || (n.includes('extension') && !n.includes('leg')))) groups.push('triceps');
@@ -1103,7 +1111,7 @@ const app = {
     },
 
     // Bouwt per oefening een reeks (datum, max gewicht) uit de logs
-    progressWeeks: 1,
+    progressWeeks: 4,
 
     setProgressWeeks(val) {
         if (val === 'all') {
@@ -1124,6 +1132,35 @@ const app = {
         if (current > 999) current = 999;
         this.progressWeeks = current;
         this.renderExerciseProgress();
+    },
+
+    getCanonicalExerciseKey(name) {
+        if (!name) return '';
+        let clean = String(name).trim().toLowerCase();
+        if (typeof DEFAULT_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_EXERCISES)) {
+            const found = DEFAULT_EXERCISES.find(ex => {
+                const exName = ex.name.toLowerCase();
+                if (exName === clean) return true;
+                if (clean.endsWith('s') && exName === clean.slice(0, -1)) return true;
+                if (exName.endsWith('s') && clean === exName.slice(0, -1)) return true;
+                return false;
+            });
+            if (found) return found.id;
+        }
+        if (clean.endsWith('s') && clean.length > 3) {
+            clean = clean.slice(0, -1);
+        }
+        return clean;
+    },
+
+    getCanonicalExerciseName(name) {
+        if (!name) return '';
+        const key = this.getCanonicalExerciseKey(name);
+        if (typeof DEFAULT_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_EXERCISES)) {
+            const found = DEFAULT_EXERCISES.find(ex => ex.id === key);
+            if (found) return found.name;
+        }
+        return name;
     },
 
     formatShortDate(dateStr) {
@@ -1156,7 +1193,7 @@ const app = {
     getExerciseProgressSeries() {
         const series = {};
         const isAll = this.progressWeeks === 'all';
-        const weeks = typeof this.progressWeeks === 'number' && this.progressWeeks >= 1 ? this.progressWeeks : 1;
+        const weeks = typeof this.progressWeeks === 'number' && this.progressWeeks >= 1 ? this.progressWeeks : 4;
         const now = Date.now();
         const cutoffTime = isAll ? 0 : (now - (weeks * 7 * 24 * 60 * 60 * 1000));
 
@@ -1166,12 +1203,22 @@ const app = {
             if (!isAll && (logTime === 0 || logTime < cutoffTime)) return;
 
             log.exercises.forEach(ex => {
+                const isHold = this.isHoldExercise(ex);
+                const isBodyweightReps = ex.exerciseType === 'bodyweight_reps' || 
+                    (ex.trackMetrics && ex.trackMetrics.includes('reps') && !ex.trackMetrics.includes('weight') && !isHold);
+
                 let maxVal = 0;
                 let bestSet = null;
                 (ex.details || []).forEach(d => {
-                    const w = parseFloat(d.weight) || 0;
-                    const r = parseInt(d.reps, 10) || 0;
-                    const val = w > 0 ? w : r;
+                    let val = 0;
+                    if (isHold) {
+                        val = parseFloat(d.durationSeconds) || parseInt(d.reps, 10) || 0;
+                    } else if (isBodyweightReps) {
+                        val = parseInt(d.reps, 10) || 0;
+                    } else {
+                        val = parseFloat(d.weight) || 0;
+                    }
+
                     if (val > maxVal) {
                         maxVal = val;
                         bestSet = d;
@@ -1183,8 +1230,19 @@ const app = {
                 const exNames = String(ex.name || '').split(/\s+of\s+/i).map(s => s.trim()).filter(Boolean);
 
                 exNames.forEach(displayName => {
-                    const key = displayName.toLowerCase();
-                    if (!series[key]) series[key] = { name: displayName, points: [] };
+                    const key = this.getCanonicalExerciseKey(displayName);
+                    const canonicalName = this.getCanonicalExerciseName(displayName) || displayName;
+                    const unit = isHold ? 'sec' : (isBodyweightReps ? 'reps' : 'kg');
+
+                    if (!series[key]) {
+                        series[key] = { 
+                            name: canonicalName, 
+                            unit: unit, 
+                            isHold: isHold, 
+                            isBodyweightReps: isBodyweightReps, 
+                            points: [] 
+                        };
+                    }
                     series[key].points.push({ 
                         date: log.date, 
                         weight: maxVal, 
@@ -1207,13 +1265,13 @@ const app = {
         return weight * (1 + reps / 30);
     },
 
-    buildSparklineSVG(points) {
+    buildSparklineSVG(points, unit = 'kg') {
         const w = 320, h = 96;
         if (points.length === 1) {
             const p = points[0];
             return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" style="width:100%; height:auto; display:block; overflow:visible;">
                 <circle cx="${w/2}" cy="${h/2}" r="4" fill="var(--accent-color)"/>
-                <text x="${w/2}" y="${h/2 - 10}" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-primary)">${this.escapeHTML(String(p.weight))} kg</text>
+                <text x="${w/2}" y="${h/2 - 10}" text-anchor="middle" font-size="12" font-weight="600" fill="var(--text-primary)">${this.escapeHTML(String(p.weight))} ${unit}</text>
             </svg>`;
         }
 
@@ -1268,7 +1326,7 @@ const app = {
             if (inputEl) inputEl.value = '';
             if (allBtn) allBtn.classList.add('active');
         } else {
-            if (inputEl) inputEl.value = this.progressWeeks || 1;
+            if (inputEl) inputEl.value = this.progressWeeks || 4;
             if (allBtn) allBtn.classList.remove('active');
         }
 
@@ -1276,7 +1334,7 @@ const app = {
         if (series.length === 0) {
             const weeksText = this.progressWeeks === 'all' 
                 ? 'het hele logboek' 
-                : ((this.progressWeeks || 1) === 1 ? 'afgelopen week' : `afgelopen ${this.progressWeeks} weken`);
+                : ((this.progressWeeks || 4) === 1 ? 'afgelopen week' : `afgelopen ${this.progressWeeks || 4} weken`);
             container.innerHTML = `<p class="text-muted text-sm text-center py-4">Geen trainingen met gewichten gelogd in ${weeksText}.</p>`;
             return;
         }
@@ -1289,21 +1347,27 @@ const app = {
             const first = s.points[0].weight;
             const last = s.points[s.points.length - 1].weight;
             const diff = Math.round((last - first) * 10) / 10;
+            const unitStr = s.unit ? ` ${s.unit}` : ' kg';
             let diffText = '';
             let diffColor = 'var(--text-muted)';
             if (s.points.length > 1) {
-                diffText = diff === 0 ? 'gelijk' : (diff > 0 ? `+${diff} kg` : `${diff} kg`);
+                diffText = diff === 0 ? 'gelijk' : (diff > 0 ? `+${diff}${unitStr}` : `${diff}${unitStr}`);
                 diffColor = diff > 0 ? 'var(--status-green)' : (diff < 0 ? 'var(--status-red)' : 'var(--text-muted)');
             } else {
                 diffText = '1 sessie';
             }
 
-            let best1RM = 0;
-            s.points.forEach(p => {
-                const est = this.estimate1RM(p.weight, p.reps);
-                if (est && est > best1RM) best1RM = est;
-            });
-            const rmHtml = best1RM > 0 ? `<span>Geschat 1RM: ${Math.round(best1RM)} kg</span>` : '';
+            let rmHtml = '';
+            if (!s.isHold && s.unit === 'kg') {
+                let best1RM = 0;
+                s.points.forEach(p => {
+                    const est = this.estimate1RM(p.weight, p.reps);
+                    if (est && est > best1RM) best1RM = est;
+                });
+                if (best1RM > 0) {
+                    rmHtml = `<span>Geschat 1RM: ${Math.round(best1RM)} kg</span>`;
+                }
+            }
 
             html += `
                 <div class="glass-panel progress-card" style="padding: 16px;">
@@ -1311,11 +1375,11 @@ const app = {
                         <div style="font-weight:600; font-size:0.9rem;">${this.escapeHTML(String(s.name))}</div>
                         <div class="text-sm" style="color:${diffColor}; white-space:nowrap;">${diffText}</div>
                     </div>
-                    <div class="mt-2">${this.buildSparklineSVG(s.points)}</div>
+                    <div class="mt-2">${this.buildSparklineSVG(s.points, s.unit || 'kg')}</div>
                     <div class="text-sm text-muted" style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
                         <span>${s.points.length} sessie${s.points.length > 1 ? 's' : ''}</span>
                         ${rmHtml}
-                        <span>Laatst: ${last} kg</span>
+                        <span>Laatst: ${last}${unitStr}</span>
                     </div>
                 </div>
             `;
@@ -2463,7 +2527,7 @@ const app = {
         const isLowerBody = groups.includes('legs') || groups.includes('glutes');
 
         const isDumbbell = fullText.includes('dumbbell') || fullText.includes(' db') || fullText.includes('kettlebell') || fullText.includes(' kb');
-        const isBarbell = fullText.includes('barbell') || fullText.includes('bench press') || fullText.includes('squat') || fullText.includes('deadlift') || fullText.includes('halterschijf');
+        const isBarbell = fullText.includes('barbell') || fullText.includes('bench press') || fullText.includes('squat') || fullText.includes('deadlift') || fullText.includes('rdl') || fullText.includes('romanian') || fullText.includes('halterschijf');
         const isIsolation = category === 'isolation' || category === 'supporting' ||
             fullText.includes('curl') || fullText.includes('raise') || fullText.includes('fly') || fullText.includes('flye') || fullText.includes('extension') || fullText.includes('kickback') || fullText.includes('pushdown');
 
