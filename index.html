@@ -156,7 +156,7 @@
                         <h3 style="margin:0;">Progressie</h3>
                         <div class="weeks-stepper">
                             <button class="weeks-stepper-btn" onclick="app.adjustProgressWeeks(-1)" title="1 week minder">-</button>
-                            <input type="number" id="progress-weeks-input" class="weeks-stepper-input" min="1" max="999" value="1" onchange="app.setProgressWeeks(this.value)" onkeydown="if(event.key==='Enter'){this.blur();}">
+                            <input type="number" id="progress-weeks-input" class="weeks-stepper-input" min="1" max="999" value="4" onchange="app.setProgressWeeks(this.value)" onkeydown="if(event.key==='Enter'){this.blur();}">
                             <button class="weeks-stepper-btn" onclick="app.adjustProgressWeeks(1)" title="1 week extra">+</button>
                             <button id="btn-progress-all" class="weeks-stepper-btn all-btn" onclick="app.setProgressWeeks('all')" title="Alle weken tonen">All</button>
                         </div>

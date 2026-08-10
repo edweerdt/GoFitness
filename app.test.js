@@ -1228,6 +1228,49 @@ describe('exercise progress', () => {
         expect(document.getElementById('exercise-progress-list').innerHTML).toContain('Geschat 1RM: 117 kg');
     });
 
+    it('should display hold exercises in seconds and omit estimated 1RM', () => {
+        store.logs = [
+            { date: '2026-07-01T10:00:00.000Z', exercises: [{ name: 'Plank Hold', details: [{ setNumber: 1, weight: '0', reps: '50', durationSeconds: 50 }] }] },
+            { date: '2026-07-08T10:00:00.000Z', exercises: [{ name: 'Plank Hold', details: [{ setNumber: 1, weight: '0', reps: '60', durationSeconds: 60 }] }] }
+        ];
+        app.renderExerciseProgress();
+
+        const html = document.getElementById('exercise-progress-list').innerHTML;
+        expect(html).toContain('Plank Hold');
+        expect(html).toContain('+10 sec');
+        expect(html).toContain('Laatst: 60 sec');
+        expect(html).not.toContain('Geschat 1RM');
+    });
+
+    it('should group singular and plural exercise names together in progress series', () => {
+        store.logs = [
+            { date: '2026-07-01T10:00:00.000Z', exercises: [{ name: 'Dumbbell Bicep Curls', details: [{ setNumber: 1, weight: '12', reps: '10' }] }] },
+            { date: '2026-07-08T10:00:00.000Z', exercises: [{ name: 'Dumbbell Bicep Curl', details: [{ setNumber: 1, weight: '14', reps: '10' }] }] }
+        ];
+        app.renderExerciseProgress();
+
+        const html = document.getElementById('exercise-progress-list').innerHTML;
+        expect(html).toContain('Dumbbell Bicep Curl');
+        expect(html).toContain('2 sessies');
+        expect(html).toContain('+2 kg');
+        expect(html).toContain('Laatst: 14 kg');
+    });
+
+    it('should ignore 0kg sets for weighted exercises on progress graph and only plot sets with extra weight', () => {
+        store.logs = [
+            { date: '2026-07-01T10:00:00.000Z', exercises: [{ name: 'Walking Lunges', details: [{ setNumber: 1, weight: '0', reps: '20' }] }] },
+            { date: '2026-07-05T10:00:00.000Z', exercises: [{ name: 'Walking Lunges', details: [{ setNumber: 1, weight: '0', reps: '20' }] }] },
+            { date: '2026-07-10T10:00:00.000Z', exercises: [{ name: 'Walking Lunges', details: [{ setNumber: 1, weight: '4', reps: '12' }] }] }
+        ];
+        app.renderExerciseProgress();
+
+        const html = document.getElementById('exercise-progress-list').innerHTML;
+        expect(html).toContain('Walking Lunges');
+        expect(html).toContain('1 sessie');
+        expect(html).toContain('Laatst: 4 kg');
+        expect(html).not.toContain('20 kg');
+    });
+
     it('should estimate 1RM with the Epley formula', () => {
         expect(app.estimate1RM(100, 1)).toBe(100);
         expect(app.estimate1RM(40, 10)).toBeCloseTo(53.33, 1);
@@ -2357,6 +2400,52 @@ describe('add and remove sets during workout', () => {
         app.removeSetFromExercise(0, 0);
 
         expect(app.activeWorkout.exercises[0].sets).toBe(1);
+    });
+
+    it('should include Romanian Deadlift (RDL) and Dumbbell Romanian Deadlift (DB RDL) in exercise library', () => {
+        const library = store.getExerciseLibrary();
+        const rdl = library.find(e => e.id === 'def_romanian_deadlift');
+        const dbRdl = library.find(e => e.id === 'def_db_romanian_deadlift');
+
+        expect(rdl).toBeDefined();
+        expect(rdl.name).toBe('Romanian Deadlift (RDL)');
+        expect(rdl.muscleGroups).toEqual(['legs', 'glutes', 'back']);
+        expect(rdl.category).toBe('compound');
+        expect(rdl.alternatives).toContain('Dumbbell Romanian Deadlift');
+
+        expect(dbRdl).toBeDefined();
+        expect(dbRdl.name).toBe('Dumbbell Romanian Deadlift (DB RDL)');
+        expect(dbRdl.muscleGroups).toEqual(['legs', 'glutes', 'back']);
+    });
+
+    it('should correctly guess muscle groups for Romanian Deadlift and RDL names', () => {
+        const groupsRDL = app.guessMuscleGroupsFromName('Romanian Deadlift');
+        expect(groupsRDL).toContain('back');
+        expect(groupsRDL).toContain('legs');
+        expect(groupsRDL).toContain('glutes');
+
+        const groupsShortRDL = app.guessMuscleGroupsFromName('DB RDL');
+        expect(groupsShortRDL).toContain('back');
+        expect(groupsShortRDL).toContain('legs');
+        expect(groupsShortRDL).toContain('glutes');
+    });
+
+    it('should deduplicate plan exercises matching default exercises like Romanian Deadlift', () => {
+        store.plans = [
+            {
+                id: 'plan_test',
+                sessions: [
+                    {
+                        exercises: [{ name: 'Romanian Deadlift', muscleGroups: ['hamstrings', 'glutes', 'legs'] }]
+                    }
+                ]
+            }
+        ];
+        const library = store.getExerciseLibrary();
+        const rdls = library.filter(e => e.name.toLowerCase().includes('romanian deadlift') && !e.name.toLowerCase().includes('dumbbell'));
+        // Should not duplicate 'Romanian Deadlift' alongside 'Romanian Deadlift (RDL)'
+        expect(rdls.length).toBe(1);
+        expect(rdls[0].name).toBe('Romanian Deadlift (RDL)');
     });
 });
 
