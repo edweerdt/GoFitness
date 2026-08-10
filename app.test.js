@@ -2443,11 +2443,93 @@ describe('add and remove sets during workout', () => {
         ];
         const library = store.getExerciseLibrary();
         const rdls = library.filter(e => e.name.toLowerCase().includes('romanian deadlift') && !e.name.toLowerCase().includes('dumbbell'));
-        // Should not duplicate 'Romanian Deadlift' alongside 'Romanian Deadlift (RDL)'
         expect(rdls.length).toBe(1);
         expect(rdls[0].name).toBe('Romanian Deadlift (RDL)');
     });
+
+    describe('Visual Statistics Sharing', () => {
+        beforeEach(() => {
+            document.body.innerHTML = `
+                <div id="modal-share-stats" class="modal-overlay hidden">
+                    <input type="checkbox" id="share-opt-stats" checked>
+                    <input type="checkbox" id="share-opt-progress" checked>
+                    <input type="checkbox" id="share-opt-muscles" checked>
+                    <div id="share-stats-empty-msg" class="hidden"></div>
+                    <img id="share-stats-img-preview" style="display:none;">
+                    <canvas id="share-stats-canvas"></canvas>
+                    <button id="btn-action-share-img"></button>
+                    <button id="btn-download-share-img"></button>
+                </div>
+                <div id="toast-container"></div>
+            `;
+        });
+
+        it('should open and hide the share stats modal', () => {
+            const modal = document.getElementById('modal-share-stats');
+            app.openShareStatsModal();
+            expect(modal.classList.contains('hidden')).toBe(false);
+
+            app.hideShareStatsModal();
+            expect(modal.classList.contains('hidden')).toBe(true);
+        });
+
+        it('should handle preview rendering when no sections are selected', () => {
+            document.getElementById('share-opt-stats').checked = false;
+            document.getElementById('share-opt-progress').checked = false;
+            document.getElementById('share-opt-muscles').checked = false;
+
+            app.renderShareStatsPreview();
+
+            const emptyMsg = document.getElementById('share-stats-empty-msg');
+            const btnShare = document.getElementById('btn-action-share-img');
+            expect(emptyMsg.classList.contains('hidden')).toBe(false);
+            expect(btnShare.disabled).toBe(true);
+        });
+
+        it('should generate canvas with selected options without crashing', () => {
+            const canvas = document.getElementById('share-stats-canvas');
+            canvas.getContext = jest.fn().mockReturnValue({
+                createLinearGradient: jest.fn().mockReturnValue({ addColorStop: jest.fn() }),
+                fillRect: jest.fn(),
+                beginPath: jest.fn(),
+                arc: jest.fn(),
+                fill: jest.fn(),
+                fillText: jest.fn(),
+                moveTo: jest.fn(),
+                lineTo: jest.fn(),
+                quadraticCurveTo: jest.fn(),
+                closePath: jest.fn(),
+                stroke: jest.fn()
+            });
+
+            store.logs = [
+                {
+                    id: 'log1',
+                    date: '2026-08-10',
+                    duration: 60,
+                    exercisesCompleted: 3,
+                    exercises: [{ name: 'Bench Press', muscleGroups: ['chest'], details: [{ weight: 80, reps: 10 }] }]
+                }
+            ];
+
+            app.renderShareStatsPreview();
+
+            expect(canvas.width).toBe(800);
+            expect(canvas.height).toBeGreaterThan(100);
+        });
+
+        it('should trigger download when downloadStatsImage is called', () => {
+            const canvas = document.getElementById('share-stats-canvas');
+            canvas.toDataURL = jest.fn().mockReturnValue('data:image/png;base64,fake');
+            app.showToast = jest.fn();
+
+            app.downloadStatsImage();
+
+            expect(canvas.toDataURL).toHaveBeenCalledWith('image/png');
+        });
+    });
 });
+
 
 
 
