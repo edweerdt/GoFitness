@@ -4173,8 +4173,9 @@ const app = {
     generateStatsCanvas(canvas, incStats, incProgress, incMuscles) {
         if (!canvas) return;
 
-        let width = 800;
-        let height = 130;
+        const canvasW = 1000;
+        const marginX = 32;
+        const contentW = canvasW - (marginX * 2); // 936px
 
         let statsData = null;
         if (incStats) {
@@ -4189,41 +4190,32 @@ const app = {
             }
             const streak = typeof this.calculateStreak === 'function' ? this.calculateStreak() : 0;
             statsData = { totalWorkouts, streak, totalMinutes, totalExercises };
-            height += 170;
         }
 
-        let progressData = [];
+        let seriesData = [];
         if (incProgress) {
-            const series = typeof this.getExerciseProgressSeries === 'function' ? this.getExerciseProgressSeries() : {};
-            const keys = Object.keys(series);
-            progressData = keys
-                .map(k => series[k])
-                .filter(s => s && s.points && s.points.length > 0)
-                .sort((a, b) => b.points.length - a.points.length)
-                .slice(0, 5);
-
-            if (progressData.length > 0) {
-                height += 60 + (progressData.length * 62);
-            } else {
-                height += 90;
+            seriesData = typeof this.getExerciseProgressSeries === 'function' ? this.getExerciseProgressSeries() : [];
+            if (seriesData.length > 0) {
+                seriesData.sort((a, b) => b.points.length - a.points.length);
             }
         }
 
-        let muscleData = [];
-        if (incMuscles) {
-            const muscleMeta = {
-                'chest': { name: 'Borst', color: '#fca5a5' },
-                'back': { name: 'Rug', color: '#93c5fd' },
-                'legs': { name: 'Benen', color: '#86efac' },
-                'glutes': { name: 'Billen', color: '#fbcfe8' },
-                'shoulders': { name: 'Schouders', color: '#fde047' },
-                'biceps': { name: 'Biceps', color: '#c4b5fd' },
-                'triceps': { name: 'Triceps', color: '#a78bfa' },
-                'core': { name: 'Core', color: '#fdba74' },
-                'overig': { name: 'Overig', color: '#d1d5db' }
-            };
+        const muscleMeta = {
+            'chest': { name: 'Borst', icon: 'fitness_center', color: '#fca5a5' },
+            'back': { name: 'Rug', icon: 'flight_takeoff', color: '#93c5fd' },
+            'legs': { name: 'Benen', icon: 'directions_run', color: '#86efac' },
+            'glutes': { name: 'Billen', icon: 'sports_gymnastics', color: '#fbcfe8' },
+            'shoulders': { name: 'Schouders', icon: 'accessibility_new', color: '#fde047' },
+            'biceps': { name: 'Biceps', icon: 'sports_martial_arts', color: '#c4b5fd' },
+            'triceps': { name: 'Triceps', icon: 'sports_mma', color: '#a78bfa' },
+            'arms': { name: 'Armen', icon: 'sports_martial_arts', color: '#c4b5fd' },
+            'core': { name: 'Core', icon: 'sports_mma', color: '#fdba74' },
+            'overig': { name: 'Overig', icon: 'more_horiz', color: '#d1d5db' }
+        };
 
-            const stats = {};
+        let muscleStatsData = {};
+        let muscleKeys = [];
+        if (incMuscles) {
             const fallbackMap = {};
             if (store.plans) {
                 store.plans.forEach(plan => {
@@ -4253,76 +4245,76 @@ const app = {
                             if (typeof this.normalizeMuscleGroup === 'function') {
                                 muscles = [...new Set(muscles.map(m => this.normalizeMuscleGroup(m)))];
                             }
-                            muscles.forEach(m => sessionMuscles.add(m));
+                            const primaryMuscle = muscles[0];
+
+                            muscles.forEach(m => {
+                                sessionMuscles.add(m);
+                                if (!muscleStatsData[m]) muscleStatsData[m] = { sessions: 0, reps: 0, maxWeight: 0, maxReps: 0 };
+                                if (ex.details) {
+                                    ex.details.forEach(detail => {
+                                        const reps = parseInt(detail.reps) || 0;
+                                        const weight = parseFloat(detail.weight) || 0;
+                                        muscleStatsData[m].reps += reps;
+                                        if (reps > muscleStatsData[m].maxReps) muscleStatsData[m].maxReps = reps;
+                                        if (m === primaryMuscle && weight > muscleStatsData[m].maxWeight) {
+                                            muscleStatsData[m].maxWeight = weight;
+                                        }
+                                    });
+                                }
+                            });
                         });
                     }
                     sessionMuscles.forEach(m => {
-                        if (!stats[m]) stats[m] = 0;
-                        stats[m]++;
+                        if (!muscleStatsData[m]) muscleStatsData[m] = { sessions: 0, reps: 0, maxWeight: 0, maxReps: 0 };
+                        muscleStatsData[m].sessions++;
                     });
                 });
             }
-
-            const keys = Object.keys(stats).sort((a, b) => stats[b] - stats[a]).slice(0, 6);
-            const totalSessions = Object.values(stats).reduce((a, b) => a + b, 0) || 1;
-            muscleData = keys.map(k => ({
-                key: k,
-                name: muscleMeta[k] ? muscleMeta[k].name : (k.charAt(0).toUpperCase() + k.slice(1)),
-                color: muscleMeta[k] ? muscleMeta[k].color : '#3b82f6',
-                count: stats[k],
-                pct: Math.round((stats[k] / totalSessions) * 100)
-            }));
-
-            if (muscleData.length > 0) {
-                height += 60 + (muscleData.length * 44);
-            } else {
-                height += 90;
-            }
+            muscleKeys = Object.keys(muscleStatsData).sort((a, b) => muscleStatsData[b].sessions - muscleStatsData[a].sessions);
         }
 
-        height += 70;
+        // Calculate total canvas height
+        let totalH = 76; // Header area
 
-        canvas.width = width;
-        canvas.height = height;
+        if (incStats && statsData) {
+            totalH += 26; // Section label
+            totalH += (2 * 104) + 16; // 2 rows of 2 cards
+            totalH += 28; // gap
+        }
+
+        if (incProgress) {
+            totalH += 26;
+            const pCount = seriesData.length || 1;
+            const pRows = Math.ceil(pCount / 2);
+            totalH += (pRows * 190) + ((pRows - 1) * 16);
+            totalH += 28;
+        }
+
+        if (incMuscles) {
+            totalH += 26;
+            const mCount = muscleKeys.length || 1;
+            const mRows = Math.ceil(mCount / 4);
+            totalH += (mRows * 210) + ((mRows - 1) * 16);
+            totalH += 28;
+        }
+
+        totalH += 16; // Bottom margin
+
+        canvas.width = canvasW;
+        canvas.height = totalH;
 
         const ctx = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
         if (!ctx) return;
 
-        // Background
-        const grad = ctx.createLinearGradient(0, 0, 0, height);
-        grad.addColorStop(0, '#0f172a');
-        grad.addColorStop(1, '#1e293b');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, width, height);
+        // Draw overall background
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, totalH);
+        bgGrad.addColorStop(0, '#0c1017');
+        bgGrad.addColorStop(1, '#111723');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, canvasW, totalH);
 
-        // Accent glow
-        ctx.fillStyle = 'rgba(37, 99, 235, 0.12)';
-        ctx.beginPath();
-        ctx.arc(700, 100, 200, 0, Math.PI * 2);
-        ctx.fill();
-
-        let currentY = 40;
-
-        // Header Title
-        ctx.fillStyle = '#3b82f6';
-        ctx.font = '900 24px system-ui, -apple-system, sans-serif';
-        ctx.fillText('GOFITNESS', 40, currentY);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '700 28px system-ui, -apple-system, sans-serif';
-        ctx.fillText('Mijn Statistieken Overzicht', 40, currentY + 34);
-
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '500 15px system-ui, -apple-system, sans-serif';
-        ctx.textAlign = 'right';
-        ctx.fillText(dateStr, width - 40, currentY + 34);
-        ctx.textAlign = 'left';
-
-        currentY += 80;
-
-        const drawRoundedRect = (x, y, w, h, r, fillColor, strokeColor) => {
+        // Helper: Draw rounded rectangle
+        const drawCard = (x, y, w, h, r = 16, fillColor = '#161f2e', strokeColor = 'rgba(255, 255, 255, 0.07)') => {
             ctx.beginPath();
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + w - r, y);
@@ -4345,125 +4337,289 @@ const app = {
             }
         };
 
-        const drawSectionHeader = (title) => {
-            ctx.fillStyle = '#64748b';
-            ctx.font = '700 13px system-ui, -apple-system, sans-serif';
-            ctx.fillText(title.toUpperCase(), 40, currentY);
-            currentY += 16;
+        // Draw Top Page Title "Statistieken"
+        let currentY = 48;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 28px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.fillText('Statistieken', marginX, currentY);
+
+        currentY += 40;
+
+        // Helper: Section Label
+        const drawSectionLabel = (label) => {
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '700 13px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.fillText(label.toUpperCase(), marginX, currentY);
+            currentY += 18;
         };
 
-        // 1. STATISTIEKEN
+        // 1. STATISTIEKEN SECTION
         if (incStats && statsData) {
-            drawSectionHeader('Algemene Statistieken');
-            const boxW = 168;
-            const boxH = 100;
-            const gap = 16;
+            drawSectionLabel('STATISTIEKEN');
+
+            const cardW = (contentW - 16) / 2; // 460px
+            const cardH = 104;
 
             const items = [
-                { label: 'TRAININGEN', value: statsData.totalWorkouts },
-                { label: 'WEKEN STREAK', value: `${statsData.streak} wk` },
-                { label: 'MINUTEN', value: statsData.totalMinutes },
-                { label: 'OEFENINGEN', value: statsData.totalExercises }
+                { value: statsData.totalWorkouts, label: 'Trainingen' },
+                { value: statsData.streak, label: 'Weken Streak' },
+                { value: statsData.totalMinutes, label: 'Minuten' },
+                { value: statsData.totalExercises, label: 'Oefeningen' }
             ];
 
             items.forEach((item, idx) => {
-                const x = 40 + idx * (boxW + gap);
-                drawRoundedRect(x, currentY, boxW, boxH, 16, 'rgba(255, 255, 255, 0.05)', 'rgba(255, 255, 255, 0.1)');
+                const row = Math.floor(idx / 2);
+                const col = idx % 2;
+                const cardX = marginX + col * (cardW + 16);
+                const cardY = currentY + row * (cardH + 16);
 
-                ctx.fillStyle = '#3b82f6';
-                ctx.font = '900 32px system-ui, -apple-system, sans-serif';
-                ctx.fillText(String(item.value), x + 16, currentY + 50);
+                drawCard(cardX, cardY, cardW, cardH, 16);
 
+                // Value
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '700 30px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.fillText(String(item.value), cardX + 24, cardY + 48);
+
+                // Label
                 ctx.fillStyle = '#94a3b8';
-                ctx.font = '600 11px system-ui, -apple-system, sans-serif';
-                ctx.fillText(item.label, x + 16, currentY + 76);
+                ctx.font = '500 14px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.fillText(item.label, cardX + 24, cardY + 76);
             });
 
-            currentY += boxH + 36;
+            currentY += (2 * cardH) + 16 + 28;
         }
 
-        // 2. PROGRESSIE
+        // 2. PROGRESSIE SECTION
         if (incProgress) {
-            drawSectionHeader('Progressie per Oefening');
-            if (progressData.length === 0) {
-                drawRoundedRect(40, currentY, width - 80, 50, 12, 'rgba(255, 255, 255, 0.03)', 'rgba(255, 255, 255, 0.06)');
+            drawSectionLabel('PROGRESSIE');
+
+            const cardW = (contentW - 16) / 2; // 460px
+            const cardH = 190;
+
+            if (seriesData.length === 0) {
+                drawCard(marginX, currentY, contentW, 70, 16);
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = '500 14px system-ui, -apple-system, sans-serif';
-                ctx.fillText('Geen voortgangsdata beschikbaar', 60, currentY + 30);
-                currentY += 70;
+                ctx.fillText('Geen trainingen met gewichten gelogd.', marginX + 24, currentY + 40);
+                currentY += 70 + 28;
             } else {
-                progressData.forEach((ex) => {
-                    const boxW = width - 80;
-                    const boxH = 50;
-                    drawRoundedRect(40, currentY, boxW, boxH, 12, 'rgba(255, 255, 255, 0.04)', 'rgba(255, 255, 255, 0.08)');
+                seriesData.forEach((s, idx) => {
+                    const row = Math.floor(idx / 2);
+                    const col = idx % 2;
+                    const cardX = marginX + col * (cardW + 16);
+                    const cardY = currentY + row * (cardH + 16);
 
-                    ctx.fillStyle = '#f8fafc';
-                    ctx.font = '600 16px system-ui, -apple-system, sans-serif';
-                    ctx.fillText(ex.name, 56, currentY + 30);
+                    drawCard(cardX, cardY, cardW, cardH, 16);
 
-                    const lastPt = ex.points[ex.points.length - 1];
-                    let valStr = '';
-                    if (lastPt) {
-                        if (ex.isHold) valStr = `${lastPt.weight} sec`;
-                        else if (ex.isBodyweightReps) valStr = `${lastPt.weight} reps`;
-                        else valStr = `${lastPt.weight} kg`;
+                    // Header Row: Name & Diff
+                    const first = s.points[0].weight;
+                    const last = s.points[s.points.length - 1].weight;
+                    const diff = Math.round((last - first) * 10) / 10;
+                    const unitStr = s.unit ? ` ${s.unit}` : ' kg';
+
+                    let diffText = '';
+                    let diffColor = '#94a3b8';
+                    if (s.points.length > 1) {
+                        diffText = diff === 0 ? 'gelijk' : (diff > 0 ? `+${diff}${unitStr}` : `${diff}${unitStr}`);
+                        diffColor = diff > 0 ? '#22c55e' : (diff < 0 ? '#ef4444' : '#94a3b8');
+                    } else {
+                        diffText = '1 sessie';
                     }
 
-                    ctx.fillStyle = '#60a5fa';
-                    ctx.font = '700 16px system-ui, -apple-system, sans-serif';
+                    // Exercise Name
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '600 16px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                    ctx.fillText(String(s.name), cardX + 20, cardY + 30);
+
+                    // Diff Badge
+                    ctx.fillStyle = diffColor;
+                    ctx.font = '600 14px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
                     ctx.textAlign = 'right';
-                    ctx.fillText(valStr, 40 + boxW - 16, currentY + 30);
+                    ctx.fillText(diffText, cardX + cardW - 20, cardY + 30);
                     ctx.textAlign = 'left';
 
-                    currentY += boxH + 12;
+                    // Sparkline Chart Drawing
+                    const sparkX = cardX + 16;
+                    const sparkY = cardY + 40;
+                    const sparkW = cardW - 32;
+                    const sparkH = 92;
+
+                    const points = s.points;
+                    if (points.length === 1) {
+                        const p = points[0];
+                        const cx = sparkX + sparkW / 2;
+                        const cy = sparkY + sparkH / 2;
+                        ctx.fillStyle = '#3b82f6';
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(`${p.weight}${unitStr}`, cx, cy - 10);
+                        ctx.textAlign = 'left';
+                    } else if (points.length > 1) {
+                        const padX = 26, padTop = 20, padBottom = 14;
+                        const weights = points.map(p => p.weight);
+                        const min = Math.min(...weights);
+                        const max = Math.max(...weights);
+                        const range = (max - min) || 1;
+                        const step = (sparkW - padX * 2) / (points.length - 1);
+
+                        const coords = points.map((p, i) => {
+                            const x = sparkX + padX + i * step;
+                            const y = sparkY + sparkH - padBottom - ((p.weight - min) / range) * (sparkH - padTop - padBottom);
+                            return { x, y, weight: p.weight };
+                        });
+
+                        // Line
+                        ctx.strokeStyle = '#3b82f6';
+                        ctx.lineWidth = 2.5;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        ctx.beginPath();
+                        coords.forEach((c, i) => {
+                            if (i === 0) ctx.moveTo(c.x, c.y);
+                            else ctx.lineTo(c.x, c.y);
+                        });
+                        ctx.stroke();
+
+                        // Dots
+                        ctx.fillStyle = '#3b82f6';
+                        coords.forEach(c => {
+                            ctx.beginPath();
+                            ctx.arc(c.x, c.y, 3.5, 0, Math.PI * 2);
+                            ctx.fill();
+                        });
+
+                        // Labels
+                        const showAll = points.length <= 6;
+                        const maxIdx = weights.indexOf(max);
+                        const labelIdx = showAll
+                            ? points.map((_, i) => i)
+                            : [...new Set([0, maxIdx, points.length - 1])];
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+                        labelIdx.forEach(i => {
+                            const c = coords[i];
+                            let anchor = 'center';
+                            if (i === 0 && points.length > 1) anchor = 'left';
+                            else if (i === points.length - 1) anchor = 'right';
+
+                            ctx.textAlign = anchor;
+                            const ly = c.y > sparkY + padTop + 6 ? c.y - 7 : c.y + 14;
+                            ctx.fillText(String(c.weight), c.x, ly);
+                        });
+                        ctx.textAlign = 'left';
+                    }
+
+                    // Footer Row
+                    const footerY = cardY + cardH - 16;
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.font = '400 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+                    // Left: Sessies
+                    ctx.fillText(`${points.length} sessie${points.length > 1 ? 's' : ''}`, cardX + 20, footerY);
+
+                    // Center: 1RM
+                    let rmText = '';
+                    if (!s.isHold && s.unit === 'kg') {
+                        let best1RM = 0;
+                        points.forEach(p => {
+                            const est = typeof this.estimate1RM === 'function' ? this.estimate1RM(p.weight, p.reps) : 0;
+                            if (est && est > best1RM) best1RM = est;
+                        });
+                        if (best1RM > 0) {
+                            rmText = `Geschat 1RM: ${Math.round(best1RM)} kg`;
+                        }
+                    }
+                    if (rmText) {
+                        ctx.textAlign = 'center';
+                        ctx.fillText(rmText, cardX + cardW / 2, footerY);
+                        ctx.textAlign = 'left';
+                    }
+
+                    // Right: Laatst
+                    ctx.textAlign = 'right';
+                    ctx.fillText(`Laatst: ${last}${unitStr}`, cardX + cardW - 20, footerY);
+                    ctx.textAlign = 'left';
                 });
-                currentY += 24;
+
+                const pRows = Math.ceil(seriesData.length / 2);
+                currentY += (pRows * cardH) + ((pRows - 1) * 16) + 28;
             }
         }
 
-        // 3. SPIERGROEPEN
+        // 3. SPIERGROEPEN SECTION
         if (incMuscles) {
-            drawSectionHeader('Spiergroepen Verdeling');
-            if (muscleData.length === 0) {
-                drawRoundedRect(40, currentY, width - 80, 50, 12, 'rgba(255, 255, 255, 0.03)', 'rgba(255, 255, 255, 0.06)');
+            drawSectionLabel('SPIERGROEPEN');
+
+            const cardW = (contentW - (3 * 16)) / 4; // 222px
+            const cardH = 210;
+
+            if (muscleKeys.length === 0) {
+                drawCard(marginX, currentY, contentW, 70, 16);
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = '500 14px system-ui, -apple-system, sans-serif';
-                ctx.fillText('Geen spiergroep data beschikbaar', 60, currentY + 30);
-                currentY += 70;
+                ctx.fillText('Nog geen spiergroep-data beschikbaar.', marginX + 24, currentY + 40);
             } else {
-                muscleData.forEach((m) => {
-                    const rowW = width - 80;
-                    ctx.fillStyle = '#e2e8f0';
-                    ctx.font = '600 14px system-ui, -apple-system, sans-serif';
-                    ctx.fillText(m.name, 40, currentY + 16);
+                muscleKeys.forEach((m, idx) => {
+                    const row = Math.floor(idx / 4);
+                    const col = idx % 4;
+                    const cardX = marginX + col * (cardW + 16);
+                    const cardY = currentY + row * (cardH + 16);
 
-                    ctx.fillStyle = '#94a3b8';
-                    ctx.font = '500 13px system-ui, -apple-system, sans-serif';
-                    ctx.textAlign = 'right';
-                    ctx.fillText(`${m.count} sessies (${m.pct}%)`, 40 + rowW, currentY + 16);
-                    ctx.textAlign = 'left';
+                    drawCard(cardX, cardY, cardW, cardH, 16);
 
-                    const barY = currentY + 24;
-                    const barW = rowW;
-                    const barH = 8;
-                    drawRoundedRect(40, barY, barW, barH, 4, 'rgba(255, 255, 255, 0.08)', null);
+                    const data = muscleStatsData[m];
+                    const fallbackName = m ? (m.charAt(0).toUpperCase() + m.slice(1).replace(/_/g, ' ')) : 'Overig';
+                    const meta = muscleMeta[m] || { name: fallbackName, icon: 'fitness_center', color: '#a78bfa' };
+                    const maxWeightDisplay = data.maxWeight > 0 ? `${data.maxWeight} kg` : '-';
 
-                    const fillW = Math.max(12, Math.round(barW * (m.pct / 100)));
-                    drawRoundedRect(40, barY, fillW, barH, 4, m.color, null);
+                    // Icon Badge Box
+                    const badgeX = cardX + 16;
+                    const badgeY = cardY + 16;
+                    drawCard(badgeX, badgeY, 34, 34, 8, 'rgba(255, 255, 255, 0.06)', null);
 
-                    currentY += 44;
+                    // Icon Symbol (Circle/Dot in muscle color)
+                    ctx.fillStyle = meta.color;
+                    ctx.beginPath();
+                    ctx.arc(badgeX + 17, badgeY + 17, 7, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Muscle Name
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '600 16px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                    ctx.fillText(meta.name, cardX + 60, cardY + 38);
+
+                    // Key-Value Stat Lines
+                    const statsList = [
+                        { label: 'Sessies:', val: data.sessions },
+                        { label: 'Reps:', val: data.reps },
+                        { label: 'Max gewicht:', val: maxWeightDisplay },
+                        { label: 'Max reps:', val: data.maxReps }
+                    ];
+
+                    statsList.forEach((st, sIdx) => {
+                        const lineY = cardY + 74 + sIdx * 32;
+
+                        // Key (Left)
+                        ctx.fillStyle = '#94a3b8';
+                        ctx.font = '400 13px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                        ctx.fillText(st.label, cardX + 16, lineY);
+
+                        // Value (Right)
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = '600 13px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                        ctx.textAlign = 'right';
+                        ctx.fillText(String(st.val), cardX + cardW - 16, lineY);
+                        ctx.textAlign = 'left';
+                    });
                 });
-                currentY += 20;
             }
         }
-
-        // Footer
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.fillRect(40, height - 50, width - 80, 1);
-
-        ctx.fillStyle = '#64748b';
-        ctx.font = '500 13px system-ui, -apple-system, sans-serif';
-        ctx.fillText('Gegenereerd door GoFitness • Jouw Slimme Krachttraining Coach', 40, height - 20);
     },
 
     downloadStatsImage() {
