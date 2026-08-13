@@ -1392,11 +1392,33 @@ const app = {
             return { x, y, weight: p.weight };
         });
 
-        const showAll = points.length <= 6;
-        const maxIdx = weights.indexOf(max);
-        const labelIdx = showAll
-            ? points.map((_, i) => i)
-            : [...new Set([0, maxIdx, points.length - 1])];
+        // Bepaal de minimale gap / stride tussen gelabelde punten zodat labels niet overlappen.
+        // minLabelDistance is de minimale afstand in pixels tussen twee gelabelde punten.
+        const minLabelDistance = 45;
+        let stride = 1;
+        if (points.length > 1 && step > 0) {
+            while (stride * step < minLabelDistance && stride < points.length) {
+                stride++;
+            }
+        }
+
+        const labelIdx = [];
+        for (let i = 0; i < points.length; i += stride) {
+            labelIdx.push(i);
+        }
+
+        // Zorg ervoor dat het laatste datapunt altijd gelabeld is
+        if (points.length > 1) {
+            const lastIdx = points.length - 1;
+            if (labelIdx[labelIdx.length - 1] !== lastIdx) {
+                const prevIdx = labelIdx[labelIdx.length - 1];
+                if (lastIdx - prevIdx < stride) {
+                    labelIdx[labelIdx.length - 1] = lastIdx;
+                } else {
+                    labelIdx.push(lastIdx);
+                }
+            }
+        }
 
         const line = `<polyline points="${coords.map(c => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ')}" fill="none" stroke="var(--accent-color)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
 
