@@ -2771,6 +2771,65 @@ describe('add and remove sets during workout', () => {
             expect(updatedSquat.details[3].weight).toBe('105');
         });
     });
+
+    describe('GOF-19: Friends exercise sorting (matched first, then non-matched)', () => {
+        beforeEach(() => {
+            document.body.innerHTML = '<div id="friends-container"></div>';
+            global.FriendsManager = {
+                user: { uid: 'user1', displayName: 'User 1' },
+                userProfile: { uid: 'user1', displayName: 'User 1', friendCode: 'GF-1111-2222-3333' },
+                friends: [
+                    {
+                        uid: 'friend1',
+                        displayName: 'Friend 1',
+                        stats: {
+                            muscleGroups: {
+                                chest: {
+                                    exercises: [
+                                        { exercise: 'Incline Bench Press', maxKg: 80, maxReps: 10, estimated1RM: 100 },
+                                        { exercise: 'Dumbbell Flyes', maxKg: 20, maxReps: 12, estimated1RM: 28 }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                ],
+                selectedFriendUid: 'friend1'
+            };
+            store.logs = [
+                {
+                    id: 'log1',
+                    date: '2026-08-10',
+                    exercises: [
+                        {
+                            name: 'Barbell Bench Press',
+                            details: [{ weight: 100, reps: 5, completed: true }]
+                        },
+                        {
+                            name: 'Incline Bench Press',
+                            details: [{ weight: 70, reps: 8, completed: true }]
+                        }
+                    ]
+                }
+            ];
+        });
+
+        it('should sort matched exercises first followed by unmatched exercises within each muscle group', () => {
+            app.renderFriends();
+            const container = document.getElementById('friends-container');
+            const exerciseCards = container.querySelectorAll('.exercise-compare-card');
+            
+            expect(exerciseCards.length).toBe(3);
+            const titles = Array.from(exerciseCards).map(card => {
+                const titleEl = card.children[0] && card.children[0].children[0];
+                return titleEl ? titleEl.textContent.trim() : '';
+            });
+            // Incline Bench Press is present for both (matched) -> should be first
+            // Barbell Bench Press (only my user) & Dumbbell Flyes (only friend) -> non-matched, sorted alphabetically
+            expect(titles[0]).toBe('Incline Bench Press');
+            expect(titles.slice(1)).toEqual(['Barbell Bench Press', 'Dumbbell Flyes']);
+        });
+    });
 });
 
 
