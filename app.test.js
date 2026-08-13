@@ -2652,6 +2652,80 @@ describe('add and remove sets during workout', () => {
             expect(inactiveSessionsContainer).not.toBeNull();
         });
     });
+
+    describe('GOF-7: Extra set and extra exercise retention in edit log', () => {
+        it('should preserve extra sets and extra exercises when opening showEditLogModal', () => {
+            store.plans = [{
+                id: 'plan-gof7',
+                name: 'Test Plan',
+                sessions: [{
+                    id: 'session-gof7',
+                    name: 'Leg Day',
+                    exercises: [
+                        { name: 'Squat', sets: 3 }
+                    ]
+                }]
+            }];
+
+            store.logs = [{
+                id: 'log-gof7',
+                planId: 'plan-gof7',
+                sessionId: 'session-gof7',
+                planName: 'Test Plan',
+                sessionName: 'Leg Day',
+                date: '2026-08-10T10:00:00.000Z',
+                exercises: [
+                    {
+                        name: 'Squat',
+                        setsCompleted: 4,
+                        totalSets: 4,
+                        details: [
+                            { setNumber: 1, weight: '100', reps: '10' },
+                            { setNumber: 2, weight: '100', reps: '10' },
+                            { setNumber: 3, weight: '100', reps: '10' },
+                            { setNumber: 4, weight: '105', reps: '8' }
+                        ]
+                    },
+                    {
+                        name: 'Dumbbell Bicep Curl',
+                        setsCompleted: 2,
+                        totalSets: 2,
+                        details: [
+                            { setNumber: 1, weight: '14', reps: '12' },
+                            { setNumber: 2, weight: '14', reps: '12' }
+                        ]
+                    }
+                ]
+            }];
+
+            app.showEditLogModal('log-gof7');
+
+            expect(app.logToEdit).not.toBeNull();
+            expect(app.logToEdit.exercises.length).toBe(2);
+
+            // Squat should retain all 4 sets (despite session default of 3)
+            const squat = app.logToEdit.exercises.find(e => e.name === 'Squat');
+            expect(squat.totalSets).toBe(4);
+            expect(squat.details.length).toBe(4);
+            expect(squat.details[3].setNumber).toBe(4);
+            expect(squat.details[3].weight).toBe('105');
+
+            // Extra exercise (Dumbbell Bicep Curl) should be retained with completed flags
+            const bicep = app.logToEdit.exercises.find(e => e.name === 'Dumbbell Bicep Curl');
+            expect(bicep).not.toBeUndefined();
+            expect(bicep.details.length).toBe(2);
+            expect(bicep.details[0].completed).toBe(true);
+
+            // Saving edit log should keep all 4 Squat sets and the Bicep Curl exercise intact in store.logs
+            app.saveEditLog();
+
+            const updatedLog = store.logs.find(l => l.id === 'log-gof7');
+            expect(updatedLog.exercises.length).toBe(2);
+            const updatedSquat = updatedLog.exercises.find(e => e.name === 'Squat');
+            expect(updatedSquat.details.length).toBe(4);
+            expect(updatedSquat.details[3].weight).toBe('105');
+        });
+    });
 });
 
 

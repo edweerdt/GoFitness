@@ -3728,8 +3728,13 @@ const app = {
                     (sessionEx.name && sessionEx.name.toLowerCase().includes(e.name.toLowerCase()))
                 );
                 if (loggedEx) matchedLoggedExs.add(loggedEx);
+                const maxLoggedSetNumber = loggedEx && loggedEx.details && loggedEx.details.length > 0
+                    ? Math.max(...loggedEx.details.map(d => d.setNumber || 0))
+                    : 0;
+                const targetSets = Math.max(sessionEx.sets || 1, maxLoggedSetNumber, loggedEx && loggedEx.totalSets ? loggedEx.totalSets : 0);
+
                 const details = [];
-                for (let i = 1; i <= sessionEx.sets; i++) {
+                for (let i = 1; i <= targetSets; i++) {
                     const loggedSet = loggedEx && loggedEx.details ? loggedEx.details.find(d => d.setNumber === i) : null;
                     const dObj = {
                         setNumber: i,
@@ -3749,7 +3754,7 @@ const app = {
                     originalName: sessionEx.name,
                     availableVariations: variations.length > 0 ? variations : this.getExerciseVariations(loggedEx || {}),
                     muscleGroups: (loggedEx && loggedEx.muscleGroups && loggedEx.muscleGroups.length > 0) ? loggedEx.muscleGroups : (sessionEx.muscleGroups || []),
-                    totalSets: sessionEx.sets,
+                    totalSets: targetSets,
                     setsCompleted: loggedEx ? loggedEx.setsCompleted : 0,
                     details: details
                 };
@@ -3760,6 +3765,7 @@ const app = {
                 if (!matchedLoggedExs.has(loggedEx)) {
                     loggedEx.availableVariations = loggedEx.availableVariations || this.getExerciseVariations(loggedEx);
                     if (!loggedEx.details) loggedEx.details = [];
+                    loggedEx.details.forEach(d => { d.completed = true; });
                     fullExercises.push(loggedEx);
                 }
             });
