@@ -1276,6 +1276,29 @@ describe('exercise progress', () => {
         expect(app.getCanonicalExerciseKey('DB Bicep Curl')).toBe('def_bicep_curl');
         expect(app.getCanonicalExerciseKey('Overhead Press')).toBe('def_overhead_press');
         expect(app.getCanonicalExerciseKey('Overhead Press (OHP)')).toBe('def_overhead_press');
+        expect(app.getCanonicalExerciseKey('Bicep Curl')).toBe('def_bicep_curl');
+    });
+
+    it('should never render duplicate cards with the same display name even if logs mix exercise IDs and name strings', () => {
+        store.plans = [{
+            id: 'plan_1',
+            sessions: [{
+                exercises: [{ id: 'plan_ex_99', name: 'Dumbbell Bicep Curl' }]
+            }]
+        }];
+        store.logs = [
+            { planName: 'Schema A', date: '2026-07-01T10:00:00.000Z', exercises: [{ id: 'plan_ex_99', name: 'Dumbbell Bicep Curl', details: [{ setNumber: 1, weight: '10', reps: '10' }] }] },
+            { planName: 'Schema B', date: '2026-07-08T10:00:00.000Z', exercises: [{ id: 'def_bicep_curl', name: 'Dumbbell Bicep Curl', details: [{ setNumber: 1, weight: '12', reps: '10' }] }] },
+            { planName: 'Schema C', date: '2026-07-15T10:00:00.000Z', exercises: [{ name: 'Bicep Curl', details: [{ setNumber: 1, weight: '14', reps: '10' }] }] }
+        ];
+        app.renderExerciseProgress();
+
+        const html = document.getElementById('exercise-progress-list').innerHTML;
+        const occurrences = (html.match(/Dumbbell Bicep Curl/g) || []).length;
+        // Should only render 1 progress card header for Dumbbell Bicep Curl
+        expect(occurrences).toBe(1);
+        expect(html).toContain('3 sessies');
+        expect(html).toContain('+4 kg');
     });
 
     it('should ignore 0kg sets for weighted exercises on progress graph and only plot sets with extra weight', () => {

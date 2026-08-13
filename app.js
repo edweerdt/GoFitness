@@ -1149,17 +1149,29 @@ const app = {
 
     getCanonicalExerciseKey(name) {
         if (!name) return '';
-        const raw = String(name).trim();
+        let raw = String(name).trim();
         if (!raw) return '';
 
-        // Normalize string for fuzzy comparison
+        const lib = (typeof store !== 'undefined' && store.getExerciseLibrary)
+            ? store.getExerciseLibrary()
+            : ((typeof DEFAULT_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_EXERCISES)) ? DEFAULT_EXERCISES : []);
+
+        // If raw is an ID (e.g. plan_ex_... or custom_ex_...), resolve to its exercise name first
+        if (lib && lib.length > 0) {
+            const foundById = lib.find(ex => ex.id === raw);
+            if (foundById && foundById.name) {
+                raw = foundById.name.trim();
+            }
+        }
+
+        // String normalization helper
         const normalizeStr = str => {
             if (!str) return '';
             let s = String(str).toLowerCase().trim();
             // Typo fixes
             s = s.replace(/dumbell/g, 'dumbbell').replace(/dumbel/g, 'dumbbell');
             // Normalize common equipment & abbreviations
-            s = s.replace(/\bdb\b/g, 'dumbbell').replace(/\bbb\b/g, 'barbell').replace(/\bkb\b/g, 'kettlebell').replace(/\bohp\b/g, 'overhead press');
+            s = s.replace(/\bdb\b/g, 'dumbbell').replace(/\bbb\b/g, 'barbell').replace(/\bkb\b/g, 'kettlebell').replace(/\bohp\b/g, 'overhead press').replace(/\brdl\b/g, 'romanian deadlift');
             // Remove parenthetical notes e.g. "(ohp)", "(rdl)", "(roeimachine)"
             s = s.replace(/\([^)]*\)/g, ' ');
             // Remove punctuation & hyphens
@@ -1171,35 +1183,55 @@ const app = {
 
         const clean = normalizeStr(raw);
 
-        const lib = (typeof store !== 'undefined' && store.getExerciseLibrary)
-            ? store.getExerciseLibrary()
-            : ((typeof DEFAULT_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_EXERCISES)) ? DEFAULT_EXERCISES : []);
-
         if (lib && lib.length > 0) {
-            // 1. Check exact match on exercise ID or exact name
-            const exactMatch = lib.find(ex => ex.id === raw || (ex.name && ex.name.toLowerCase().trim() === raw.toLowerCase()));
-            if (exactMatch) return exactMatch.id;
+            // Prioritize DEFAULT_EXERCISES and customExercises over generated plan exercises
+            const primaryLib = lib.filter(ex => !ex.fromPlan);
+            const searchLists = [primaryLib, lib];
 
-            // 2. Check normalized name match against exercise name or alternatives
-            const normMatch = lib.find(ex => {
-                if (ex.name && normalizeStr(ex.name) === clean) return true;
-                if (Array.isArray(ex.alternatives) && ex.alternatives.some(alt => normalizeStr(alt) === clean)) return true;
-                return false;
-            });
-            if (normMatch) return normMatch.id;
+            for (const list of searchLists) {
+                if (!list || list.length === 0) continue;
 
-            // 3. Token-based fallback check using extractExerciseNameTokens
+                // 1. Check exact match on exercise name
+                const exactMatch = list.find(ex => ex.name && ex.name.toLowerCase().trim() === raw.toLowerCase());
+                if (exactMatch) return exactMatch.id;
+
+                // 2. Check normalized name match against exercise name or alternatives
+                const normMatch = list.find(ex => {
+                    if (ex.name && normalizeStr(ex.name) === clean) return true;
+                    if (Array.isArray(ex.alternatives) && ex.alternatives.some(alt => normalizeStr(alt) === clean)) return true;
+                    return false;
+                });
+                if (normMatch) return normMatch.id;
+            }
+
+            // 3. Equipment-stripped matching (e.g., "bicep curl" matching "dumbbell bicep curl")
+            const stripEquipment = s => s.replace(/\b(dumbbell|barbell|cable|machine|seated|lying|standing|single arm)\b/g, '').replace(/\s+/g, ' ').trim();
+            const cleanCore = stripEquipment(clean);
+            if (cleanCore.length > 3) {
+                for (const list of searchLists) {
+                    const coreMatch = list.find(ex => {
+                        if (!ex.name) return false;
+                        const exCore = stripEquipment(normalizeStr(ex.name));
+                        return exCore === cleanCore;
+                    });
+                    if (coreMatch) return coreMatch.id;
+                }
+            }
+
+            // 4. Token-based fallback check using extractExerciseNameTokens
             if (this.extractExerciseNameTokens) {
                 const targetTokens = this.extractExerciseNameTokens(raw);
                 if (targetTokens && targetTokens.size > 0) {
-                    const tokenMatch = lib.find(ex => {
-                        const libTokens = this.extractExerciseNameTokens(ex.name, ex);
-                        for (const t of libTokens) {
-                            if (targetTokens.has(t)) return true;
-                        }
-                        return false;
-                    });
-                    if (tokenMatch) return tokenMatch.id;
+                    for (const list of searchLists) {
+                        const tokenMatch = list.find(ex => {
+                            const libTokens = this.extractExerciseNameTokens(ex.name, ex);
+                            for (const t of libTokens) {
+                                if (targetTokens.has(t)) return true;
+                            }
+                            return false;
+                        });
+                        if (tokenMatch) return tokenMatch.id;
+                    }
                 }
             }
         }
@@ -1310,8 +1342,23 @@ const app = {
             });
         });
 
+        // Deduplicate series sharing the same canonical display name
+        const mergedSeriesMap = {};
+        Object.values(series).forEach(s => {
+            const displayKey = (s.name || '').toLowerCase().trim();
+            if (!displayKey) return;
+            if (!mergedSeriesMap[displayKey]) {
+                mergedSeriesMap[displayKey] = {
+                    ...s,
+                    points: [...s.points]
+                };
+            } else {
+                mergedSeriesMap[displayKey].points.push(...s.points);
+            }
+        });
+
         // Punten op datumvolgorde
-        return Object.values(series)
+        return Object.values(mergedSeriesMap)
             .map(s => ({ ...s, points: [...s.points].sort((a, b) => (this.parseLogDate(a.date) - this.parseLogDate(b.date))) }));
     },
 
