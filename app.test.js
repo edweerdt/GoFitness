@@ -2599,7 +2599,61 @@ describe('add and remove sets during workout', () => {
             expect(status).toBe('pr');
         });
     });
+
+    describe('GOF-18: Schema list rendering and collapse functionality', () => {
+        beforeEach(() => {
+            document.body.innerHTML = `
+                <div id="plans-list"></div>
+                <div id="exercise-library-list"></div>
+            `;
+            store.plans = [
+                {
+                    id: 'plan-1',
+                    name: 'Inactief Schema',
+                    description: 'Beschrijving van inactief schema',
+                    sessions: [{ id: 's1', name: 'Sessie 1', exercises: [] }]
+                },
+                {
+                    id: 'plan-2',
+                    name: 'Actief Schema',
+                    description: 'Beschrijving van actief schema',
+                    sessions: [{ id: 's2', name: 'Sessie 2', exercises: [] }]
+                }
+            ];
+            store.activePlanId = 'plan-2';
+        });
+
+        it('should render active plan at the top of plans list below custom workout card', () => {
+            app.renderPlans();
+
+            const planList = document.getElementById('plans-list');
+            const cards = planList.children;
+            // First card is Vrije Sessie
+            expect(cards[0].textContent).toContain('Vrije Sessie');
+            // Second card should be Actief Schema (plan-2) because it is active
+            expect(cards[1].textContent).toContain('Actief Schema');
+            // Third card should be Inactief Schema (plan-1)
+            expect(cards[2].textContent).toContain('Inactief Schema');
+        });
+
+        it('should collapse sessions list for inactive plans and expand for active plans', () => {
+            app.renderPlans();
+
+            const planList = document.getElementById('plans-list');
+            const activeCard = planList.children[1];
+            const inactiveCard = planList.children[2];
+
+            // Active card sessions container should NOT have 'hidden' class
+            const activeSessionsContainer = activeCard.querySelector('.flex-col.gap-2:not(.hidden)');
+            expect(activeSessionsContainer).not.toBeNull();
+
+            // Inactive card sessions container SHOULD have 'hidden' class
+            const inactiveSessionsContainer = inactiveCard.querySelector('.flex-col.gap-2.hidden');
+            expect(inactiveSessionsContainer).not.toBeNull();
+        });
+    });
 });
+
 
 
 
