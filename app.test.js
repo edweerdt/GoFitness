@@ -1195,7 +1195,7 @@ describe('exercise progress', () => {
         expect(html).not.toContain('Plank');
     });
 
-    it('should limit value labels to first, peak and last when there are many sessions', () => {
+    it('should limit value labels with an adaptive stride when there are many sessions', () => {
         const weights = [40, 42, 44, 46, 48, 50, 52];
         store.logs = weights.map((wt, i) => ({
             date: `2026-07-0${i + 1}T10:00:00.000Z`,
@@ -1204,12 +1204,34 @@ describe('exercise progress', () => {
         app.renderExerciseProgress();
 
         const html = document.getElementById('exercise-progress-list').innerHTML;
-        // 7 metingen -> alleen eerste (40), piek (52) en laatste (52) gelabeld, niet alle
+        // 7 metingen -> met minLabelDistance 45px wordt stride 2 gebruikt (indices 0, 2, 4, 6)
         const labelCount = (html.match(/<text/g) || []).length;
-        expect(labelCount).toBeLessThan(weights.length);
+        expect(labelCount).toBe(4);
         expect(html).toContain('>40</text>');
+        expect(html).toContain('>44</text>');
+        expect(html).toContain('>48</text>');
         expect(html).toContain('>52</text>');
-        expect(html).not.toContain('>44</text>');
+        expect(html).not.toContain('>42</text>');
+        expect(html).not.toContain('>46</text>');
+    });
+
+    it('should increase label gap stride to 3 when 13 sessions are rendered to prevent overlapping labels like Goblet Squat', () => {
+        const weights = [10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 30, 30]; // 13 values
+        store.logs = weights.map((wt, i) => ({
+            date: `2026-07-${i < 9 ? '0' + (i + 1) : (i + 1)}T10:00:00.000Z`,
+            exercises: [{ name: 'Goblet Squat', details: [{ setNumber: 1, weight: String(wt), reps: '10' }] }]
+        }));
+        app.renderExerciseProgress();
+
+        const html = document.getElementById('exercise-progress-list').innerHTML;
+        // 13 metingen -> step ~22.3px -> stride 3 (indices 0, 3, 6, 9, 12)
+        const labelMatches = html.match(/<text[^>]*>([^<]+)<\/text>/g) || [];
+        expect(labelMatches.length).toBe(5);
+        expect(html).toContain('>10</text>'); // idx 0
+        expect(html).toContain('>16</text>'); // idx 3
+        expect(html).toContain('>22</text>'); // idx 6
+        expect(html).toContain('>28</text>'); // idx 9
+        expect(html).toContain('>30</text>'); // idx 12
     });
 
     it('should show a hint when there is not enough data', () => {
