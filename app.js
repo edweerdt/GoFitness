@@ -5257,16 +5257,35 @@ const app = {
 
                     if (allExerciseNames.size === 0) return; // skip empty groups
 
+                    // Sorteer oefeningen: eerst matchende oefeningen (data bij beiden), daarna niet-matchend
+                    const sortedExerciseNames = Array.from(allExerciseNames).sort((a, b) => {
+                        const aMy = myExercises.find(e => e.exercise === a);
+                        const aFr = friendExercises.find(e => e.exercise === a);
+                        const aHasMy = aMy && (aMy.maxKg > 0 || aMy.maxReps > 0 || aMy.estimated1RM > 0);
+                        const aHasFr = aFr && (aFr.maxKg > 0 || aFr.maxReps > 0 || aFr.estimated1RM > 0);
+                        const aMatch = aHasMy && aHasFr;
+
+                        const bMy = myExercises.find(e => e.exercise === b);
+                        const bFr = friendExercises.find(e => e.exercise === b);
+                        const bHasMy = bMy && (bMy.maxKg > 0 || bMy.maxReps > 0 || bMy.estimated1RM > 0);
+                        const bHasFr = bFr && (bFr.maxKg > 0 || bFr.maxReps > 0 || bFr.estimated1RM > 0);
+                        const bMatch = bHasMy && bHasFr;
+
+                        if (aMatch && !bMatch) return -1;
+                        if (!aMatch && bMatch) return 1;
+                        return a.localeCompare(b);
+                    });
+
                     html += `
                         <div class="muscle-group-section">
                             <div class="muscle-group-header">
                                 <span class="material-icons-round text-accent" style="font-size:1.2rem;">${mgDef.icon}</span>
                                 ${mgDef.name}
-                                <span class="text-sm text-muted" style="font-weight:400;">(${allExerciseNames.size} oefening${allExerciseNames.size !== 1 ? 'en' : ''})</span>
+                                <span class="text-sm text-muted" style="font-weight:400;">(${sortedExerciseNames.length} oefening${sortedExerciseNames.length !== 1 ? 'en' : ''})</span>
                             </div>
                     `;
 
-                    allExerciseNames.forEach(exName => {
+                    sortedExerciseNames.forEach(exName => {
                         const myStat = myExercises.find(e => e.exercise === exName) || null;
                         const fStat = friendExercises.find(e => e.exercise === exName) || null;
                         const my1RM = myStat ? (myStat.estimated1RM || 0) : 0;
