@@ -1256,6 +1256,28 @@ describe('exercise progress', () => {
         expect(html).toContain('Laatst: 14 kg');
     });
 
+    it('should aggregate sessions across different schemas and name variations/typos (GOF-20)', () => {
+        store.logs = [
+            { planName: 'Schema A', date: '2026-07-01T10:00:00.000Z', exercises: [{ name: 'Dumbell Bicep Curl', details: [{ setNumber: 1, weight: '10', reps: '10' }] }] },
+            { planName: 'Schema B', date: '2026-07-08T10:00:00.000Z', exercises: [{ name: 'Dumbbell Bicep Curl', details: [{ setNumber: 1, weight: '12', reps: '10' }] }] },
+            { planName: 'Schema C', date: '2026-07-15T10:00:00.000Z', exercises: [{ name: 'DB Bicep Curl', details: [{ setNumber: 1, weight: '14', reps: '10' }] }] }
+        ];
+        app.renderExerciseProgress();
+
+        const html = document.getElementById('exercise-progress-list').innerHTML;
+        expect(html).toContain('Dumbbell Bicep Curl');
+        expect(html).toContain('3 sessies');
+        expect(html).toContain('+4 kg');
+        expect(html).toContain('Laatst: 14 kg');
+    });
+
+    it('should resolve canonical exercise keys for typos, abbreviations, and parenthetical suffixes', () => {
+        expect(app.getCanonicalExerciseKey('Dumbell Bicep Curl')).toBe('def_bicep_curl');
+        expect(app.getCanonicalExerciseKey('DB Bicep Curl')).toBe('def_bicep_curl');
+        expect(app.getCanonicalExerciseKey('Overhead Press')).toBe('def_overhead_press');
+        expect(app.getCanonicalExerciseKey('Overhead Press (OHP)')).toBe('def_overhead_press');
+    });
+
     it('should ignore 0kg sets for weighted exercises on progress graph and only plot sets with extra weight', () => {
         store.logs = [
             { date: '2026-07-01T10:00:00.000Z', exercises: [{ name: 'Walking Lunges', details: [{ setNumber: 1, weight: '0', reps: '20' }] }] },

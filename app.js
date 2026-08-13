@@ -1149,29 +1149,73 @@ const app = {
 
     getCanonicalExerciseKey(name) {
         if (!name) return '';
-        let clean = String(name).trim().toLowerCase();
-        if (typeof DEFAULT_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_EXERCISES)) {
-            const found = DEFAULT_EXERCISES.find(ex => {
-                const exName = ex.name.toLowerCase();
-                if (exName === clean) return true;
-                if (clean.endsWith('s') && exName === clean.slice(0, -1)) return true;
-                if (exName.endsWith('s') && clean === exName.slice(0, -1)) return true;
+        const raw = String(name).trim();
+        if (!raw) return '';
+
+        // Normalize string for fuzzy comparison
+        const normalizeStr = str => {
+            if (!str) return '';
+            let s = String(str).toLowerCase().trim();
+            // Typo fixes
+            s = s.replace(/dumbell/g, 'dumbbell').replace(/dumbel/g, 'dumbbell');
+            // Normalize common equipment & abbreviations
+            s = s.replace(/\bdb\b/g, 'dumbbell').replace(/\bbb\b/g, 'barbell').replace(/\bkb\b/g, 'kettlebell').replace(/\bohp\b/g, 'overhead press');
+            // Remove parenthetical notes e.g. "(ohp)", "(rdl)", "(roeimachine)"
+            s = s.replace(/\([^)]*\)/g, ' ');
+            // Remove punctuation & hyphens
+            s = s.replace(/[^a-z0-9]/gi, ' ').replace(/\s+/g, ' ').trim();
+            // Strip trailing plural 's' from words longer than 3 chars
+            s = s.split(' ').map(w => (w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w)).join(' ');
+            return s;
+        };
+
+        const clean = normalizeStr(raw);
+
+        const lib = (typeof store !== 'undefined' && store.getExerciseLibrary)
+            ? store.getExerciseLibrary()
+            : ((typeof DEFAULT_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_EXERCISES)) ? DEFAULT_EXERCISES : []);
+
+        if (lib && lib.length > 0) {
+            // 1. Check exact match on exercise ID or exact name
+            const exactMatch = lib.find(ex => ex.id === raw || (ex.name && ex.name.toLowerCase().trim() === raw.toLowerCase()));
+            if (exactMatch) return exactMatch.id;
+
+            // 2. Check normalized name match against exercise name or alternatives
+            const normMatch = lib.find(ex => {
+                if (ex.name && normalizeStr(ex.name) === clean) return true;
+                if (Array.isArray(ex.alternatives) && ex.alternatives.some(alt => normalizeStr(alt) === clean)) return true;
                 return false;
             });
-            if (found) return found.id;
+            if (normMatch) return normMatch.id;
+
+            // 3. Token-based fallback check using extractExerciseNameTokens
+            if (this.extractExerciseNameTokens) {
+                const targetTokens = this.extractExerciseNameTokens(raw);
+                if (targetTokens && targetTokens.size > 0) {
+                    const tokenMatch = lib.find(ex => {
+                        const libTokens = this.extractExerciseNameTokens(ex.name, ex);
+                        for (const t of libTokens) {
+                            if (targetTokens.has(t)) return true;
+                        }
+                        return false;
+                    });
+                    if (tokenMatch) return tokenMatch.id;
+                }
+            }
         }
-        if (clean.endsWith('s') && clean.length > 3) {
-            clean = clean.slice(0, -1);
-        }
-        return clean;
+
+        return clean || raw.toLowerCase().trim();
     },
 
     getCanonicalExerciseName(name) {
         if (!name) return '';
         const key = this.getCanonicalExerciseKey(name);
-        if (typeof DEFAULT_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_EXERCISES)) {
-            const found = DEFAULT_EXERCISES.find(ex => ex.id === key);
-            if (found) return found.name;
+        const lib = (typeof store !== 'undefined' && store.getExerciseLibrary)
+            ? store.getExerciseLibrary()
+            : ((typeof DEFAULT_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_EXERCISES)) ? DEFAULT_EXERCISES : []);
+        if (lib && lib.length > 0) {
+            const found = lib.find(ex => ex.id === key);
+            if (found && found.name) return found.name;
         }
         return name;
     },
@@ -1268,7 +1312,7 @@ const app = {
 
         // Punten op datumvolgorde
         return Object.values(series)
-            .map(s => ({ ...s, points: [...s.points].sort((a, b) => (a.date < b.date ? -1 : 1)) }));
+            .map(s => ({ ...s, points: [...s.points].sort((a, b) => (this.parseLogDate(a.date) - this.parseLogDate(b.date))) }));
     },
 
     // Epley-formule: geschat 1-rep-max op basis van gewicht en herhalingen
@@ -2325,6 +2369,15 @@ const app = {
             const cleanPunct = raw.replace(/['"`]/g, '');
             tokens.add(cleanPunct);
 
+            // Typos & abbreviation normalization
+            const cleanTypos = cleanPunct
+                .replace(/dumbell/g, 'dumbbell')
+                .replace(/dumbel/g, 'dumbbell')
+                .replace(/\bdb\b/g, 'dumbbell')
+                .replace(/\bbb\b/g, 'barbell')
+                .replace(/\bkb\b/g, 'kettlebell');
+            tokens.add(cleanTypos);
+
             // Extract content inside parentheses e.g. "Row Machine (Roeimachine)" -> "roeimachine" & "row machine"
             const parenRegex = /\(([^)]+)\)/g;
             let match;
@@ -2350,7 +2403,7 @@ const app = {
             });
 
             // Strip equipment/modifier prefixes
-            const modifiers = ['barbell', 'dumbbell', 'cable', 'machine', 'seated', 'lying', 'standing', 'single-arm', 'single arm', 'kettlebell'];
+            const modifiers = ['barbell', 'dumbbell', 'dumbell', 'db', 'kb', 'bb', 'kettlebell', 'cable', 'machine', 'seated', 'lying', 'standing', 'single-arm', 'single arm'];
             Array.from(tokens).forEach(s => {
                 modifiers.forEach(mod => {
                     if (s.startsWith(mod + ' ')) {
