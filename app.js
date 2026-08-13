@@ -985,7 +985,12 @@ const app = {
             emptyNote.textContent = 'Nog geen vaste schema\'s geïmporteerd. Importeer een schema of start een Vrije Sessie!';
             list.appendChild(emptyNote);
         } else {
-            store.plans.forEach(p => {
+            const sortedPlans = [...store.plans].sort((a, b) => {
+                if (a.id === store.activePlanId) return -1;
+                if (b.id === store.activePlanId) return 1;
+                return 0;
+            });
+            sortedPlans.forEach(p => {
                 const el = document.createElement('div');
                 el.className = 'glass-panel flex-col gap-3';
                 const isActive = store.activePlanId === p.id;
@@ -997,7 +1002,7 @@ const app = {
                 // die toevallig het woord 'mijlpalen' bevat niet wordt afgekapt
                 let descriptionText = String(p.description || '');
                 descriptionText = descriptionText.split(/\n\s*(?:Herstelregels|Voltooiingsregels|Mijlpalen)/i)[0].trim();
-                const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary);">${this.escapeHTML(descriptionText)}</p>` : '';
+                const desc = descriptionText ? `<p class="text-sm mt-1" style="color:var(--text-primary); width:100%;">${this.escapeHTML(descriptionText)}</p>` : '';
                 const recPattern = sched.recommendedPattern || p.recommendedPattern ?
                     `<div class="text-sm text-muted mt-1"><strong>Aanbevolen patroon:</strong> ${this.escapeHTML(String(sched.recommendedPattern || p.recommendedPattern))}</div>` : '';
                 const recovery = sched.minRecoveryHours || p.minRecoveryHours ?
@@ -1017,10 +1022,16 @@ const app = {
 
                 let sessionsListHtml = '';
                 if (p.sessions && p.sessions.length > 0) {
+                    const isSessionsHidden = !isActive;
                     sessionsListHtml = `
-                        <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
-                            <div style="font-weight:600; font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:6px;">Sessies in dit schema</div>
-                            <div class="flex-col gap-2">
+                        <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding: 4px 0;" onclick="this.nextElementSibling.classList.toggle('hidden'); const chevron = this.querySelector('.chevron-icon'); if (chevron) chevron.textContent = this.nextElementSibling.classList.contains('hidden') ? 'expand_more' : 'expand_less';">
+                                <div style="font-weight:600; font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; display:flex; align-items:center; gap:6px;">
+                                    Sessies in dit schema (${p.sessions.length})
+                                </div>
+                                <span class="material-icons-round text-muted chevron-icon" style="font-size:1.2rem;">${isSessionsHidden ? 'expand_more' : 'expand_less'}</span>
+                            </div>
+                            <div class="flex-col gap-2 ${isSessionsHidden ? 'hidden' : ''}" style="margin-top: 8px;">
                                 ${p.sessions.map(s => {
                                     const sId = this.escapeHTML(s.id || s.sessionId);
                                     const exCount = (s.exercises || []).length;
@@ -1043,27 +1054,27 @@ const app = {
                 }
 
                 el.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                        <div style="flex:1; min-width:0;">
-                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%; gap:8px;">
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1; min-width:0;">
                                 <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0; overflow-wrap:anywhere;">${this.escapeHTML(p.name)}</h3>
                                 ${level}
                             </div>
-                            ${desc}
+                            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                                ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
+                                <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${this.escapeHTML(p.id)}')" title="Schema delen">ios_share</span>
+                                <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${this.escapeHTML(p.id)}')">delete_outline</span>
+                            </div>
                         </div>
-                        <div style="display:flex; align-items:center; gap:8px; margin-left:12px; flex-shrink:0;">
-                            ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${this.escapeHTML(p.id)}')" title="Schema delen">ios_share</span>
-                            <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${this.escapeHTML(p.id)}')">delete_outline</span>
-                        </div>
+                        ${desc}
                     </div>
                     
-                    <div style="background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; margin-top: 8px; cursor: pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                    <div style="background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; margin-top: 4px; cursor: pointer;" onclick="this.nextElementSibling.classList.toggle('hidden'); const chevron = this.querySelector('.chevron-icon'); if (chevron) chevron.textContent = this.nextElementSibling.classList.contains('hidden') ? 'expand_more' : 'expand_less';">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div style="font-weight:600; font-size:0.85rem; color:var(--accent-color);">DETAILS</div>
-                            <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
+                            <span class="material-icons-round text-muted chevron-icon" style="font-size:1.2rem;">expand_more</span>
                         </div>
-                        <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${this.escapeHTML(String(targetSessions))}x per week (${p.sessions.length} unieke sessies)</div>
+                        <div class="text-sm text-muted mt-1"><strong>Frequentie:</strong> ${this.escapeHTML(String(targetSessions))}x per week (${p.sessions ? p.sessions.length : 0} unieke sessies)</div>
                         ${goal}
                     </div>
 
