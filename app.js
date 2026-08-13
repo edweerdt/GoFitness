@@ -217,6 +217,7 @@ class DataStore {
             exerciseType: exData.exerciseType || 'weight_reps',
             trackMetrics: exData.trackMetrics || (exData.exerciseType === 'duration' ? ['duration_seconds'] : (exData.exerciseType === 'bodyweight_reps' ? ['reps'] : ['weight', 'reps'])),
             category: exData.category || 'custom',
+            alternatives: exData.alternatives || [],
             isCustom: true
         };
         if (!this.customExercises) this.customExercises = [];
@@ -234,7 +235,8 @@ class DataStore {
             muscleGroups: exData.muscleGroups || this.customExercises[idx].muscleGroups,
             exerciseType: exData.exerciseType || this.customExercises[idx].exerciseType,
             trackMetrics: exData.trackMetrics || this.customExercises[idx].trackMetrics,
-            category: exData.category || this.customExercises[idx].category
+            category: exData.category || this.customExercises[idx].category,
+            alternatives: exData.alternatives !== undefined ? exData.alternatives : (this.customExercises[idx].alternatives || [])
         };
         this.save();
         return this.customExercises[idx];
@@ -2594,6 +2596,111 @@ const app = {
         };
     },
 
+    evaluateSetAchievement(ex, setIndex) {
+        if (!ex || !ex.setsCompleted || !ex.setsCompleted[setIndex]) return 'none';
+
+        const weight = (ex.weights && ex.weights[setIndex] !== undefined && ex.weights[setIndex] !== '')
+            ? parseFloat(ex.weights[setIndex]) : 0;
+        const reps = (ex.actualReps && ex.actualReps[setIndex] !== undefined && ex.actualReps[setIndex] !== '')
+            ? parseInt(ex.actualReps[setIndex], 10) : 0;
+
+        if (!(weight > 0) && !(reps > 0)) return 'normal';
+
+        const current1RM = this.estimate1RM(weight, reps) || 0;
+
+        // 1. Check for PR against all historical logs in store.logs
+        let maxHistorical1RM = 0;
+        let maxHistoricalWeight = 0;
+        let maxHistoricalReps = 0;
+        let hasPreviousLogs = false;
+
+        const targetTokens = this.extractExerciseNameTokens(ex.name, ex);
+
+        if (typeof store !== 'undefined' && Array.isArray(store.logs)) {
+            for (const log of store.logs) {
+                if (!log || !log.exercises) continue;
+                for (const e of log.exercises) {
+                    if (!e || !e.name) continue;
+                    const logTokens = this.extractExerciseNameTokens(e.name, e);
+                    let matches = false;
+                    for (const t of logTokens) {
+                        if (targetTokens.has(t)) { matches = true; break; }
+                    }
+                    if (matches && Array.isArray(e.details)) {
+                        for (const d of e.details) {
+                            if (!d) continue;
+                            const w = parseFloat(d.weight) || 0;
+                            const r = parseInt(d.reps, 10) || 0;
+                            if (w > 0 || r > 0) {
+                                hasPreviousLogs = true;
+                                if (w > maxHistoricalWeight) maxHistoricalWeight = w;
+                                if (r > maxHistoricalReps) maxHistoricalReps = r;
+                                const est = this.estimate1RM(w, r) || 0;
+                                if (est > maxHistorical1RM) maxHistorical1RM = est;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (hasPreviousLogs) {
+            if (current1RM > 0 && maxHistorical1RM > 0 && current1RM > maxHistorical1RM + 0.01) {
+                return 'pr';
+            }
+            if (weight > 0 && maxHistoricalWeight > 0 && weight > maxHistoricalWeight + 0.01) {
+                return 'pr';
+            }
+            if (weight === 0 && maxHistoricalReps > 0 && reps > maxHistoricalReps) {
+                return 'pr';
+            }
+        }
+
+        // 2. Progressive Overload Check: compare against previous session details
+        const prevDetails = this.getPreviousExerciseDetails(ex.name, ex) || [];
+        if (prevDetails.length > 0) {
+            const prevSet = (prevDetails[setIndex] && (prevDetails[setIndex].weight || prevDetails[setIndex].reps))
+                ? prevDetails[setIndex] : (prevDetails[0] || {});
+            const prevWeight = parseFloat(prevSet.weight) || 0;
+            const prevReps = parseInt(prevSet.reps, 10) || 0;
+
+            if (weight > 0 && prevWeight > 0 && weight > prevWeight + 0.01) {
+                return 'overload';
+            }
+            if (weight === prevWeight && reps > prevReps && reps > 0) {
+                return 'overload';
+            }
+
+            const overloadSugg = this.getOverloadSuggestion(ex, prevDetails, (typeof store !== 'undefined' ? store.getActivePlan() : null));
+            if (overloadSugg && overloadSugg.newWeight && weight >= overloadSugg.newWeight - 0.01) {
+                return 'overload';
+            }
+        }
+
+        return 'normal';
+    },
+
+    updateCheckBtnDOM(exIndex, setIndex) {
+        if (typeof document === 'undefined' || !document.getElementById('workout-exercise-list')) return;
+        const anchor = document.querySelector(`#workout-exercise-list input[data-ex="${exIndex}"][data-set="${setIndex}"]`);
+        const checkBtn = anchor && anchor.closest('.set-row') ? anchor.closest('.set-row').querySelector('.check-btn') : null;
+        if (!checkBtn) return;
+
+        const ex = this.activeWorkout ? this.activeWorkout.exercises[exIndex] : null;
+        checkBtn.classList.remove('checked', 'checked-overload', 'checked-pr', 'checked-radiant');
+
+        if (ex && ex.setsCompleted && ex.setsCompleted[setIndex]) {
+            const achievement = this.evaluateSetAchievement(ex, setIndex);
+            if (achievement === 'pr') {
+                checkBtn.classList.add('checked-pr');
+            } else if (achievement === 'overload') {
+                checkBtn.classList.add('checked-overload');
+            } else {
+                checkBtn.classList.add('checked');
+            }
+        }
+    },
+
     renderWorkoutExercises() {
         const list = document.getElementById('workout-exercise-list');
         if (!list) return;
@@ -2715,7 +2822,13 @@ const app = {
 
             let setsHtml = '';
             for(let i=0; i<ex.sets; i++) {
-                const checked = ex.setsCompleted[i] ? 'checked' : '';
+                let checked = '';
+                if (ex.setsCompleted && ex.setsCompleted[i]) {
+                    const achievement = app.evaluateSetAchievement(ex, i);
+                    if (achievement === 'pr') checked = 'checked-pr';
+                    else if (achievement === 'overload') checked = 'checked-overload';
+                    else checked = 'checked';
+                }
                 
                 const prevSet = (prevDetails[i] && (prevDetails[i].weight || prevDetails[i].reps)) ? prevDetails[i] : (prevDetails[0] || {});
                 const weightPlaceholder = prevSet.weight || (prevDetails[0] ? prevDetails[0].weight : '') || 'kg';
@@ -3285,7 +3398,7 @@ const app = {
                 const anchor = document.querySelector(`#workout-exercise-list input[data-ex="${exIndex}"][data-set="${setIndex}"]`);
                 const checkBtn = anchor && anchor.closest('.set-row') ? anchor.closest('.set-row').querySelector('.check-btn') : null;
                 if (checkBtn) {
-                    checkBtn.classList.add('checked');
+                    this.updateCheckBtnDOM(exIndex, setIndex);
                 } else {
                     this.renderWorkoutExercises();
                 }
@@ -3302,6 +3415,7 @@ const app = {
         ex.weights[setIndex] = val;
         if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
         if (finalize) this.checkAutoCompleteSet(exIndex, setIndex);
+        this.updateCheckBtnDOM(exIndex, setIndex);
     },
 
     updateReps(exIndex, setIndex, val, finalize = false) {
@@ -3311,6 +3425,7 @@ const app = {
         ex.actualReps[setIndex] = val;
         if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
         if (finalize) this.checkAutoCompleteSet(exIndex, setIndex);
+        this.updateCheckBtnDOM(exIndex, setIndex);
     },
 
     updateLevel(exIndex, setIndex, val, finalize = false) {
@@ -3320,6 +3435,7 @@ const app = {
         ex.levels[setIndex] = val;
         if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
         if (finalize) this.checkAutoCompleteSet(exIndex, setIndex);
+        this.updateCheckBtnDOM(exIndex, setIndex);
     },
 
     handleInputEnter(event, exIndex, setIndex, inputType) {

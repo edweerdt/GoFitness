@@ -422,6 +422,7 @@ button:disabled {
 }
 
 .check-btn {
+    position: relative;
     background: var(--surface-light);
     border: 1px solid rgba(255,255,255,0.1);
     color: var(--text-muted);
@@ -430,12 +431,81 @@ button:disabled {
     border-radius: 50%;
     display: grid;
     place-items: center;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .check-btn.checked {
     background: var(--status-green);
     color: white;
     border-color: var(--status-green);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+/* Progressive Overload: Normal solid green base with a lighter glowing neon green border ring */
+.check-btn.checked-overload {
+    background: var(--status-green);
+    color: white;
+    border-color: var(--status-green);
+    box-shadow: 0 0 0 3px #69f0ae, 0 0 14px rgba(105, 240, 174, 0.85);
+    animation: overloadPulse 2s infinite ease-in-out;
+}
+
+@keyframes overloadPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 3px #69f0ae, 0 0 12px rgba(105, 240, 174, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 3.5px #a7ffeb, 0 0 18px rgba(167, 255, 235, 0.95);
+    }
+}
+
+/* PR (Personal Record) / V Radiant: Radiant gradient fill, glowing ambient box-shadow & sparkle effect */
+.check-btn.checked-pr, .check-btn.checked-radiant {
+    background: linear-gradient(135deg, #00e676 0%, #00e5ff 50%, #69f0ae 100%);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 0 18px rgba(0, 230, 118, 0.85), 0 0 32px rgba(0, 229, 255, 0.5);
+    animation: radiantPulse 2.5s infinite ease-in-out;
+}
+
+.check-btn.checked-pr::before, .check-btn.checked-radiant::before {
+    content: '✦';
+    position: absolute;
+    top: -5px;
+    right: -4px;
+    font-size: 11px;
+    color: #b9f6ca;
+    text-shadow: 0 0 6px #69f0ae;
+    animation: sparkleFloat 1.8s infinite alternate ease-in-out;
+    pointer-events: none;
+}
+
+.check-btn.checked-pr::after, .check-btn.checked-radiant::after {
+    content: '✦';
+    position: absolute;
+    bottom: -4px;
+    left: -4px;
+    font-size: 9px;
+    color: #80d8ff;
+    text-shadow: 0 0 6px #00e5ff;
+    animation: sparkleFloat 2.2s infinite alternate-reverse ease-in-out;
+    pointer-events: none;
+}
+
+@keyframes radiantPulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 16px rgba(0, 230, 118, 0.8), 0 0 28px rgba(0, 229, 255, 0.4);
+    }
+    50% {
+        transform: scale(1.04);
+        box-shadow: 0 0 22px rgba(0, 230, 118, 0.95), 0 0 38px rgba(0, 229, 255, 0.7);
+    }
+}
+
+@keyframes sparkleFloat {
+    0% { transform: translateY(0) scale(0.8); opacity: 0.6; }
+    100% { transform: translateY(-3px) scale(1.2); opacity: 1; }
 }
 
 /* Sticky Footer */

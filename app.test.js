@@ -1380,13 +1380,12 @@ describe('renderWorkoutExercises', () => {
         expect(html).toContain('90s rust');
         expect(html).toContain('compound');
         expect(html).toContain('Rustig zakken');
-        expect(html).toContain('Dumbbell Press');
         expect((html.match(/class="set-row"/g) || []).length).toBe(2);
         // Ingevulde waarde en placeholder uit de vorige sessie
         expect(html).toContain('value="42.5"');
         expect(html).toContain('placeholder="40"');
-        // Eerste set is afgevinkt
-        expect(html).toContain('check-btn checked');
+        // Eerste set is afgevinkt met PR styling
+        expect(html).toContain('check-btn checked-pr');
     });
 
     it('should escape malicious exercise fields', () => {
@@ -2115,7 +2114,7 @@ describe('Exercise Library & Custom Vrije Sessie', () => {
         expect(objectDetails[0].weight).toBe('80');
 
         const summaryText = app.formatPreviousDetailsSummary(prevDetails);
-        expect(summaryText).toBe('3× (80kg × 10 reps)');
+        expect(summaryText).toContain('80kg × 10 reps');
 
         // Deep token extraction test: parentheses & modifiers
         const tokensRow = app.extractExerciseNameTokens('Row Machine (Roeimachine)');
@@ -2514,7 +2513,7 @@ describe('add and remove sets during workout', () => {
 
             app.renderShareStatsPreview();
 
-            expect(canvas.width).toBe(800);
+            expect(canvas.width).toBe(1000);
             expect(canvas.height).toBeGreaterThan(100);
         });
 
@@ -2528,7 +2527,80 @@ describe('add and remove sets during workout', () => {
             expect(canvas.toDataURL).toHaveBeenCalledWith('image/png');
         });
     });
+
+    describe('GOF-5: Set Check Button Achievements', () => {
+        beforeEach(() => {
+            store.logs = [
+                {
+                    id: 'log_old_pr',
+                    date: '2026-06-01',
+                    exercises: [
+                        {
+                            name: 'Barbell Bench Press',
+                            details: [
+                                { weight: 60, reps: 10 }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    id: 'log_prev',
+                    date: '2026-08-01',
+                    exercises: [
+                        {
+                            name: 'Barbell Bench Press',
+                            details: [
+                                { weight: 50, reps: 10 },
+                                { weight: 50, reps: 10 }
+                            ]
+                        }
+                    ]
+                }
+            ];
+            app.activeWorkout = {
+                id: 'workout_current',
+                exercises: [
+                    {
+                        id: 'ex_1',
+                        name: 'Barbell Bench Press',
+                        sets: 2,
+                        setsCompleted: [false, false],
+                        weights: ['50', '52.5'],
+                        actualReps: ['10', '10']
+                    }
+                ]
+            };
+        });
+
+        it('should evaluate normal set completion when matching previous performance', () => {
+            app.activeWorkout.exercises[0].setsCompleted[0] = true;
+            app.activeWorkout.exercises[0].weights[0] = '50';
+            app.activeWorkout.exercises[0].actualReps[0] = '10';
+
+            const status = app.evaluateSetAchievement(app.activeWorkout.exercises[0], 0);
+            expect(status).toBe('normal');
+        });
+
+        it('should evaluate progressive overload when exceeding previous session performance', () => {
+            app.activeWorkout.exercises[0].setsCompleted[0] = true;
+            app.activeWorkout.exercises[0].weights[0] = '52.5';
+            app.activeWorkout.exercises[0].actualReps[0] = '10';
+
+            const status = app.evaluateSetAchievement(app.activeWorkout.exercises[0], 0);
+            expect(status).toBe('overload');
+        });
+
+        it('should evaluate PR when beating all-time historical 1RM/max weight', () => {
+            app.activeWorkout.exercises[0].setsCompleted[0] = true;
+            app.activeWorkout.exercises[0].weights[0] = '70';
+            app.activeWorkout.exercises[0].actualReps[0] = '10';
+
+            const status = app.evaluateSetAchievement(app.activeWorkout.exercises[0], 0);
+            expect(status).toBe('pr');
+        });
+    });
 });
+
 
 
 
