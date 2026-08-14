@@ -48,6 +48,36 @@ const DEFAULT_EXERCISES = [
     { id: 'def_squat_clean', name: 'Barbell Squat Clean', muscleGroups: ['legs', 'glutes', 'shoulders', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' }
 ];
 
+function normalizeExerciseName(str) {
+    if (!str) return '';
+    let s = String(str).toLowerCase().trim();
+    s = s.replace(/dumbell/g, 'dumbbell').replace(/dumbel/g, 'dumbbell');
+    s = s.replace(/\bpush-?ups?\b/g, 'pushup')
+         .replace(/\bpull-?ups?\b/g, 'pullup')
+         .replace(/\bchin-?ups?\b/g, 'chinup');
+    s = s.replace(/\bdb\b/g, 'dumbbell').replace(/\bbb\b/g, 'barbell').replace(/\bkb\b/g, 'kettlebell').replace(/\bohp\b/g, 'overhead press').replace(/\brdl\b/g, 'romanian deadlift');
+    s = s.replace(/\([^)]*\)/g, ' ');
+    s = s.replace(/[^a-z0-9]/gi, ' ').replace(/\s+/g, ' ').trim();
+    s = s.split(' ').map(w => (w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w)).join(' ');
+    return s;
+}
+
+const CANONICAL_INDEX = new Map();
+DEFAULT_EXERCISES.forEach(ex => {
+    const key = normalizeExerciseName(ex.name);
+    if (key && !CANONICAL_INDEX.has(key)) {
+        CANONICAL_INDEX.set(key, { id: ex.id, name: ex.name });
+    }
+    if (Array.isArray(ex.alternatives)) {
+        ex.alternatives.forEach(alt => {
+            const altKey = normalizeExerciseName(alt);
+            if (altKey && !CANONICAL_INDEX.has(altKey)) {
+                CANONICAL_INDEX.set(altKey, { id: ex.id, name: ex.name });
+            }
+        });
+    }
+});
+
 class DataStore {
     constructor() {
         // Only load if localStorage is defined (useful for testing environments)
@@ -64,6 +94,44 @@ class DataStore {
             this.customExercises = [];
         }
     }
+    invalidateCache() {
+        this._cachedLibrary = null;
+        try {
+            if (typeof app !== 'undefined' && app) {
+                app._canonicalKeyCache = {};
+                app._canonicalNameCache = {};
+            }
+        } catch (e) {}
+    }
+    resolveCanonicalExercise(name) {
+        if (!name) return null;
+        const raw = String(name).trim();
+        if (!raw) return null;
+
+        const norm = normalizeExerciseName(raw);
+        if (CANONICAL_INDEX.has(norm)) {
+            return CANONICAL_INDEX.get(norm);
+        }
+
+        const stripEquipment = s => s.replace(/\b(dumbbell|barbell|cable|machine|seated|lying|standing|single arm)\b/g, '').replace(/\s+/g, ' ').trim();
+        const normCore = stripEquipment(norm);
+        if (normCore.length > 3) {
+            for (const [key, val] of CANONICAL_INDEX.entries()) {
+                if (stripEquipment(key) === normCore) {
+                    return val;
+                }
+            }
+        }
+
+        if (this.customExercises) {
+            const foundCustom = this.customExercises.find(c => c.name && normalizeExerciseName(c.name) === norm);
+            if (foundCustom) {
+                return { id: foundCustom.id, name: foundCustom.name };
+            }
+        }
+
+        return null;
+    }
     load() {
         this.plans = this.safeParse('plans', []);
         this.activePlanId = localStorage.getItem('activePlanId') || null;
@@ -75,6 +143,7 @@ class DataStore {
         // Tombstones: ids van verwijderde items, zodat cloud-sync ze niet terugbrengt
         this.deleted = this.safeParse('deleted', { plans: [], logs: [] });
         this.sanitizeLogPlanIds();
+        this.invalidateCache();
     }
     setHoldTimerDelaySeconds(val) {
         const parsed = parseInt(val, 10);
@@ -82,6 +151,25 @@ class DataStore {
         this.save();
     }
     sanitizeLogPlanIds() {
+        if (this.plans) {
+            this.plans.forEach(p => {
+                if (p.sessions) {
+                    p.sessions.forEach(s => {
+                        if (s.exercises) {
+                            s.exercises.forEach(e => {
+                                if (e.name && !e.canonicalId) {
+                                    const matched = this.resolveCanonicalExercise(e.name);
+                                    if (matched) {
+                                        e.canonicalId = matched.id;
+                                        if (!e.id || e.id.startsWith('ex_')) e.id = matched.id;
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+        }
         if (!this.plans || !this.logs) return;
         this.logs.forEach(log => {
             if (log.planId && !this.plans.some(p => p.id === log.planId)) {
@@ -120,6 +208,7 @@ class DataStore {
             localStorage.setItem('holdTimerDelaySeconds', String(this.holdTimerDelaySeconds || 3));
             localStorage.setItem('customExercises', JSON.stringify(this.customExercises || []));
             localStorage.setItem('deleted', JSON.stringify(this.deleted));
+            this.invalidateCache();
             return true;
         } catch (e) {
             console.error('Opslaan naar localStorage mislukt:', e);
@@ -160,20 +249,21 @@ class DataStore {
     }
     getExerciseLibrary() {
         const list = [...DEFAULT_EXERCISES];
+        const existingIds = new Set(list.map(ex => ex.id));
 
-        const normalizeKey = str => {
-            if (!str) return '';
-            let s = String(str).toLowerCase().trim();
-            s = s.replace(/dumbell/g, 'dumbbell').replace(/dumbel/g, 'dumbbell');
-            s = s.replace(/\bpush-?ups?\b/g, 'pushup').replace(/\bpull-?ups?\b/g, 'pullup').replace(/\bchin-?ups?\b/g, 'chinup');
-            s = s.replace(/\bdb\b/g, 'dumbbell').replace(/\bbb\b/g, 'barbell').replace(/\bkb\b/g, 'kettlebell').replace(/\bohp\b/g, 'overhead press').replace(/\brdl\b/g, 'romanian deadlift');
-            s = s.replace(/\([^)]*\)/g, ' ');
-            s = s.replace(/[^a-z0-9]/gi, ' ').replace(/\s+/g, ' ').trim();
-            s = s.split(' ').map(w => (w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w)).join(' ');
-            return s;
-        };
+        if (this.customExercises) {
+            this.customExercises.forEach(c => {
+                const cKey = normalizeExerciseName(c.name);
+                const idx = list.findIndex(item => normalizeExerciseName(item.name) === cKey);
+                if (idx !== -1) {
+                    list[idx] = { ...list[idx], ...c };
+                } else if (!existingIds.has(c.id)) {
+                    list.push(c);
+                    existingIds.add(c.id);
+                }
+            });
+        }
 
-        // Oefeningen uit geïmporteerde schema's toevoegen indien nog niet in de lijst
         if (this.plans) {
             this.plans.forEach(p => {
                 if (p.sessions) {
@@ -181,46 +271,24 @@ class DataStore {
                         if (s.exercises) {
                             s.exercises.forEach(e => {
                                 if (e.name) {
-                                    const eKey = normalizeKey(e.name);
-                                    const stripEquipment = str => str.replace(/\b(dumbbell|barbell|cable|machine|seated|lying|standing|single arm)\b/g, '').replace(/\s+/g, ' ').trim();
-                                    const eCore = stripEquipment(eKey);
-                                    const exists = list.some(item => {
-                                        if (e.id && item.id === e.id) return true;
-                                        if (e.canonicalId && item.id === e.canonicalId) return true;
-                                        if (normalizeKey(item.name) === eKey) return true;
-                                        if (Array.isArray(item.alternatives) && item.alternatives.some(alt => normalizeKey(alt) === eKey)) return true;
-                                        const itemCore = stripEquipment(normalizeKey(item.name));
-                                        if (itemCore.length > 3 && itemCore === eCore) return true;
-                                        return false;
-                                    });
-                                    if (!exists) {
+                                    const matched = this.resolveCanonicalExercise(e.name);
+                                    const exId = (matched && matched.id) || e.canonicalId || e.id || ('plan_ex_' + normalizeExerciseName(e.name));
+                                    if (exId && !existingIds.has(exId)) {
                                         list.push({
-                                            id: e.id || ('plan_ex_' + Math.random().toString(36).slice(2, 9)),
-                                            name: e.name,
+                                            id: exId,
+                                            name: (matched && matched.name) || e.name,
                                             muscleGroups: e.muscleGroups || [],
                                             exerciseType: e.exerciseType || (e.durationSeconds ? 'duration' : 'weight_reps'),
                                             trackMetrics: e.trackMetrics || (e.durationSeconds ? ['duration_seconds'] : ['weight', 'reps']),
                                             category: e.category || 'compound',
                                             fromPlan: true
                                         });
+                                        existingIds.add(exId);
                                     }
                                 }
                             });
                         }
                     });
-                }
-            });
-        }
-
-        // Custom oefeningen van de gebruiker toevoegen / overschrijven
-        if (this.customExercises) {
-            this.customExercises.forEach(c => {
-                const cKey = normalizeKey(c.name);
-                const idx = list.findIndex(item => normalizeKey(item.name) === cKey);
-                if (idx !== -1) {
-                    list[idx] = { ...list[idx], ...c };
-                } else {
-                    list.push(c);
                 }
             });
         }
@@ -1179,92 +1247,25 @@ const app = {
         let raw = String(name).trim();
         if (!raw) return '';
 
-        const lib = (typeof store !== 'undefined' && store.getExerciseLibrary)
-            ? store.getExerciseLibrary()
-            : ((typeof DEFAULT_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_EXERCISES)) ? DEFAULT_EXERCISES : []);
+        const matched = (typeof store !== 'undefined' && store.resolveCanonicalExercise)
+            ? store.resolveCanonicalExercise(raw)
+            : null;
+        if (matched && matched.id) return matched.id;
 
-        // If raw is an ID (e.g. plan_ex_... or custom_ex_...), resolve to its exercise name first
-        if (lib && lib.length > 0) {
-            const foundById = lib.find(ex => ex.id === raw);
-            if (foundById && foundById.name) {
-                raw = foundById.name.trim();
-            }
-        }
-
-        // String normalization helper
-        const normalizeStr = str => {
-            if (!str) return '';
-            let s = String(str).toLowerCase().trim();
-            // Typo fixes
-            s = s.replace(/dumbell/g, 'dumbbell').replace(/dumbel/g, 'dumbbell');
-            // Plural/singular & hyphen compound normalization before stripping punctuation
-            s = s.replace(/\bpush-?ups?\b/g, 'pushup')
-                 .replace(/\bpull-?ups?\b/g, 'pullup')
-                 .replace(/\bchin-?ups?\b/g, 'chinup');
-            // Normalize common equipment & abbreviations
-            s = s.replace(/\bdb\b/g, 'dumbbell').replace(/\bbb\b/g, 'barbell').replace(/\bkb\b/g, 'kettlebell').replace(/\bohp\b/g, 'overhead press').replace(/\brdl\b/g, 'romanian deadlift');
-            // Remove parenthetical notes e.g. "(ohp)", "(rdl)", "(roeimachine)"
-            s = s.replace(/\([^)]*\)/g, ' ');
-            // Remove punctuation & hyphens
-            s = s.replace(/[^a-z0-9]/gi, ' ').replace(/\s+/g, ' ').trim();
-            // Strip trailing plural 's' from words longer than 3 chars
-            s = s.split(' ').map(w => (w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w)).join(' ');
-            return s;
-        };
-
-        const clean = normalizeStr(raw);
-
-        if (lib && lib.length > 0) {
-            // Prioritize DEFAULT_EXERCISES and customExercises over generated plan exercises
-            const primaryLib = lib.filter(ex => !ex.fromPlan);
-            const searchLists = [primaryLib, lib];
-
-            for (const list of searchLists) {
-                if (!list || list.length === 0) continue;
-
-                // 1. Check exact match on exercise name
-                const exactMatch = list.find(ex => ex.name && ex.name.toLowerCase().trim() === raw.toLowerCase());
-                if (exactMatch) return exactMatch.id;
-
-                // 2. Check normalized name match against exercise name or alternatives
-                const normMatch = list.find(ex => {
-                    if (ex.name && normalizeStr(ex.name) === clean) return true;
-                    if (Array.isArray(ex.alternatives) && ex.alternatives.some(alt => normalizeStr(alt) === clean)) return true;
-                    return false;
-                });
-                if (normMatch) return normMatch.id;
-            }
-
-            // 3. Equipment-stripped matching (e.g., "bicep curl" matching "dumbbell bicep curl")
-            const stripEquipment = s => s.replace(/\b(dumbbell|barbell|cable|machine|seated|lying|standing|single arm)\b/g, '').replace(/\s+/g, ' ').trim();
-            const cleanCore = stripEquipment(clean);
-            if (cleanCore.length > 3) {
-                for (const list of searchLists) {
-                    const coreMatch = list.find(ex => {
-                        if (!ex.name) return false;
-                        const exCore = stripEquipment(normalizeStr(ex.name));
-                        return exCore === cleanCore;
-                    });
-                    if (coreMatch) return coreMatch.id;
-                }
-            }
-
-        }
-
-        return clean || raw.toLowerCase().trim();
+        return normalizeExerciseName(raw) || raw.toLowerCase().trim();
     },
 
     getCanonicalExerciseName(name) {
         if (!name) return '';
-        const key = this.getCanonicalExerciseKey(name);
-        const lib = (typeof store !== 'undefined' && store.getExerciseLibrary)
-            ? store.getExerciseLibrary()
-            : ((typeof DEFAULT_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_EXERCISES)) ? DEFAULT_EXERCISES : []);
-        if (lib && lib.length > 0) {
-            const found = lib.find(ex => ex.id === key);
-            if (found && found.name) return found.name;
-        }
-        return name;
+        let raw = String(name).trim();
+        if (!raw) return '';
+
+        const matched = (typeof store !== 'undefined' && store.resolveCanonicalExercise)
+            ? store.resolveCanonicalExercise(raw)
+            : null;
+        if (matched && matched.name) return matched.name;
+
+        return raw;
     },
 
     formatShortDate(dateStr) {
