@@ -5314,27 +5314,35 @@ const app = {
                         }
                     }
 
+                    const getCanonName = name => (name ? this.getCanonicalExerciseName(name) : '');
+
                     // Merge all unique exercise names (only if at least one user has valid data: maxKg > 0 or maxReps > 0)
                     const allExerciseNames = new Set();
                     myExercises.forEach(e => {
-                        if (e.maxKg > 0 || e.maxReps > 0 || e.estimated1RM > 0) allExerciseNames.add(e.exercise);
+                        if (e.maxKg > 0 || e.maxReps > 0 || e.estimated1RM > 0) {
+                            allExerciseNames.add(getCanonName(e.exercise));
+                        }
                     });
                     friendExercises.forEach(e => {
-                        if (e.maxKg > 0 || e.maxReps > 0 || e.estimated1RM > 0) allExerciseNames.add(e.exercise);
+                        if (e.maxKg > 0 || e.maxReps > 0 || e.estimated1RM > 0) {
+                            allExerciseNames.add(getCanonName(e.exercise));
+                        }
                     });
 
                     if (allExerciseNames.size === 0) return; // skip empty groups
 
+                    const findStat = (list, canonName) => list.find(e => getCanonName(e.exercise) === canonName);
+
                     // Sorteer oefeningen: eerst matchende oefeningen (data bij beiden), daarna niet-matchend
                     const sortedExerciseNames = Array.from(allExerciseNames).sort((a, b) => {
-                        const aMy = myExercises.find(e => e.exercise === a);
-                        const aFr = friendExercises.find(e => e.exercise === a);
+                        const aMy = findStat(myExercises, a);
+                        const aFr = findStat(friendExercises, a);
                         const aHasMy = aMy && (aMy.maxKg > 0 || aMy.maxReps > 0 || aMy.estimated1RM > 0);
                         const aHasFr = aFr && (aFr.maxKg > 0 || aFr.maxReps > 0 || aFr.estimated1RM > 0);
                         const aMatch = aHasMy && aHasFr;
 
-                        const bMy = myExercises.find(e => e.exercise === b);
-                        const bFr = friendExercises.find(e => e.exercise === b);
+                        const bMy = findStat(myExercises, b);
+                        const bFr = findStat(friendExercises, b);
                         const bHasMy = bMy && (bMy.maxKg > 0 || bMy.maxReps > 0 || bMy.estimated1RM > 0);
                         const bHasFr = bFr && (bFr.maxKg > 0 || bFr.maxReps > 0 || bFr.estimated1RM > 0);
                         const bMatch = bHasMy && bHasFr;
@@ -5354,8 +5362,8 @@ const app = {
                     `;
 
                     sortedExerciseNames.forEach(exName => {
-                        const myStat = myExercises.find(e => e.exercise === exName) || null;
-                        const fStat = friendExercises.find(e => e.exercise === exName) || null;
+                        const myStat = findStat(myExercises, exName) || null;
+                        const fStat = findStat(friendExercises, exName) || null;
                         const my1RM = myStat ? (myStat.estimated1RM || 0) : 0;
                         const f1RM = fStat ? (fStat.estimated1RM || 0) : 0;
                         const myReps = myStat ? (myStat.maxReps || 0) : 0;
