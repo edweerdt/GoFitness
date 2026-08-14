@@ -2544,6 +2544,36 @@ const app = {
         return null;
     },
 
+    getPreviousSetDetails(exerciseName, setIndex, exObj = null) {
+        if ((!exerciseName && !exObj) || typeof setIndex !== 'number' || setIndex < 0) return null;
+        const targetTokens = this.extractExerciseNameTokens(exerciseName, exObj);
+        if (targetTokens.size === 0) return null;
+
+        const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
+
+        for (let i = store.logs.length - 1; i >= 0; i--) {
+            const log = store.logs[i];
+            if (!log || !log.exercises) continue;
+            
+            const matchedEx = log.exercises.find(e => {
+                if (!e || !e.name) return false;
+                const logTokens = this.extractExerciseNameTokens(e.name, e);
+                for (const t of logTokens) {
+                    if (targetTokens.has(t)) return true;
+                }
+                return false;
+            });
+
+            if (matchedEx && matchedEx.details && matchedEx.details.length > setIndex) {
+                const d = matchedEx.details[setIndex];
+                if (d && (isNonEmpty(d.weight) || isNonEmpty(d.reps) || isNonEmpty(d.level))) {
+                    return d;
+                }
+            }
+        }
+        return null;
+    },
+
     formatPreviousDetailsSummary(prevDetails) {
         if (!prevDetails || !Array.isArray(prevDetails) || prevDetails.length === 0) return null;
         const parts = prevDetails.map(d => {
@@ -2963,9 +2993,9 @@ const app = {
                     else checked = 'checked';
                 }
                 
-                const prevSet = (prevDetails[i] && (prevDetails[i].weight || prevDetails[i].reps)) ? prevDetails[i] : (prevDetails[0] || {});
-                const weightPlaceholder = prevSet.weight || (prevDetails[0] ? prevDetails[0].weight : '') || 'kg';
-                const repsPlaceholder = prevSet.reps || (prevDetails[0] ? prevDetails[0].reps : '') || 'reps';
+                const prevSet = app.getPreviousSetDetails(ex.name, i, ex);
+                const weightPlaceholder = (prevSet && prevSet.weight) ? prevSet.weight : 'kg';
+                const repsPlaceholder = (prevSet && prevSet.reps) ? prevSet.reps : 'reps';
 
                 // TrackMetrics check for dynamic inputs
                 const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
@@ -3016,7 +3046,7 @@ const app = {
                      `;
                 }
                 if (wantsLevel) {
-                    const levelPlaceholder = prevSet.level || 'stand';
+                    const levelPlaceholder = (prevSet && prevSet.level) ? prevSet.level : 'stand';
                     inputsHtml += `<input type="text" class="weight-input" placeholder="${app.escapeHTML(String(levelPlaceholder))}" style="width: 65px;"
                         inputmode="text" enterkeyhint="next"
                         data-ex="${exIndex}" data-set="${i}" data-type="level"
@@ -3167,14 +3197,17 @@ const app = {
         if (!Array.isArray(ex.actualReps)) ex.actualReps = [];
         if (!Array.isArray(ex.levels)) ex.levels = [];
 
-        const lastWeight = ex.weights.length > 0 ? ex.weights[ex.weights.length - 1] : '';
-        const lastReps = ex.actualReps.length > 0 ? ex.actualReps[ex.actualReps.length - 1] : '';
-        const lastLevel = ex.levels.length > 0 ? ex.levels[ex.levels.length - 1] : '';
+        const newSetIndex = ex.setsCompleted.length;
+        const prevSetDetail = this.getPreviousSetDetails(ex.name, newSetIndex, ex);
+
+        const initialWeight = (prevSetDetail && prevSetDetail.weight !== undefined && prevSetDetail.weight !== null) ? String(prevSetDetail.weight) : '';
+        const initialReps = (prevSetDetail && prevSetDetail.reps !== undefined && prevSetDetail.reps !== null) ? String(prevSetDetail.reps) : '';
+        const initialLevel = (prevSetDetail && prevSetDetail.level !== undefined && prevSetDetail.level !== null) ? String(prevSetDetail.level) : '';
 
         ex.setsCompleted.push(false);
-        ex.weights.push(lastWeight);
-        ex.actualReps.push(lastReps);
-        ex.levels.push(lastLevel);
+        ex.weights.push(initialWeight);
+        ex.actualReps.push(initialReps);
+        ex.levels.push(initialLevel);
 
         store.saveActiveWorkoutState(this.activeWorkout);
         this.renderWorkoutExercises();
@@ -3206,7 +3239,7 @@ const app = {
 
         if (isTurningOn) {
             const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
-            const prevDetails = this.getPreviousExerciseDetails(ex.name, ex) || [];
+            const prevSetDetail = this.getPreviousSetDetails(ex.name, setIndex, ex);
 
             // Auto-fill missing weight if empty
             if (!ex.weights) ex.weights = Array(ex.sets).fill('');
@@ -3215,10 +3248,8 @@ const app = {
                 for (let k = setIndex - 1; k >= 0; k--) {
                     if (isNonEmpty(ex.weights[k])) { fillW = ex.weights[k]; break; }
                 }
-                if (!isNonEmpty(fillW) && prevDetails[setIndex] && isNonEmpty(prevDetails[setIndex].weight)) {
-                    fillW = prevDetails[setIndex].weight;
-                } else if (!isNonEmpty(fillW) && prevDetails[0] && isNonEmpty(prevDetails[0].weight)) {
-                    fillW = prevDetails[0].weight;
+                if (!isNonEmpty(fillW) && prevSetDetail && isNonEmpty(prevSetDetail.weight)) {
+                    fillW = prevSetDetail.weight;
                 }
                 if (isNonEmpty(fillW)) ex.weights[setIndex] = fillW;
             }
@@ -3230,10 +3261,8 @@ const app = {
                 for (let k = setIndex - 1; k >= 0; k--) {
                     if (isNonEmpty(ex.actualReps[k])) { fillR = ex.actualReps[k]; break; }
                 }
-                if (!isNonEmpty(fillR) && prevDetails[setIndex] && isNonEmpty(prevDetails[setIndex].reps)) {
-                    fillR = prevDetails[setIndex].reps;
-                } else if (!isNonEmpty(fillR) && prevDetails[0] && isNonEmpty(prevDetails[0].reps)) {
-                    fillR = prevDetails[0].reps;
+                if (!isNonEmpty(fillR) && prevSetDetail && isNonEmpty(prevSetDetail.reps)) {
+                    fillR = prevSetDetail.reps;
                 } else if (!isNonEmpty(fillR) && isNonEmpty(ex.repsMax)) {
                     fillR = ex.repsMax;
                 } else if (!isNonEmpty(fillR) && isNonEmpty(ex.reps)) {
@@ -3251,8 +3280,8 @@ const app = {
                 for (let k = setIndex - 1; k >= 0; k--) {
                     if (isNonEmpty(ex.levels[k])) { fillL = ex.levels[k]; break; }
                 }
-                if (!isNonEmpty(fillL) && prevDetails[setIndex] && isNonEmpty(prevDetails[setIndex].level)) {
-                    fillL = prevDetails[setIndex].level;
+                if (!isNonEmpty(fillL) && prevSetDetail && isNonEmpty(prevSetDetail.level)) {
+                    fillL = prevSetDetail.level;
                 }
                 if (isNonEmpty(fillL)) ex.levels[setIndex] = fillL;
             }

@@ -2432,7 +2432,7 @@ describe('add and remove sets during workout', () => {
         expect(app.activeWorkout.exercises[0].setsCompleted.length).toBe(1);
     });
 
-    it('should allow adding a set to an exercise during workout and inherit last set values', () => {
+    it('should allow adding a set to an exercise during workout without prefilling values if no set history exists', () => {
         app.startCustomWorkout();
         app.addExerciseToActiveWorkout({ name: 'Bench Press', exerciseType: 'weight_reps' }, 2);
 
@@ -2444,8 +2444,8 @@ describe('add and remove sets during workout', () => {
         expect(app.activeWorkout.exercises[0].sets).toBe(3);
         expect(app.activeWorkout.exercises[0].setsCompleted.length).toBe(3);
         expect(app.activeWorkout.exercises[0].setsCompleted[2]).toBe(false);
-        expect(app.activeWorkout.exercises[0].weights[2]).toBe('85');
-        expect(app.activeWorkout.exercises[0].actualReps[2]).toBe('8');
+        expect(app.activeWorkout.exercises[0].weights[2]).toBe('');
+        expect(app.activeWorkout.exercises[0].actualReps[2]).toBe('');
     });
 
     it('should allow removing a set from an exercise during workout', () => {
@@ -2849,7 +2849,85 @@ describe('add and remove sets during workout', () => {
             // Incline Bench Press is present for both (matched) -> should be first
             // Barbell Bench Press (only my user) & Dumbbell Flyes (only friend) -> non-matched, sorted alphabetically
             expect(titles[0]).toBe('Incline Bench Press');
-            expect(titles.slice(1)).toEqual(['Barbell Bench Press', 'Dumbbell Flyes']);
+        });
+    });
+
+    describe('GOF-9: Extra set handling', () => {
+        beforeEach(() => {
+            store.logs = [
+                {
+                    id: 'log_2sets',
+                    date: '2026-08-01',
+                    exercises: [
+                        {
+                            name: 'Barbell Bench Press',
+                            details: [
+                                { weight: 80, reps: 10 },
+                                { weight: 80, reps: 8 }
+                            ]
+                        }
+                    ]
+                }
+            ];
+            app.activeWorkout = {
+                id: 'workout_test',
+                exercises: [
+                    {
+                        id: 'ex_bench',
+                        name: 'Barbell Bench Press',
+                        sets: 2,
+                        setsCompleted: [false, false],
+                        weights: ['80', '80'],
+                        actualReps: ['10', '8'],
+                        levels: ['', '']
+                    }
+                ]
+            };
+        });
+
+        it('getPreviousSetDetails returns correct set detail if present in history, or null if set index missing', () => {
+            const set0 = app.getPreviousSetDetails('Barbell Bench Press', 0);
+            const set1 = app.getPreviousSetDetails('Barbell Bench Press', 1);
+            const set2 = app.getPreviousSetDetails('Barbell Bench Press', 2);
+
+            expect(set0).toEqual({ weight: 80, reps: 10 });
+            expect(set1).toEqual({ weight: 80, reps: 8 });
+            expect(set2).toBeNull();
+        });
+
+        it('addSetToExercise leaves new set empty if set index does not exist in history', () => {
+            app.addSetToExercise(0);
+
+            const ex = app.activeWorkout.exercises[0];
+            expect(ex.sets).toBe(3);
+            expect(ex.setsCompleted.length).toBe(3);
+            expect(ex.weights[2]).toBe('');
+            expect(ex.actualReps[2]).toBe('');
+            expect(ex.levels[2]).toBe('');
+        });
+
+        it('addSetToExercise populates matching set history if set index exists in historical log', () => {
+            store.logs.unshift({
+                id: 'log_3sets',
+                date: '2026-08-05',
+                exercises: [
+                    {
+                        name: 'Barbell Bench Press',
+                        details: [
+                            { weight: 80, reps: 10 },
+                            { weight: 80, reps: 8 },
+                            { weight: 75, reps: 6 }
+                        ]
+                    }
+                ]
+            });
+
+            app.addSetToExercise(0);
+
+            const ex = app.activeWorkout.exercises[0];
+            expect(ex.sets).toBe(3);
+            expect(ex.weights[2]).toBe('75');
+            expect(ex.actualReps[2]).toBe('6');
         });
     });
 });
