@@ -2839,7 +2839,8 @@ describe('add and remove sets during workout', () => {
         it('should sort matched exercises first followed by unmatched exercises within each muscle group', () => {
             app.renderFriends();
             const container = document.getElementById('friends-container');
-            const exerciseCards = container.querySelectorAll('.exercise-compare-card');
+            const chestSection = container.querySelector('.muscle-group-section');
+            const exerciseCards = chestSection.querySelectorAll('.exercise-compare-card');
             
             expect(exerciseCards.length).toBe(3);
             const titles = Array.from(exerciseCards).map(card => {
