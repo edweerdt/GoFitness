@@ -2930,6 +2930,77 @@ describe('add and remove sets during workout', () => {
             expect(ex.actualReps[2]).toBe('6');
         });
     });
+
+    describe('GOF-8: Exercise library cleanup and schema exercise matching', () => {
+        it('should resolve canonical keys for plurals, hyphens, and compound words', () => {
+            expect(app.getCanonicalExerciseKey('Dumbbell Bicep Curls')).toBe('def_bicep_curl');
+            expect(app.getCanonicalExerciseKey('Pushups')).toBe('def_pushup');
+            expect(app.getCanonicalExerciseKey('Push-ups')).toBe('def_pushup');
+            expect(app.getCanonicalExerciseKey('Push up')).toBe('def_pushup');
+            expect(app.getCanonicalExerciseKey('Pull-ups')).toBe('def_pullup');
+            expect(app.getCanonicalExerciseKey('Chest Dips')).toBe('def_dip');
+        });
+
+        it('should deduplicate schema exercises in getExerciseLibrary when schema contains variations', () => {
+            store.plans = [
+                {
+                    id: 'plan_test_gof8',
+                    name: 'GOF-8 Test Plan',
+                    sessions: [
+                        {
+                            id: 's_gof8',
+                            name: 'Session 1',
+                            exercises: [
+                                { name: 'Dumbbell Bicep Curls' },
+                                { name: 'Push-ups' },
+                                { name: 'Unieke Custom Oefening Zonder Library Match' }
+                            ]
+                        }
+                    ]
+                }
+            ];
+
+            const lib = store.getExerciseLibrary();
+            // Dumbbell Bicep Curls and Push-ups should match def_bicep_curl and def_pushup, so no new fromPlan items for them
+            const fromPlanItems = lib.filter(ex => ex.fromPlan);
+            expect(fromPlanItems.length).toBe(1);
+            expect(fromPlanItems[0].name).toBe('Unieke Custom Oefening Zonder Library Match');
+        });
+
+        it('should aggregate exercise maxes by canonical exercise name in calculateExerciseMaxesByMuscleGroup', () => {
+            store.logs = [
+                {
+                    id: 'l1',
+                    date: '2026-08-01',
+                    exercises: [
+                        {
+                            name: 'Dumbell Bicep Curl',
+                            muscleGroups: ['biceps'],
+                            details: [{ weight: 12, reps: 10 }]
+                        }
+                    ]
+                },
+                {
+                    id: 'l2',
+                    date: '2026-08-05',
+                    exercises: [
+                        {
+                            name: 'Dumbbell Bicep Curls',
+                            muscleGroups: ['biceps'],
+                            details: [{ weight: 14, reps: 10 }]
+                        }
+                    ]
+                }
+            ];
+
+            const maxes = app.calculateExerciseMaxesByMuscleGroup();
+            expect(maxes.biceps).toBeDefined();
+            // Both variations should be aggregated under the canonical name "Dumbbell Bicep Curl"
+            const bicepEntry = maxes.biceps.find(e => app.getCanonicalExerciseKey(e.exercise) === 'def_bicep_curl');
+            expect(bicepEntry).toBeDefined();
+            expect(bicepEntry.maxKg).toBe(14);
+        });
+    });
 });
 
 

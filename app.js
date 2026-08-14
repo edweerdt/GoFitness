@@ -5,8 +5,8 @@ const DEFAULT_EXERCISES = [
     { id: 'def_incline_bench_press', name: 'Incline Bench Press', muscleGroups: ['chest', 'shoulders', 'triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_incline_db_press', name: 'Incline Dumbbell Press', muscleGroups: ['chest', 'shoulders', 'triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_chest_fly', name: 'Dumbbell Chest Fly', muscleGroups: ['chest'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
-    { id: 'def_pushup', name: 'Push-Up', muscleGroups: ['chest', 'triceps', 'core'], exerciseType: 'bodyweight_reps', trackMetrics: ['reps'], category: 'bodyweight' },
-    { id: 'def_dip', name: 'Chest / Tricep Dips', muscleGroups: ['chest', 'triceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight' },
+    { id: 'def_pushup', name: 'Push-Up', muscleGroups: ['chest', 'triceps', 'core'], exerciseType: 'bodyweight_reps', trackMetrics: ['reps'], category: 'bodyweight', alternatives: ['Pushup', 'Push-ups', 'Pushups', 'Push up', 'Push ups'] },
+    { id: 'def_dip', name: 'Chest / Tricep Dips', muscleGroups: ['chest', 'triceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight', alternatives: ['Chest Dips', 'Tricep Dips', 'Dip', 'Dips', 'Chest Dip', 'Tricep Dip'] },
     { id: 'def_overhead_press', name: 'Overhead Press (OHP)', muscleGroups: ['shoulders', 'triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_lateral_raise', name: 'Dumbbell Lateral Raise', muscleGroups: ['shoulders'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_barbell_squat', name: 'Barbell Back Squat', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
@@ -20,7 +20,7 @@ const DEFAULT_EXERCISES = [
     { id: 'def_deadlift', name: 'Conventional Deadlift', muscleGroups: ['back', 'legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Romanian Deadlift (RDL)', 'Sumo Deadlift'] },
     { id: 'def_barbell_row', name: 'Barbell Bent Over Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_lat_pulldown', name: 'Lat Pulldown', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
-    { id: 'def_pullup', name: 'Pull-Up / Chin-Up', muscleGroups: ['back', 'biceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight' },
+    { id: 'def_pullup', name: 'Pull-Up / Chin-Up', muscleGroups: ['back', 'biceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight', alternatives: ['Pull-Up', 'Chin-Up', 'Pullup', 'Chinup', 'Pull-ups', 'Pullups', 'Chinups'] },
     { id: 'def_bicep_curl', name: 'Dumbbell Bicep Curl', muscleGroups: ['biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_tricep_pushdown', name: 'Tricep Cable Pushdown', muscleGroups: ['triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_plank', name: 'Plank Hold', muscleGroups: ['core'], exerciseType: 'duration', trackMetrics: ['duration_seconds'], category: 'isometric' },
@@ -161,7 +161,17 @@ class DataStore {
     getExerciseLibrary() {
         const list = [...DEFAULT_EXERCISES];
 
-        const normalizeKey = str => String(str || '').toLowerCase().replace(/\([^)]*\)/g, '').replace(/[^a-z0-9]/gi, ' ').replace(/\s+/g, ' ').trim();
+        const normalizeKey = str => {
+            if (!str) return '';
+            let s = String(str).toLowerCase().trim();
+            s = s.replace(/dumbell/g, 'dumbbell').replace(/dumbel/g, 'dumbbell');
+            s = s.replace(/\bpush-?ups?\b/g, 'pushup').replace(/\bpull-?ups?\b/g, 'pullup').replace(/\bchin-?ups?\b/g, 'chinup');
+            s = s.replace(/\bdb\b/g, 'dumbbell').replace(/\bbb\b/g, 'barbell').replace(/\bkb\b/g, 'kettlebell').replace(/\bohp\b/g, 'overhead press').replace(/\brdl\b/g, 'romanian deadlift');
+            s = s.replace(/\([^)]*\)/g, ' ');
+            s = s.replace(/[^a-z0-9]/gi, ' ').replace(/\s+/g, ' ').trim();
+            s = s.split(' ').map(w => (w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w)).join(' ');
+            return s;
+        };
 
         // Oefeningen uit geïmporteerde schema's toevoegen indien nog niet in de lijst
         if (this.plans) {
@@ -172,7 +182,17 @@ class DataStore {
                             s.exercises.forEach(e => {
                                 if (e.name) {
                                     const eKey = normalizeKey(e.name);
-                                    const exists = list.some(item => normalizeKey(item.name) === eKey);
+                                    const stripEquipment = str => str.replace(/\b(dumbbell|barbell|cable|machine|seated|lying|standing|single arm)\b/g, '').replace(/\s+/g, ' ').trim();
+                                    const eCore = stripEquipment(eKey);
+                                    const exists = list.some(item => {
+                                        if (e.id && item.id === e.id) return true;
+                                        if (e.canonicalId && item.id === e.canonicalId) return true;
+                                        if (normalizeKey(item.name) === eKey) return true;
+                                        if (Array.isArray(item.alternatives) && item.alternatives.some(alt => normalizeKey(alt) === eKey)) return true;
+                                        const itemCore = stripEquipment(normalizeKey(item.name));
+                                        if (itemCore.length > 3 && itemCore === eCore) return true;
+                                        return false;
+                                    });
                                     if (!exists) {
                                         list.push({
                                             id: e.id || ('plan_ex_' + Math.random().toString(36).slice(2, 9)),
@@ -326,8 +346,15 @@ class DataStore {
             if (!Array.isArray(s.exercises)) s.exercises = [];
 
             s.exercises.forEach(e => {
+                if (e.name && typeof app !== 'undefined' && app && app.getCanonicalExerciseKey) {
+                    const canonicalKey = app.getCanonicalExerciseKey(e.name);
+                    if (canonicalKey && canonicalKey.startsWith('def_')) {
+                        e.canonicalId = canonicalKey;
+                        if (!e.id && !e.exerciseId) e.id = canonicalKey;
+                    }
+                }
                 if (!e.id && !e.exerciseId) e.id = 'ex_' + Math.random().toString(36).slice(2, 11);
-                else if (e.exerciseId) e.id = e.exerciseId;
+                else if (e.exerciseId && !e.id) e.id = e.exerciseId;
             });
         });
 
@@ -1170,6 +1197,10 @@ const app = {
             let s = String(str).toLowerCase().trim();
             // Typo fixes
             s = s.replace(/dumbell/g, 'dumbbell').replace(/dumbel/g, 'dumbbell');
+            // Plural/singular & hyphen compound normalization before stripping punctuation
+            s = s.replace(/\bpush-?ups?\b/g, 'pushup')
+                 .replace(/\bpull-?ups?\b/g, 'pullup')
+                 .replace(/\bchin-?ups?\b/g, 'chinup');
             // Normalize common equipment & abbreviations
             s = s.replace(/\bdb\b/g, 'dumbbell').replace(/\bbb\b/g, 'barbell').replace(/\bkb\b/g, 'kettlebell').replace(/\bohp\b/g, 'overhead press').replace(/\brdl\b/g, 'romanian deadlift');
             // Remove parenthetical notes e.g. "(ohp)", "(rdl)", "(roeimachine)"
@@ -5043,9 +5074,10 @@ const app = {
                         const mg = this.normalizeMuscleGroup ? this.normalizeMuscleGroup(rawMg) : String(rawMg).toLowerCase().trim();
                         if (!groups[mg]) groups[mg] = {};
 
-                        const key = displayName;
+                        const canonicalName = this.getCanonicalExerciseName ? this.getCanonicalExerciseName(displayName) : displayName;
+                        const key = canonicalName || displayName;
                         if (!groups[mg][key]) {
-                            groups[mg][key] = { exercise: displayName, maxKg: 0, maxReps: 0, estimated1RM: 0 };
+                            groups[mg][key] = { exercise: key, maxKg: 0, maxReps: 0, estimated1RM: 0 };
                         }
 
                         ex.details.forEach(d => {
