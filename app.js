@@ -5046,10 +5046,13 @@ const app = {
             log.exercises.forEach(ex => {
                 if (!ex.details || ex.details.length === 0) return;
                 
-                let mGroups = ex.muscleGroups || [];
-                if (mGroups.length === 0 && this.guessMuscleGroupsFromName) {
-                    mGroups = this.guessMuscleGroupsFromName(ex.name);
-                }
+                const canonKey = this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(ex.name) : null;
+                const libEx = (canonKey && store && store.getExerciseLibrary) ? store.getExerciseLibrary().find(item => item.id === canonKey) : null;
+                let mGroups = (ex.muscleGroups && Array.isArray(ex.muscleGroups) && ex.muscleGroups.length > 0)
+                    ? ex.muscleGroups
+                    : ((libEx && Array.isArray(libEx.muscleGroups) && libEx.muscleGroups.length > 0)
+                        ? libEx.muscleGroups
+                        : (this.guessMuscleGroupsFromName ? this.guessMuscleGroupsFromName(ex.name) : []));
 
                 // Split old "X of Y" names into individual exercise names
                 const exNames = String(ex.name || '').split(/\s+of\s+/i).map(s => s.trim()).filter(Boolean);
