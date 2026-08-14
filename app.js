@@ -64,6 +64,15 @@ class DataStore {
             this.customExercises = [];
         }
     }
+    invalidateCache() {
+        this._cachedLibrary = null;
+        try {
+            if (typeof app !== 'undefined' && app) {
+                app._canonicalKeyCache = {};
+                app._canonicalNameCache = {};
+            }
+        } catch (e) {}
+    }
     load() {
         this.plans = this.safeParse('plans', []);
         this.activePlanId = localStorage.getItem('activePlanId') || null;
@@ -75,6 +84,7 @@ class DataStore {
         // Tombstones: ids van verwijderde items, zodat cloud-sync ze niet terugbrengt
         this.deleted = this.safeParse('deleted', { plans: [], logs: [] });
         this.sanitizeLogPlanIds();
+        this.invalidateCache();
     }
     setHoldTimerDelaySeconds(val) {
         const parsed = parseInt(val, 10);
@@ -120,6 +130,7 @@ class DataStore {
             localStorage.setItem('holdTimerDelaySeconds', String(this.holdTimerDelaySeconds || 3));
             localStorage.setItem('customExercises', JSON.stringify(this.customExercises || []));
             localStorage.setItem('deleted', JSON.stringify(this.deleted));
+            this.invalidateCache();
             return true;
         } catch (e) {
             console.error('Opslaan naar localStorage mislukt:', e);
@@ -159,6 +170,11 @@ class DataStore {
         return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     }
     getExerciseLibrary() {
+        const cacheKey = (this.plans ? JSON.stringify(this.plans.map(p => ({ id: p.id, sCount: (p.sessions || []).length }))) : '') + '_' + (this.customExercises ? this.customExercises.length : 0);
+        if (this._cachedLibrary && this._cacheKey === cacheKey) {
+            return this._cachedLibrary;
+        }
+
         const list = [...DEFAULT_EXERCISES];
 
         const normalizeKey = str => {
@@ -173,6 +189,8 @@ class DataStore {
             return s;
         };
 
+        const stripEquipment = str => str.replace(/\b(dumbbell|barbell|cable|machine|seated|lying|standing|single arm)\b/g, '').replace(/\s+/g, ' ').trim();
+
         // Oefeningen uit geïmporteerde schema's toevoegen indien nog niet in de lijst
         if (this.plans) {
             this.plans.forEach(p => {
@@ -182,7 +200,6 @@ class DataStore {
                             s.exercises.forEach(e => {
                                 if (e.name) {
                                     const eKey = normalizeKey(e.name);
-                                    const stripEquipment = str => str.replace(/\b(dumbbell|barbell|cable|machine|seated|lying|standing|single arm)\b/g, '').replace(/\s+/g, ' ').trim();
                                     const eCore = stripEquipment(eKey);
                                     const exists = list.some(item => {
                                         if (e.id && item.id === e.id) return true;
@@ -225,7 +242,8 @@ class DataStore {
             });
         }
 
-        return list;
+        this._cachedLibrary = list;
+        return this._cachedLibrary;
     }
     addCustomExercise(exData) {
         if (!exData.name || !exData.name.trim()) throw new Error("Oefeningnaam is verplicht.");
@@ -1179,9 +1197,18 @@ const app = {
         let raw = String(name).trim();
         if (!raw) return '';
 
+        const storeCacheKey = (typeof store !== 'undefined' && store._cacheKey) ? store._cacheKey : '';
+        if (!this._canonicalKeyCache || this._canonicalCacheKey !== storeCacheKey) {
+            this._canonicalKeyCache = {};
+            this._canonicalCacheKey = storeCacheKey;
+        }
+        if (this._canonicalKeyCache[raw]) return this._canonicalKeyCache[raw];
+
         const lib = (typeof store !== 'undefined' && store.getExerciseLibrary)
             ? store.getExerciseLibrary()
             : ((typeof DEFAULT_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_EXERCISES)) ? DEFAULT_EXERCISES : []);
+
+        let resultKey = raw.toLowerCase().trim();
 
         // If raw is an ID (e.g. plan_ex_... or custom_ex_...), resolve to its exercise name first
         if (lib && lib.length > 0) {
@@ -1213,6 +1240,7 @@ const app = {
         };
 
         const clean = normalizeStr(raw);
+        resultKey = clean || raw.toLowerCase().trim();
 
         if (lib && lib.length > 0) {
             // Prioritize DEFAULT_EXERCISES and customExercises over generated plan exercises
@@ -1224,7 +1252,7 @@ const app = {
 
                 // 1. Check exact match on exercise name
                 const exactMatch = list.find(ex => ex.name && ex.name.toLowerCase().trim() === raw.toLowerCase());
-                if (exactMatch) return exactMatch.id;
+                if (exactMatch) { resultKey = exactMatch.id; break; }
 
                 // 2. Check normalized name match against exercise name or alternatives
                 const normMatch = list.find(ex => {
@@ -1232,39 +1260,54 @@ const app = {
                     if (Array.isArray(ex.alternatives) && ex.alternatives.some(alt => normalizeStr(alt) === clean)) return true;
                     return false;
                 });
-                if (normMatch) return normMatch.id;
+                if (normMatch) { resultKey = normMatch.id; break; }
             }
 
-            // 3. Equipment-stripped matching (e.g., "bicep curl" matching "dumbbell bicep curl")
-            const stripEquipment = s => s.replace(/\b(dumbbell|barbell|cable|machine|seated|lying|standing|single arm)\b/g, '').replace(/\s+/g, ' ').trim();
-            const cleanCore = stripEquipment(clean);
-            if (cleanCore.length > 3) {
-                for (const list of searchLists) {
-                    const coreMatch = list.find(ex => {
-                        if (!ex.name) return false;
-                        const exCore = stripEquipment(normalizeStr(ex.name));
-                        return exCore === cleanCore;
-                    });
-                    if (coreMatch) return coreMatch.id;
+            if (resultKey === (clean || raw.toLowerCase().trim())) {
+                // 3. Equipment-stripped matching (e.g., "bicep curl" matching "dumbbell bicep curl")
+                const stripEquipment = s => s.replace(/\b(dumbbell|barbell|cable|machine|seated|lying|standing|single arm)\b/g, '').replace(/\s+/g, ' ').trim();
+                const cleanCore = stripEquipment(clean);
+                if (cleanCore.length > 3) {
+                    for (const list of searchLists) {
+                        const coreMatch = list.find(ex => {
+                            if (!ex.name) return false;
+                            const exCore = stripEquipment(normalizeStr(ex.name));
+                            return exCore === cleanCore;
+                        });
+                        if (coreMatch) { resultKey = coreMatch.id; break; }
+                    }
                 }
             }
-
         }
 
-        return clean || raw.toLowerCase().trim();
+        this._canonicalKeyCache[raw] = resultKey;
+        return resultKey;
     },
 
     getCanonicalExerciseName(name) {
         if (!name) return '';
-        const key = this.getCanonicalExerciseKey(name);
+        const raw = String(name).trim();
+        if (!raw) return '';
+
+        const storeCacheKey = (typeof store !== 'undefined' && store._cacheKey) ? store._cacheKey : '';
+        if (!this._canonicalNameCache || this._canonicalNameCacheKey !== storeCacheKey) {
+            this._canonicalNameCache = {};
+            this._canonicalNameCacheKey = storeCacheKey;
+        }
+        if (this._canonicalNameCache[raw]) return this._canonicalNameCache[raw];
+
+        const key = this.getCanonicalExerciseKey(raw);
         const lib = (typeof store !== 'undefined' && store.getExerciseLibrary)
             ? store.getExerciseLibrary()
             : ((typeof DEFAULT_EXERCISES !== 'undefined' && Array.isArray(DEFAULT_EXERCISES)) ? DEFAULT_EXERCISES : []);
+        let resultName = name;
         if (lib && lib.length > 0) {
             const found = lib.find(ex => ex.id === key);
-            if (found && found.name) return found.name;
+            if (found && found.name) resultName = found.name;
         }
-        return name;
+
+        this._canonicalNameCache[raw] = resultName;
+        return resultName;
     },
 
     formatShortDate(dateStr) {
