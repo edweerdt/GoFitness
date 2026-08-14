@@ -1249,22 +1249,6 @@ const app = {
                 }
             }
 
-            // 4. Token-based fallback check using extractExerciseNameTokens
-            if (this.extractExerciseNameTokens) {
-                const targetTokens = this.extractExerciseNameTokens(raw);
-                if (targetTokens && targetTokens.size > 0) {
-                    for (const list of searchLists) {
-                        const tokenMatch = list.find(ex => {
-                            const libTokens = this.extractExerciseNameTokens(ex.name, ex);
-                            for (const t of libTokens) {
-                                if (targetTokens.has(t)) return true;
-                            }
-                            return false;
-                        });
-                        if (tokenMatch) return tokenMatch.id;
-                    }
-                }
-            }
         }
 
         return clean || raw.toLowerCase().trim();
