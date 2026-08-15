@@ -2626,6 +2626,7 @@ const app = {
         const safeName = this.escapeHTML(exerciseName);
         if (titleEl) titleEl.textContent = `Geschiedenis: ${exerciseName}`;
 
+        const targetCanonical = this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(exerciseName) : null;
         const targetTokens = this.extractExerciseNameTokens(exerciseName);
         const entries = [];
 
@@ -2635,6 +2636,9 @@ const app = {
 
             const matchedEx = log.exercises.find(e => {
                 if (!e || !e.name) return false;
+                if (targetCanonical && this.getCanonicalExerciseKey && (e.canonicalId === targetCanonical || this.getCanonicalExerciseKey(e.name) === targetCanonical)) {
+                    return true;
+                }
                 const logTokens = this.extractExerciseNameTokens(e.name, e);
                 for (const t of logTokens) {
                     if (targetTokens.has(t)) return true;
@@ -2666,12 +2670,10 @@ const app = {
                     const parts = [];
                     if (d.weight && String(d.weight).trim() !== '') parts.push(`${app.escapeHTML(String(d.weight))} kg`);
                     if (d.reps && String(d.reps).trim() !== '') parts.push(`${app.escapeHTML(String(d.reps))} reps`);
+                    if (d.durationSeconds && String(d.durationSeconds).trim() !== '') parts.push(`${app.escapeHTML(String(d.durationSeconds))} sec`);
                     if (d.level && String(d.level).trim() !== '') parts.push(`stand ${app.escapeHTML(String(d.level))}`);
-                    return `<div class="text-sm" style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
-                        <span class="text-muted">Set ${d.setNumber || (idx + 1)}:</span>
-                        <span style="font-weight:500;">${parts.join(' × ')}</span>
-                    </div>`;
-                }).join('');
+                    return `Set ${d.setNumber || (idx + 1)}: ${parts.join(' × ')}`;
+                }).join(' • ');
 
                 html += `
                     <div class="glass-panel" style="padding:12px; margin-bottom:8px; background:rgba(255,255,255,0.03); border-radius:10px;">
@@ -2799,6 +2801,7 @@ const app = {
         let maxHistoricalReps = 0;
         let hasPreviousLogs = false;
 
+        const targetCanonical = this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(ex.name) : null;
         const targetTokens = this.extractExerciseNameTokens(ex.name, ex);
 
         if (typeof store !== 'undefined' && Array.isArray(store.logs)) {
@@ -2806,10 +2809,14 @@ const app = {
                 if (!log || !log.exercises) continue;
                 for (const e of log.exercises) {
                     if (!e || !e.name) continue;
-                    const logTokens = this.extractExerciseNameTokens(e.name, e);
                     let matches = false;
-                    for (const t of logTokens) {
-                        if (targetTokens.has(t)) { matches = true; break; }
+                    if (targetCanonical && this.getCanonicalExerciseKey && (e.canonicalId === targetCanonical || this.getCanonicalExerciseKey(e.name) === targetCanonical)) {
+                        matches = true;
+                    } else {
+                        const logTokens = this.extractExerciseNameTokens(e.name, e);
+                        for (const t of logTokens) {
+                            if (targetTokens.has(t)) { matches = true; break; }
+                        }
                     }
                     if (matches && Array.isArray(e.details)) {
                         for (const d of e.details) {
