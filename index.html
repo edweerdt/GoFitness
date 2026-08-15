@@ -483,19 +483,19 @@
                     </label>
                 </div>
                 
-                <div id="share-preview-container" class="glass-panel" style="background: rgba(0,0,0,0.3); border-radius:12px; padding:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:180px; max-height:50vh; overflow-y:auto; margin-bottom:16px;">
+                <div id="share-preview-container" class="glass-panel" style="background: rgba(0,0,0,0.3); border-radius:12px; padding:12px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; min-height:180px; max-height:50vh; overflow-y:auto; margin-bottom:16px;">
                     <canvas id="share-stats-canvas" style="display:none; max-width:100%; height:auto; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.4);"></canvas>
                     <img id="share-stats-img-preview" style="max-width:100%; height:auto; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.4);" alt="Preview">
-                    <div id="share-stats-empty-msg" class="text-sm text-muted hidden" style="text-align:center; padding:24px;">Selecteer minimaal 1 onderdeel om te delen.</div>
+                    <div id="share-stats-empty-msg" class="text-sm text-muted hidden" style="text-align:center; padding:24px; margin:auto;">Selecteer minimaal 1 onderdeel om te delen.</div>
                 </div>
 
                 <div class="modal-actions">
                     <button class="btn-secondary flex-1" onclick="app.hideShareStatsModal()">Annuleren</button>
                     <button class="btn-secondary flex-1" onclick="app.downloadStatsImage()" id="btn-download-share-img">
-                        <span class="material-icons-round" style="font-size:18px; vertical-align:middle; margin-right:4px;">download</span>Download
+                        <span class="material-icons-round">download</span>Download
                     </button>
                     <button class="btn-primary flex-1" onclick="app.shareStatsImage()" id="btn-action-share-img">
-                        <span class="material-icons-round" style="font-size:18px; vertical-align:middle; margin-right:4px;">share</span>Delen
+                        <span class="material-icons-round">share</span>Delen
                     </button>
                 </div>
             </div>

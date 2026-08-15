@@ -4659,32 +4659,39 @@ const app = {
             muscleKeys = Object.keys(muscleStatsData).sort((a, b) => muscleStatsData[b].sessions - muscleStatsData[a].sessions);
         }
 
-        // Calculate total canvas height
-        let totalH = 76; // Header area
+        // Calculate total canvas height metrics
+        const startY = 32;
+        const labelHeight = 26;
+        const sectionGap = 28;
+        const bottomPadding = 32;
+
+        let totalH = startY;
 
         if (incStats && statsData) {
-            totalH += 26; // Section label
-            totalH += (2 * 104) + 16; // 2 rows of 2 cards
-            totalH += 28; // gap
+            totalH += labelHeight + (2 * 104) + 16 + sectionGap; // 2 rows of 2 cards + label + gap
         }
 
         if (incProgress) {
-            totalH += 26;
-            const pCount = seriesData.length || 1;
-            const pRows = Math.ceil(pCount / 2);
-            totalH += (pRows * 190) + ((pRows - 1) * 16);
-            totalH += 28;
+            totalH += labelHeight;
+            if (seriesData.length === 0) {
+                totalH += 70 + sectionGap;
+            } else {
+                const pRows = Math.ceil(seriesData.length / 2);
+                totalH += (pRows * 190) + ((pRows - 1) * 16) + sectionGap;
+            }
         }
 
         if (incMuscles) {
-            totalH += 26;
-            const mCount = muscleKeys.length || 1;
-            const mRows = Math.ceil(mCount / 4);
-            totalH += (mRows * 210) + ((mRows - 1) * 16);
-            totalH += 28;
+            totalH += labelHeight;
+            if (muscleKeys.length === 0) {
+                totalH += 70 + sectionGap;
+            } else {
+                const mRows = Math.ceil(muscleKeys.length / 4);
+                totalH += (mRows * 210) + ((mRows - 1) * 16) + sectionGap;
+            }
         }
 
-        totalH += 16; // Bottom margin
+        totalH += bottomPadding;
 
         canvas.width = canvasW;
         canvas.height = totalH;
@@ -4723,20 +4730,14 @@ const app = {
             }
         };
 
-        // Draw Top Page Title "Statistieken"
-        let currentY = 48;
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '700 28px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-        ctx.fillText('Statistieken', marginX, currentY);
-
-        currentY += 40;
+        let currentY = startY;
 
         // Helper: Section Label
         const drawSectionLabel = (label) => {
             ctx.fillStyle = '#94a3b8';
             ctx.font = '700 13px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-            ctx.fillText(label.toUpperCase(), marginX, currentY);
-            currentY += 18;
+            ctx.fillText(label.toUpperCase(), marginX, currentY + 14);
+            currentY += labelHeight;
         };
 
         // 1. STATISTIEKEN SECTION
@@ -4772,7 +4773,7 @@ const app = {
                 ctx.fillText(item.label, cardX + 24, cardY + 76);
             });
 
-            currentY += (2 * cardH) + 16 + 28;
+            currentY += (2 * cardH) + 16 + sectionGap;
         }
 
         // 2. PROGRESSIE SECTION
@@ -4787,7 +4788,7 @@ const app = {
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = '500 14px system-ui, -apple-system, sans-serif';
                 ctx.fillText('Geen trainingen met gewichten gelogd.', marginX + 24, currentY + 40);
-                currentY += 70 + 28;
+                currentY += 70 + sectionGap;
             } else {
                 seriesData.forEach((s, idx) => {
                     const row = Math.floor(idx / 2);
@@ -4934,7 +4935,7 @@ const app = {
                 });
 
                 const pRows = Math.ceil(seriesData.length / 2);
-                currentY += (pRows * cardH) + ((pRows - 1) * 16) + 28;
+                currentY += (pRows * cardH) + ((pRows - 1) * 16) + sectionGap;
             }
         }
 
@@ -4950,6 +4951,7 @@ const app = {
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = '500 14px system-ui, -apple-system, sans-serif';
                 ctx.fillText('Nog geen spiergroep-data beschikbaar.', marginX + 24, currentY + 40);
+                currentY += 70 + sectionGap;
             } else {
                 muscleKeys.forEach((m, idx) => {
                     const row = Math.floor(idx / 4);
@@ -5004,6 +5006,9 @@ const app = {
                         ctx.textAlign = 'left';
                     });
                 });
+
+                const mRows = Math.ceil(muscleKeys.length / 4);
+                currentY += (mRows * cardH) + ((mRows - 1) * 16) + sectionGap;
             }
         }
     },

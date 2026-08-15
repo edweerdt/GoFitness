@@ -2716,6 +2716,108 @@ describe('add and remove sets during workout', () => {
 
             expect(canvas.toDataURL).toHaveBeenCalledWith('image/png');
         });
+
+        it('GOF-21: should omit duplicate top title and render section labels when stats, progress, and muscles are selected', () => {
+            const canvas = document.getElementById('share-stats-canvas');
+            const fillTextCalls = [];
+            canvas.getContext = jest.fn().mockReturnValue({
+                createLinearGradient: jest.fn().mockReturnValue({ addColorStop: jest.fn() }),
+                fillRect: jest.fn(),
+                beginPath: jest.fn(),
+                arc: jest.fn(),
+                fill: jest.fn(),
+                fillText: jest.fn((text, x, y) => fillTextCalls.push({ text, x, y })),
+                moveTo: jest.fn(),
+                lineTo: jest.fn(),
+                quadraticCurveTo: jest.fn(),
+                closePath: jest.fn(),
+                stroke: jest.fn()
+            });
+
+            store.plans = [{
+                id: 'plan_test',
+                sessions: [{
+                    exercises: [{ id: 'ex_bench', name: 'Barbell Bench Press', muscleGroups: ['chest'] }]
+                }]
+            }];
+
+            store.logs = [
+                {
+                    id: 'log1',
+                    date: '2026-08-10T10:00:00.000Z',
+                    duration: 60,
+                    exercisesCompleted: 2,
+                    exercises: [
+                        { name: 'Barbell Bench Press', muscleGroups: ['chest'], details: [{ weight: 80, reps: 10 }, { weight: 90, reps: 8 }] },
+                        { name: 'Pull Up', muscleGroups: ['back'], details: [{ weight: 0, reps: 12 }] }
+                    ]
+                },
+                {
+                    id: 'log2',
+                    date: '2026-08-12T10:00:00.000Z',
+                    duration: 45,
+                    exercisesCompleted: 1,
+                    exercises: [
+                        { name: 'Barbell Bench Press', muscleGroups: ['chest'], details: [{ weight: 85, reps: 10 }] }
+                    ]
+                }
+            ];
+
+            document.getElementById('share-opt-stats').checked = true;
+            document.getElementById('share-opt-progress').checked = true;
+            document.getElementById('share-opt-muscles').checked = true;
+
+            app.renderShareStatsPreview();
+
+            // Check that the duplicate top title 'Statistieken' is NOT drawn separately from the section label
+            const drawnTexts = fillTextCalls.map(c => c.text);
+            const statsHeaders = drawnTexts.filter(t => t === 'STATISTIEKEN' || t === 'Statistieken');
+            // Only 1 section label 'STATISTIEKEN' should be present
+            expect(statsHeaders).toEqual(['STATISTIEKEN']);
+            expect(drawnTexts).toContain('PROGRESSIE');
+            expect(drawnTexts).toContain('SPIERGROEPEN');
+
+            // Total height should accurately accommodate all 3 sections without clipping
+            expect(canvas.width).toBe(1000);
+            expect(canvas.height).toBeGreaterThan(600);
+        });
+
+        it('GOF-21: should compute exact canvas height without clipping when all 3 sections are enabled with multiple items', () => {
+            const canvas = document.createElement('canvas');
+            canvas.getContext = jest.fn().mockReturnValue({
+                createLinearGradient: jest.fn().mockReturnValue({ addColorStop: jest.fn() }),
+                fillRect: jest.fn(),
+                beginPath: jest.fn(),
+                arc: jest.fn(),
+                fill: jest.fn(),
+                fillText: jest.fn(),
+                moveTo: jest.fn(),
+                lineTo: jest.fn(),
+                quadraticCurveTo: jest.fn(),
+                closePath: jest.fn(),
+                stroke: jest.fn()
+            });
+
+            store.plans = [];
+            store.logs = [
+                {
+                    id: 'log1',
+                    date: '2026-08-01T10:00:00.000Z',
+                    exercises: [
+                        { name: 'Ex A', muscleGroups: ['chest'], details: [{ weight: 50, reps: 10 }] },
+                        { name: 'Ex B', muscleGroups: ['back'], details: [{ weight: 60, reps: 10 }] },
+                        { name: 'Ex C', muscleGroups: ['legs'], details: [{ weight: 70, reps: 10 }] },
+                        { name: 'Ex D', muscleGroups: ['shoulders'], details: [{ weight: 80, reps: 10 }] },
+                        { name: 'Ex E', muscleGroups: ['biceps'], details: [{ weight: 30, reps: 10 }] }
+                    ]
+                }
+            ];
+
+            app.generateStatsCanvas(canvas, true, true, true);
+
+            // startY (32) + Stats (26 + 224 + 28 = 278) + Progress (26 + (3 * 190 + 2 * 16) + 28 = 656) + Muscles (26 + (2 * 210 + 1 * 16) + 28 = 490) + bottomPadding (32) = 1488
+            expect(canvas.height).toBe(1488);
+        });
     });
 
     describe('GOF-5: Set Check Button Achievements', () => {

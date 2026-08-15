@@ -553,6 +553,54 @@ button:disabled {
     overflow-y: auto;
 }
 
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: stretch;
+    width: 100%;
+    margin-top: 16px;
+}
+
+.modal-actions > * {
+    flex: 1;
+    min-width: 0;
+}
+
+.modal-actions .btn-primary,
+.modal-actions .btn-secondary {
+    padding: 12px 10px;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+    min-height: 44px;
+    box-sizing: border-box;
+}
+
+.modal-actions .btn-primary .material-icons-round,
+.modal-actions .btn-secondary .material-icons-round {
+    font-size: 1.15rem;
+}
+
+@media (max-width: 480px) {
+    .modal-actions {
+        gap: 8px;
+    }
+    .modal-actions .btn-primary,
+    .modal-actions .btn-secondary {
+        padding: 10px 6px;
+        font-size: 0.85rem;
+        gap: 4px;
+    }
+    .modal-actions .btn-primary .material-icons-round,
+    .modal-actions .btn-secondary .material-icons-round {
+        font-size: 1rem;
+    }
+}
+
 .input-field {
     width: 100%;
     background: var(--bg-color);
