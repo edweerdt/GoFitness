@@ -2025,6 +2025,129 @@ describe('Hold Timer (Stopwatch)', () => {
         expect(app.activeWorkout.exercises[0].actualReps[1]).toBe('40');
         expect(app.activeWorkout.exercises[0].setsCompleted[1]).toBe(true);
     });
+
+    describe('getPreviousAchievedDuration and green timer state (GOF-24)', () => {
+        it('should return previous set duration from previous session log', () => {
+            store.logs = [
+                {
+                    id: 'log_1',
+                    date: '2026-08-01',
+                    exercises: [
+                        {
+                            name: 'Plank Hold',
+                            details: [
+                                { set: 1, reps: '35', completed: true },
+                                { set: 2, reps: '45', completed: true }
+                            ]
+                        }
+                    ]
+                }
+            ];
+
+            const ex = { name: 'Plank Hold', sets: 2 };
+            expect(app.getPreviousAchievedDuration(ex, 0)).toBe(35);
+            expect(app.getPreviousAchievedDuration(ex, 1)).toBe(45);
+        });
+
+        it('should fallback to earlier sets or historical logs or planned duration', () => {
+            store.logs = [
+                {
+                    id: 'log_old',
+                    date: '2026-07-20',
+                    exercises: [
+                        {
+                            name: 'Side Plank',
+                            details: [
+                                { set: 1, reps: '50', completed: true }
+                            ]
+                        }
+                    ]
+                }
+            ];
+
+            // Set 2 not in log, but historical log has 50
+            const ex = { name: 'Side Plank', sets: 3 };
+            expect(app.getPreviousAchievedDuration(ex, 1)).toBe(50);
+
+            // Exercise with planned durationSeconds fallback
+            const plannedEx = { name: 'Wall Sit', durationSeconds: 60 };
+            expect(app.getPreviousAchievedDuration(plannedEx, 0)).toBe(60);
+
+            // Exercise with no history or duration
+            const unknownEx = { name: 'Brand New Hold Exercise' };
+            expect(app.getPreviousAchievedDuration(unknownEx, 0)).toBe(0);
+        });
+
+        it('should color the timer green and vibrate when elapsed time exceeds previous achieved time', () => {
+            const mockVibrate = jest.fn();
+            global.navigator.vibrate = mockVibrate;
+
+            store.logs = [
+                {
+                    id: 'log_prev',
+                    date: '2026-08-10',
+                    exercises: [
+                        {
+                            name: 'Plank Hold',
+                            details: [
+                                { set: 1, reps: '30', completed: true }
+                            ]
+                        }
+                    ]
+                }
+            ];
+
+            const mockSession = {
+                id: 'sess_1',
+                name: 'Test Session',
+                exercises: [
+                    { id: 'ex_1', name: 'Plank Hold', sets: 2, actualReps: ['', ''], setsCompleted: [false, false] }
+                ]
+            };
+            app.activeWorkout = {
+                session: mockSession,
+                exercises: mockSession.exercises
+            };
+
+            document.body.innerHTML = `
+                <div id="workout-exercise-list">
+                    <button id="hold-timer-btn-0" class="hold-timer-btn"></button>
+                </div>
+            `;
+
+            store.holdTimerDelaySeconds = 0;
+            app.startHoldTimer(0, 0);
+
+            const btnEl = document.getElementById('hold-timer-btn-0');
+            expect(btnEl).not.toBeNull();
+
+            // Simulate 20s elapsed time (previous was 30s): should still be red/running, not green
+            app.holdTimerState.startTime = Date.now() - 20000;
+            const ex = app.activeWorkout.exercises[0];
+            const targetSec = app.getPreviousAchievedDuration(ex, 0);
+            expect(targetSec).toBe(30);
+
+            // Tick timer update directly
+            const currentNow20 = Date.now();
+            const elapsed20 = Math.floor((currentNow20 - app.holdTimerState.startTime) / 1000);
+            expect(elapsed20 >= 20 && elapsed20 < 30).toBe(true);
+
+            // Simulate 35s elapsed time (exceeding previous 30s): should turn green
+            app.holdTimerState.startTime = Date.now() - 35000;
+            const currentNow35 = Date.now();
+            const elapsed35 = Math.floor((currentNow35 - app.holdTimerState.startTime) / 1000);
+            expect(elapsed35 > 30).toBe(true);
+
+            // Re-render exercises: button should have green and passed-previous classes
+            app.renderWorkoutExercises();
+            const renderedBtn = document.getElementById('hold-timer-btn-0');
+            expect(renderedBtn.className).toContain('running');
+            expect(renderedBtn.className).toContain('green');
+            expect(renderedBtn.className).toContain('passed-previous');
+
+            app.stopHoldTimer(false);
+        });
+    });
 });
 
 describe('clickable exercise web search', () => {

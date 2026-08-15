@@ -2596,6 +2596,66 @@ const app = {
         return null;
     },
 
+    getPreviousAchievedDuration(ex, setIndex) {
+        if (!ex) return 0;
+
+        // 1. Try to get previous details for this specific set
+        const prevSet = this.getPreviousSetDetails ? this.getPreviousSetDetails(ex.name, setIndex, ex) : null;
+        if (prevSet && prevSet.reps !== undefined && prevSet.reps !== null && String(prevSet.reps).trim() !== '') {
+            const val = parseInt(prevSet.reps, 10);
+            if (!isNaN(val) && val > 0) return val;
+        }
+
+        // 2. Try previous session details for this exercise (same set index, or any set in previous session)
+        const prevDetails = this.getPreviousExerciseDetails ? this.getPreviousExerciseDetails(ex.name, ex) : null;
+        if (prevDetails && Array.isArray(prevDetails) && prevDetails.length > 0) {
+            const matchSet = (typeof setIndex === 'number' && prevDetails[setIndex]) ? prevDetails[setIndex] : prevDetails[0];
+            if (matchSet && matchSet.reps !== undefined && matchSet.reps !== null && String(matchSet.reps).trim() !== '') {
+                const val = parseInt(matchSet.reps, 10);
+                if (!isNaN(val) && val > 0) return val;
+            }
+        }
+
+        // 3. Try to check highest historical duration across all logs for this exercise
+        const targetCanonical = this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(ex.name) : null;
+        const targetTokens = this.extractExerciseNameTokens ? this.extractExerciseNameTokens(ex.name, ex) : null;
+        let maxHistoricalDuration = 0;
+        if (typeof store !== 'undefined' && Array.isArray(store.logs)) {
+            for (const log of store.logs) {
+                if (!log || !log.exercises) continue;
+                for (const e of log.exercises) {
+                    if (!e || !e.name) continue;
+                    let matches = false;
+                    if (targetCanonical && this.getCanonicalExerciseKey && (e.canonicalId === targetCanonical || this.getCanonicalExerciseKey(e.name) === targetCanonical)) {
+                        matches = true;
+                    } else if (targetTokens) {
+                        const logTokens = this.extractExerciseNameTokens(e.name, e);
+                        for (const t of logTokens) {
+                            if (targetTokens.has(t)) { matches = true; break; }
+                        }
+                    }
+                    if (matches && Array.isArray(e.details)) {
+                        for (const d of e.details) {
+                            if (!d || !d.reps) continue;
+                            const r = parseInt(d.reps, 10);
+                            if (!isNaN(r) && r > maxHistoricalDuration) {
+                                maxHistoricalDuration = r;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (maxHistoricalDuration > 0) return maxHistoricalDuration;
+
+        // 4. Fallback to planned duration if defined on exercise (e.g. durationSeconds, durationSecondsMax, reps)
+        if (ex.durationSeconds && typeof ex.durationSeconds === 'number' && ex.durationSeconds > 0) return ex.durationSeconds;
+        if (ex.durationSecondsMax && typeof ex.durationSecondsMax === 'number' && ex.durationSecondsMax > 0) return ex.durationSecondsMax;
+        if (ex.reps && !isNaN(parseInt(ex.reps, 10)) && parseInt(ex.reps, 10) > 0) return parseInt(ex.reps, 10);
+
+        return 0;
+    },
+
     formatPreviousDetailsSummary(prevDetails) {
         if (!prevDetails || !Array.isArray(prevDetails) || prevDetails.length === 0) return null;
         const parts = prevDetails.map(d => {
@@ -3140,9 +3200,12 @@ const app = {
                         const mins = Math.floor(elapsedSec / 60);
                         const secs = elapsedSec % 60;
                         const timeStr = mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
+                        const targetSec = app.getPreviousAchievedDuration(ex, activeSetIdx);
+                        const isGreen = targetSec > 0 && elapsedSec > targetSec;
+                        const greenClasses = isGreen ? ' green passed-previous' : '';
                         singleHoldTimerHtml = `
                             <div class="hold-timer-container">
-                                <button id="hold-timer-btn-${exIndex}" class="hold-timer-btn running" onclick="app.stopHoldTimer(true)">
+                                <button id="hold-timer-btn-${exIndex}" class="hold-timer-btn running${greenClasses}" onclick="app.stopHoldTimer(true)">
                                     <span class="material-icons-round">stop</span> ${timeStr} Stop (Set ${activeSetIdx + 1})
                                 </button>
                             </div>
@@ -3440,6 +3503,7 @@ const app = {
             startTime: delaySec > 0 ? null : now,
             delayStartTime: now,
             status: delaySec > 0 ? 'delay' : 'running',
+            hasAlertedPass: false,
             intervalId: null
         };
 
@@ -3478,8 +3542,17 @@ const app = {
                 const secs = elapsedSec % 60;
                 const timeStr = mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
 
+                const ex = (this.activeWorkout && this.activeWorkout.exercises) ? this.activeWorkout.exercises[exIndex] : null;
+                const targetSec = this.getPreviousAchievedDuration(ex, setIndex);
+                const isGreen = targetSec > 0 && elapsedSec > targetSec;
+
+                if (isGreen && !this.holdTimerState.hasAlertedPass) {
+                    this.holdTimerState.hasAlertedPass = true;
+                    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([60, 40, 60]);
+                }
+
                 if (btnEl) {
-                    btnEl.className = 'hold-timer-btn running';
+                    btnEl.className = isGreen ? 'hold-timer-btn running green passed-previous' : 'hold-timer-btn running';
                     btnEl.innerHTML = `<span class="material-icons-round">stop</span> ${timeStr} Stop (Set ${setIndex + 1})`;
                 }
             }

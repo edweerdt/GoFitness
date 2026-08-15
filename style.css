@@ -775,6 +775,15 @@ button:disabled {
     animation: pulse-running 1.2s infinite alternate;
 }
 
+.hold-timer-btn.running.green,
+.hold-timer-btn.running.passed-previous {
+    background: rgba(16, 185, 129, 0.25);
+    color: var(--status-green);
+    border-color: var(--status-green);
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.45);
+    animation: pulse-running-green 1.2s infinite alternate;
+}
+
 @keyframes pulse-delay {
     from { opacity: 0.8; }
     to { opacity: 1; transform: scale(1.02); }
@@ -783,6 +792,11 @@ button:disabled {
 @keyframes pulse-running {
     from { box-shadow: 0 0 4px rgba(239, 68, 68, 0.3); }
     to { box-shadow: 0 0 14px rgba(239, 68, 68, 0.7); }
+}
+
+@keyframes pulse-running-green {
+    from { box-shadow: 0 0 4px rgba(16, 185, 129, 0.3); }
+    to { box-shadow: 0 0 16px rgba(16, 185, 129, 0.7); }
 }
 
 .step-btn-group {
