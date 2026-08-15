@@ -2532,8 +2532,8 @@ const app = {
 
     getPreviousExerciseDetails(exerciseName, exObj = null) {
         if (!exerciseName && !exObj) return null;
+        const targetCanonical = this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(exerciseName || (exObj && exObj.name)) : null;
         const targetTokens = this.extractExerciseNameTokens(exerciseName, exObj);
-        if (targetTokens.size === 0) return null;
 
         const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
 
@@ -2543,6 +2543,9 @@ const app = {
             
             const matchedEx = log.exercises.find(e => {
                 if (!e || !e.name) return false;
+                if (targetCanonical && this.getCanonicalExerciseKey && (e.canonicalId === targetCanonical || this.getCanonicalExerciseKey(e.name) === targetCanonical)) {
+                    return true;
+                }
                 const logTokens = this.extractExerciseNameTokens(e.name, e);
                 for (const t of logTokens) {
                     if (targetTokens.has(t)) return true;
@@ -2562,8 +2565,8 @@ const app = {
 
     getPreviousSetDetails(exerciseName, setIndex, exObj = null) {
         if ((!exerciseName && !exObj) || typeof setIndex !== 'number' || setIndex < 0) return null;
+        const targetCanonical = this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(exerciseName || (exObj && exObj.name)) : null;
         const targetTokens = this.extractExerciseNameTokens(exerciseName, exObj);
-        if (targetTokens.size === 0) return null;
 
         const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
 
@@ -2573,6 +2576,9 @@ const app = {
             
             const matchedEx = log.exercises.find(e => {
                 if (!e || !e.name) return false;
+                if (targetCanonical && this.getCanonicalExerciseKey && (e.canonicalId === targetCanonical || this.getCanonicalExerciseKey(e.name) === targetCanonical)) {
+                    return true;
+                }
                 const logTokens = this.extractExerciseNameTokens(e.name, e);
                 for (const t of logTokens) {
                     if (targetTokens.has(t)) return true;
@@ -5110,12 +5116,18 @@ const app = {
 
     // --- Variation helpers ---
     getExerciseVariations(ex) {
-        // 1. Use alternatives field if present
-        if (ex.alternatives && ex.alternatives.length > 0) return ex.alternatives;
-        if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) return ex.optionalAlternatives;
-        // 2. Split name by " of " as fallback
-        const parts = String(ex.name || '').split(/\s+of\s+/i).map(s => s.trim()).filter(Boolean);
-        return parts.length > 1 ? parts : [];
+        if (!ex) return [];
+        // 1. Explicit choice variations set on exercise
+        if (Array.isArray(ex.availableVariations) && ex.availableVariations.length > 1) {
+            return ex.availableVariations;
+        }
+        // 2. Choice exercises defined with " of " or " or " in name (e.g. "Goblet Squat of Leg Press")
+        const nameStr = String(ex.name || '');
+        if (/\s+(?:of|or)\s+/i.test(nameStr)) {
+            const parts = nameStr.split(/\s+(?:of|or)\s+/i).map(s => s.trim()).filter(Boolean);
+            if (parts.length > 1) return parts;
+        }
+        return [];
     },
 
     selectVariation(exIndex, variationName) {
