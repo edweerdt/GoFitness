@@ -1167,19 +1167,26 @@ button:disabled {
 }
 
 .ai-assistant-card {
-    border: 1px solid rgba(59, 130, 246, 0.25);
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(26, 29, 36, 0.95) 100%);
+    border: 1px solid var(--border-color);
+    background: var(--surface-color);
     position: relative;
     overflow: hidden;
 }
 
-.theme-light .ai-assistant-card {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(255, 255, 255, 0.95) 100%);
-    border: 1px solid rgba(59, 130, 246, 0.25);
+.ai-assistant-card:hover {
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.ai-help-content {
+    line-height: 1.5;
+    background: var(--surface-light);
+    border: 1px solid var(--border-color);
+    padding: 10px 14px;
+    border-radius: 8px;
 }
 
 .onboarding-home-card {
     border: 1.5px solid rgba(59, 130, 246, 0.35);
-    background: linear-gradient(145deg, rgba(59, 130, 246, 0.08) 0%, var(--surface-color) 100%);
+    background: var(--surface-color);
 }
 

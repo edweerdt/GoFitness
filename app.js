@@ -1552,10 +1552,10 @@ const app = {
         const panel = document.getElementById('ai-generator-panel');
         if (!panel) return;
 
-        panel.className = 'glass-panel ai-assistant-card';
+        panel.className = 'glass-panel ai-assistant-card mt-4';
         panel.innerHTML = `
             <div style="display:flex; align-items:flex-start; gap:12px;">
-                <div class="stat-icon-wrapper text-accent" style="width:40px; height:40px; flex-shrink:0; background:rgba(59,130,246,0.15); border-radius:10px; display:grid; place-items:center;">
+                <div class="stat-icon-wrapper text-accent" style="width:40px; height:40px; flex-shrink:0; background:rgba(59,130,246,0.12); border-radius:10px; display:grid; place-items:center;">
                     <span class="material-icons-round" style="font-size:1.4rem;">smart_toy</span>
                 </div>
                 <div style="flex:1; min-width:0;">
@@ -1578,14 +1578,14 @@ const app = {
                 </button>
             </div>
 
-            <div style="margin-top:10px; border-top:1px solid rgba(255,255,255,0.06); padding-top:8px;">
+            <div style="margin-top:10px; border-top:1px solid var(--border-color); padding-top:8px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden'); const ic = this.querySelector('.ai-help-icon'); if(ic) ic.textContent = this.nextElementSibling.classList.contains('hidden') ? 'help_outline' : 'expand_less';">
                     <span class="text-sm text-accent" style="display:flex; align-items:center; gap:4px; font-weight:600;">
                         <span class="material-icons-round ai-help-icon" style="font-size:1.1rem;">help_outline</span> Hoe werkt dit in 3 stappen?
                     </span>
                     <span class="text-sm text-muted" style="font-size:0.75rem;">Uitleg</span>
                 </div>
-                <div class="text-sm text-muted mt-2 hidden" style="line-height:1.5; background:rgba(0,0,0,0.15); padding:10px 12px; border-radius:8px;">
+                <div class="text-sm text-muted mt-2 hidden ai-help-content">
                     <ol style="margin-left:18px; display:flex; flex-direction:column; gap:6px;">
                         <li>Klik op <strong>Kopieer AI Prompt</strong> en open <a href="https://chatgpt.com" target="_blank" rel="noopener" style="color:var(--accent-color); text-decoration:underline;">ChatGPT</a> of <a href="https://claude.ai" target="_blank" rel="noopener" style="color:var(--accent-color); text-decoration:underline;">Claude</a>.</li>
                         <li>Plak de prompt en vul je eigen wensen in (bijv. aantal dagen per week, blessures of trainingslocatie).</li>
