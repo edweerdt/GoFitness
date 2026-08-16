@@ -3250,6 +3250,39 @@ describe('add and remove sets during workout', () => {
             expect(htmlContent).toContain('<header class="workout-header">');
         });
     });
+
+    describe('GOF-22: Rusttimer bovenaan onder de sessieheader', () => {
+        it('should place #rest-timer under .workout-header inside .workout-sticky-header before #workout-exercise-list in index.html', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const htmlPath = path.join(__dirname, 'index.html');
+            const htmlContent = fs.readFileSync(htmlPath, 'utf8');
+
+            expect(htmlContent).toContain('<div class="workout-sticky-header">');
+            const stickyHeaderIdx = htmlContent.indexOf('<div class="workout-sticky-header">');
+            const workoutHeaderIdx = htmlContent.indexOf('<header class="workout-header">', stickyHeaderIdx);
+            const restTimerIdx = htmlContent.indexOf('id="rest-timer"', stickyHeaderIdx);
+            const exerciseListIdx = htmlContent.indexOf('id="workout-exercise-list"');
+
+            expect(workoutHeaderIdx).toBeGreaterThan(stickyHeaderIdx);
+            expect(restTimerIdx).toBeGreaterThan(workoutHeaderIdx);
+            expect(exerciseListIdx).toBeGreaterThan(restTimerIdx);
+        });
+
+        it('should style .workout-sticky-header and .rest-timer at the top and not at the bottom in style.css', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const cssPath = path.join(__dirname, 'style.css');
+            const cssContent = fs.readFileSync(cssPath, 'utf8');
+
+            expect(cssContent).toContain('.workout-sticky-header');
+            expect(cssContent).toMatch(/\.workout-sticky-header\s*\{[^}]*position:\s*sticky;/);
+            expect(cssContent).toMatch(/\.workout-sticky-header\s*\{[^}]*top:\s*0;/);
+
+            // .rest-timer should not have fixed bottom positioning
+            expect(cssContent).not.toMatch(/\.rest-timer\s*\{[^}]*bottom:\s*96px;/);
+        });
+    });
 });
 
 
