@@ -1113,3 +1113,73 @@ button:disabled {
         background: rgba(0, 0, 0, 0.03);
     }
 }
+
+/* --- PRESET BIBLIOTHEEK & AI ASSISTENT (GOF-25) --- */
+.preset-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 0;
+}
+
+.preset-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--border-radius);
+    padding: 16px;
+    transition: var(--transition);
+}
+
+.preset-card:hover {
+    border-color: rgba(59, 130, 246, 0.3);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.theme-light .preset-card {
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.theme-light .preset-card:hover {
+    border-color: rgba(59, 130, 246, 0.4);
+    background: rgba(59, 130, 246, 0.02);
+}
+
+.preset-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent-color);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.preset-badge.success {
+    background: var(--status-green-bg);
+    color: var(--status-green);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.ai-assistant-card {
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(26, 29, 36, 0.95) 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.theme-light .ai-assistant-card {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(255, 255, 255, 0.95) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.onboarding-home-card {
+    border: 1.5px solid rgba(59, 130, 246, 0.35);
+    background: linear-gradient(145deg, rgba(59, 130, 246, 0.08) 0%, var(--surface-color) 100%);
+}
+

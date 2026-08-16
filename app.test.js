@@ -3367,6 +3367,216 @@ describe('add and remove sets during workout', () => {
             expect(cssContent).not.toMatch(/\.rest-timer\s*\{[^}]*bottom:\s*96px;/);
         });
     });
+
+    describe('GOF-25: Preset Bibliotheek, Startersschema & AI Template Generator', () => {
+        beforeEach(() => {
+            document.body.innerHTML = `
+                <div id="app">
+                    <section id="view-home" class="view active">
+                        <h1 id="home-date">Vandaag</h1>
+                        <div id="recovery-status" class="status-badge green">
+                            <span class="material-icons-round">battery_charging_full</span>
+                            <span id="recovery-text">Klaar om te trainen</span>
+                            <span id="recovery-hours" class="recovery-hours-text"></span>
+                        </div>
+                        <div class="recommended-card glass-panel">
+                            <h3 id="recommended-card-title">Aanbevolen Sessie</h3>
+                            <h2 id="recommended-session-name">Geen schema actief</h2>
+                            <p id="recommended-reason" class="text-muted">Importeer eerst een trainingsschema.</p>
+                            <div id="session-picker-wrapper" class="hidden mt-3">
+                                <select id="home-session-select" class="input-field"></select>
+                            </div>
+                            <button id="btn-start-session" class="btn-primary mt-4" disabled>Start Nu</button>
+                        </div>
+                        <div class="stats-mini mt-4">
+                            <span id="stat-streak">0</span>
+                            <span id="stat-completed">0</span>
+                        </div>
+                    </section>
+
+                    <section id="view-plans" class="view">
+                        <div id="preset-plans-container" class="mt-4"></div>
+                        <div id="ai-generator-panel" class="glass-panel mt-4"></div>
+                        <div id="plans-list" class="flex-col gap-3"></div>
+                        <div id="exercise-library-list"></div>
+                        <div id="sync-panel">
+                            <span id="sync-status">uit</span>
+                            <div id="sync-detail"></div>
+                            <div id="sync-actions"></div>
+                        </div>
+                    </section>
+                </div>
+            `;
+            store.plans = [];
+            store.activePlanId = null;
+            store.logs = [];
+            store.customExercises = [];
+            app.activeWorkout = null;
+            app._presetsExpanded = undefined;
+        });
+
+        it('should have valid PRESET_PLANS that pass DataStore.validatePlanSchema', () => {
+            const { PRESET_PLANS } = require('./app');
+            expect(Array.isArray(PRESET_PLANS)).toBe(true);
+            expect(PRESET_PLANS.length).toBeGreaterThanOrEqual(3);
+
+            PRESET_PLANS.forEach(preset => {
+                expect(() => DataStore.validatePlanSchema(preset)).not.toThrow();
+                expect(preset.id).toBeTruthy();
+                expect(preset.name).toBeTruthy();
+                expect(preset.sessions.length).toBeGreaterThanOrEqual(2);
+                preset.sessions.forEach(sess => {
+                    expect(sess.name).toBeTruthy();
+                    expect(sess.exercises.length).toBeGreaterThanOrEqual(4);
+                    sess.exercises.forEach(ex => {
+                        expect(ex.name).toBeTruthy();
+                        expect(ex.sets).toBeGreaterThan(0);
+                    });
+                });
+            });
+        });
+
+        it('should load a preset plan and set it as active via app.loadPresetPlan', () => {
+            const loaded = app.loadPresetPlan('preset_beginner_gym_mix');
+            expect(loaded).toBeTruthy();
+            expect(loaded.name).toBe('Beginner Gym + Lichaamsgewicht Mix');
+            expect(store.plans.length).toBe(1);
+            expect(store.activePlanId).toBe(loaded.id);
+
+            // Loading again should not duplicate
+            const reloaded = app.loadPresetPlan('preset_beginner_gym_mix');
+            expect(store.plans.length).toBe(1);
+            expect(reloaded.id).toBe(loaded.id);
+        });
+
+        it('should start session directly if autoStartSession is true in app.loadPresetPlan', () => {
+            const startWorkoutSpy = jest.spyOn(app, 'startWorkout').mockImplementation(() => {});
+            const loaded = app.loadPresetPlan('preset_beginner_gym_mix', true);
+            expect(startWorkoutSpy).toHaveBeenCalledWith(loaded.sessions[0], loaded);
+            startWorkoutSpy.mockRestore();
+        });
+
+        it('should return null and show error toast when loading invalid preset ID', () => {
+            const toastSpy = jest.spyOn(app, 'showToast').mockImplementation(() => {});
+            const result = app.loadPresetPlan('non_existent_preset');
+            expect(result).toBeNull();
+            expect(toastSpy).toHaveBeenCalledWith('Preset schema niet gevonden.', 'error');
+            toastSpy.mockRestore();
+        });
+
+        it('should render friendly onboarding starter card on Home when store.plans is empty', () => {
+            store.plans = [];
+            store.activePlanId = null;
+            app.renderHome();
+
+            const titleEl = document.getElementById('recommended-card-title');
+            const nameEl = document.getElementById('recommended-session-name');
+            const btnStart = document.getElementById('btn-start-session');
+            const choosePresetsBtn = document.getElementById('btn-home-presets');
+
+            expect(titleEl.textContent).toBe('⚡ Direct Starten');
+            expect(nameEl.textContent).toBe('Beginner Gym + Lichaamsgewicht Mix');
+            expect(btnStart.textContent).toBe('⚡ Start Beginnersschema');
+            expect(btnStart.disabled).toBe(false);
+            expect(choosePresetsBtn).toBeTruthy();
+            expect(choosePresetsBtn.classList.contains('hidden')).toBe(false);
+        });
+
+        it('should generate complete AI Prompt with schema v2.0 and library exercises', () => {
+            const prompt = app.getAIPromptText();
+            expect(prompt).toContain('GoFitness');
+            expect(prompt).toContain('GOFITNESS SCHEMA v2.0 JSON STRUCTUUR');
+            expect(prompt).toContain('GOFITNESS OEFENINGENBIBLIOTHEEK');
+            expect(prompt).toContain('Barbell Bench Press');
+            expect(prompt).toContain('Barbell Back Squat');
+            expect(prompt).toContain('Lat Pulldown');
+            expect(prompt).toContain('Push-Up');
+        });
+
+        it('should copy AI prompt to clipboard via app.copyAIPrompt', async () => {
+            const writeTextMock = jest.fn().mockResolvedValue(undefined);
+            Object.assign(navigator, {
+                clipboard: {
+                    writeText: writeTextMock
+                }
+            });
+            const toastSpy = jest.spyOn(app, 'showToast').mockImplementation(() => {});
+
+            await app.copyAIPrompt();
+            expect(writeTextMock).toHaveBeenCalled();
+            expect(writeTextMock.mock.calls[0][0]).toContain('GOFITNESS SCHEMA v2.0 JSON STRUCTUUR');
+            expect(toastSpy).toHaveBeenCalledWith('AI Prompt gekopieerd naar klembord!', 'success');
+
+            toastSpy.mockRestore();
+        });
+
+        it('should trigger JSON download via app.downloadTemplateJSON', () => {
+            const clickMock = jest.fn();
+            const originalCreateElement = document.createElement.bind(document);
+            jest.spyOn(document, 'createElement').mockImplementation((tag) => {
+                const el = originalCreateElement(tag);
+                if (tag === 'a') {
+                    el.click = clickMock;
+                }
+                return el;
+            });
+            const toastSpy = jest.spyOn(app, 'showToast').mockImplementation(() => {});
+
+            app.downloadTemplateJSON();
+            expect(clickMock).toHaveBeenCalled();
+            expect(toastSpy).toHaveBeenCalledWith('Template JSON gedownload!', 'success');
+
+            document.createElement.mockRestore();
+            toastSpy.mockRestore();
+        });
+
+        it('should render Presets and AI Generator in renderPlans', () => {
+            app.renderPlans();
+
+            const presetContainer = document.getElementById('preset-plans-container');
+            const aiPanel = document.getElementById('ai-generator-panel');
+
+            expect(presetContainer.innerHTML).toContain('Preset Bibliotheek');
+            expect(presetContainer.innerHTML).toContain('Beginner Gym + Lichaamsgewicht Mix');
+            expect(presetContainer.innerHTML).toContain('Full Body Thuis &amp; Lichaamsgewicht');
+            expect(presetContainer.innerHTML).toContain('Upper / Lower Split (4 Dagen)');
+
+            expect(aiPanel.innerHTML).toContain('Maak een persoonlijk schema met AI');
+            expect(aiPanel.innerHTML).toContain('Kopieer AI Prompt');
+            expect(aiPanel.innerHTML).toContain('Download Template');
+        });
+
+        it('should toggle presets expansion state via app.togglePresetsExpanded', () => {
+            app._presetsExpanded = false;
+            app.togglePresetsExpanded();
+            expect(app._presetsExpanded).toBe(true);
+
+            app.togglePresetsExpanded();
+            expect(app._presetsExpanded).toBe(false);
+        });
+
+        it('should check index.html for correct structure and moved sync-panel', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const htmlPath = path.join(__dirname, 'index.html');
+            const htmlContent = fs.readFileSync(htmlPath, 'utf8');
+
+            expect(htmlContent).toContain('id="preset-plans-container"');
+            expect(htmlContent).toContain('id="ai-generator-panel"');
+            expect(htmlContent).toContain('id="sync-panel"');
+
+            const presetIdx = htmlContent.indexOf('id="preset-plans-container"');
+            const aiIdx = htmlContent.indexOf('id="ai-generator-panel"');
+            const plansListIdx = htmlContent.indexOf('id="plans-list"');
+            const libIdx = htmlContent.indexOf('id="exercise-library-list"');
+            const syncIdx = htmlContent.indexOf('id="sync-panel"');
+
+            expect(aiIdx).toBeGreaterThan(presetIdx);
+            expect(plansListIdx).toBeGreaterThan(aiIdx);
+            expect(libIdx).toBeGreaterThan(plansListIdx);
+            expect(syncIdx).toBeGreaterThan(libIdx); // Sync panel is moved to the bottom!
+        });
+    });
 });
 
 
