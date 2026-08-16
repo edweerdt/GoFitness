@@ -1,9 +1,10 @@
 // Versienummer ophogen bij wijzigingen aan de assets, zodat oude caches opgeruimd worden
-const CACHE_NAME = 'go-fitness-cache-v18';
+const CACHE_NAME = 'go-fitness-cache-v19';
 const ASSETS = [
     './',
     './index.html',
     './style.css',
+    './qr.js',
     './app.js',
     './sync.js',
     './firebase-config.js',
