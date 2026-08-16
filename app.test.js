@@ -1363,7 +1363,62 @@ describe('sharePlan', () => {
         try { delete global.navigator.clipboard; } catch(e) { global.navigator.clipboard = undefined; }
     });
 
-    it('should share the plan JSON without the internal id via the Web Share API', async () => {
+    it('should share as a file when navigator.canShare with files is supported', async () => {
+        const share = jest.fn().mockResolvedValue();
+        const canShare = jest.fn().mockReturnValue(true);
+        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
+        Object.defineProperty(global.navigator, 'canShare', { value: canShare, configurable: true, writable: true });
+
+        await app.sharePlan('p1');
+
+        expect(canShare).toHaveBeenCalledTimes(1);
+        expect(share).toHaveBeenCalledTimes(1);
+        const arg = share.mock.calls[0][0];
+        expect(arg.title).toBe('Mijn Schema');
+        expect(arg.files).toBeDefined();
+        expect(arg.files.length).toBe(1);
+    });
+
+    it('should fallback to sharing text when file sharing throws NotAllowedError', async () => {
+        const share = jest.fn()
+            .mockRejectedValueOnce(new DOMException('Permission denied', 'NotAllowedError'))
+            .mockResolvedValueOnce();
+        const canShare = jest.fn().mockReturnValue(true);
+        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
+        Object.defineProperty(global.navigator, 'canShare', { value: canShare, configurable: true, writable: true });
+
+        await app.sharePlan('p1');
+
+        expect(share).toHaveBeenCalledTimes(2);
+        const textArg = share.mock.calls[1][0];
+        expect(textArg.title).toBe('Mijn Schema');
+        expect(textArg.text).toContain('"name": "Mijn Schema"');
+    });
+
+    it('should fallback to clipboard when Web Share throws Permission denied or fails', async () => {
+        const share = jest.fn().mockRejectedValue(new DOMException('Permission denied', 'NotAllowedError'));
+        const writeText = jest.fn().mockResolvedValue();
+        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
+        Object.defineProperty(global.navigator, 'clipboard', { value: { writeText }, configurable: true, writable: true });
+
+        await app.sharePlan('p1');
+
+        expect(writeText).toHaveBeenCalledTimes(1);
+        expect(writeText.mock.calls[0][0]).toContain('Mijn Schema');
+    });
+
+    it('should not fallback or show errors when user cancels share (AbortError)', async () => {
+        const share = jest.fn().mockRejectedValue(new DOMException('User cancelled', 'AbortError'));
+        const writeText = jest.fn().mockResolvedValue();
+        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
+        Object.defineProperty(global.navigator, 'clipboard', { value: { writeText }, configurable: true, writable: true });
+
+        await app.sharePlan('p1');
+
+        expect(writeText).not.toHaveBeenCalled();
+    });
+
+    it('should share the plan JSON without the internal id via the Web Share API text share', async () => {
         const share = jest.fn().mockResolvedValue();
         Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
 
@@ -1386,6 +1441,35 @@ describe('sharePlan', () => {
 
         expect(writeText).toHaveBeenCalledTimes(1);
         expect(writeText.mock.calls[0][0]).toContain('Mijn Schema');
+    });
+
+    it('should fallback to downloadPlan when Web Share and clipboard are unavailable', async () => {
+        try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
+        try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
+        try { delete global.navigator.clipboard; } catch(e) { global.navigator.clipboard = undefined; }
+        const downloadSpy = jest.spyOn(app, 'downloadPlan').mockImplementation(() => {});
+
+        await app.sharePlan('p1');
+
+        expect(downloadSpy).toHaveBeenCalledWith('p1');
+        downloadSpy.mockRestore();
+    });
+
+    it('should download plan as JSON file via downloadPlan', () => {
+        const clickSpy = jest.fn();
+        const originalCreateElement = document.createElement.bind(document);
+        jest.spyOn(document, 'createElement').mockImplementation((tagName) => {
+            const el = originalCreateElement(tagName);
+            if (tagName.toLowerCase() === 'a') {
+                el.click = clickSpy;
+            }
+            return el;
+        });
+
+        app.downloadPlan('p1');
+
+        expect(clickSpy).toHaveBeenCalled();
+        document.createElement.mockRestore();
     });
 });
 
