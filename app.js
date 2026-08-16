@@ -78,6 +78,244 @@ DEFAULT_EXERCISES.forEach(ex => {
     }
 });
 
+const PRESET_PLANS = [
+    {
+        id: "preset_beginner_gym_mix",
+        planId: "beginner-gym-bodyweight-mix-v2",
+        schemaVersion: "2.0",
+        name: "Beginner Gym + Lichaamsgewicht Mix",
+        description: "Gebalanceerd 2-daags full body schema voor beginners (3x per week in A-B-A / B-A-B rotatie). Combineert effectieve gym-oefeningen met lichaamsgewicht voor optimale basiskracht en mobiliteit.",
+        author: "GoFitness Coach",
+        version: "2.1.0",
+        targetAudience: "beginner",
+        level: "Beginner",
+        goal: "Basiskracht en trainingsroutine opbouwen",
+        schedule: {
+            frequencyType: "sessions_per_week",
+            targetSessionsPerWeek: 3,
+            defaultSessionOrder: ["full-body-a", "full-body-b"],
+            recommendedPattern: "A-B-A, volgende week B-A-B",
+            minRecoveryHours: 48,
+            estimatedWeeklyMinutes: 135
+        },
+        progressionGlobalRules: {
+            primaryMethod: "double_progression",
+            description: "Verhoog eerst herhalingen binnen de weergegeven range met goed gevoel en vorm. Pas zodra het maximale aantal herhalingen in alle sets gehaald is, verhoog je het gewicht met een kleine stap."
+        },
+        recoveryRules: {
+            minGlobalRecoveryHours: 48,
+            muscleGroupRecoveryHours: {
+                chest: 48,
+                back: 48,
+                legs: 72,
+                glutes: 48,
+                shoulders: 48,
+                biceps: 48,
+                triceps: 48,
+                core: 24
+            }
+        },
+        equipment: ["Leg press of squat rack", "Bench / chest press", "Lat pulldown / pull-up bar", "Cable row / seated row", "Dumbbells", "Mat"],
+        sessions: [
+            {
+                id: "full-body-a",
+                sessionId: "full-body-a",
+                name: "Full Body A",
+                description: "Basissessie met nadruk op grote bewegingen, rugwerk, schouders en biceps.",
+                estimatedDurationMinutes: 45,
+                exercises: [
+                    { id: "a-leg-press-or-squat", name: "Leg Press of Squat", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["legs", "glutes"] },
+                    { id: "a-bench-press-or-chest-press", name: "Bench Press of Chest Press Machine", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["chest", "triceps", "shoulders"] },
+                    { id: "a-lat-pulldown-or-assisted-pullup", name: "Lat Pulldown of Assisted Pull-up", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "biceps"] },
+                    { id: "a-seated-row", name: "Seated Row", sets: 2, repsMin: 10, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "rear_shoulders", "biceps"] },
+                    { id: "a-pushups", name: "Push-ups", sets: 2, repsMin: 8, repsMax: 15, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["chest", "triceps", "shoulders"] },
+                    { id: "a-dumbbell-shoulder-press", name: "Dumbbell Shoulder Press", sets: 2, repsMin: 8, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["shoulders", "triceps"] },
+                    { id: "a-plank", name: "Plank", sets: 3, durationSecondsMin: 20, durationSecondsMax: 40, restSeconds: 45, exerciseType: "duration", category: "isometric", muscleGroups: ["core"] },
+                    { id: "a-dumbbell-bicep-curls", name: "Dumbbell Bicep Curls", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["biceps"] }
+                ]
+            },
+            {
+                id: "full-body-b",
+                sessionId: "full-body-b",
+                name: "Full Body B",
+                description: "Lichte variatie voor afwisseling, benen, lunges en biceps.",
+                estimatedDurationMinutes: 45,
+                exercises: [
+                    { id: "b-db-rdl", name: "Dumbbell Romanian Deadlift (DB RDL)", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["legs", "glutes", "back"] },
+                    { id: "b-walking-lunges", name: "Walking Lunges of Split Squats", sets: 2, repsMin: 10, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["legs", "glutes"] },
+                    { id: "b-incline-db-press", name: "Incline Dumbbell Press of Incline Machine Press", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["chest", "shoulders", "triceps"] },
+                    { id: "b-lat-pulldown", name: "Lat Pulldown of Assisted Pull-up", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "biceps"] },
+                    { id: "b-db-lateral-raises", name: "Dumbbell Lateral Raises of Cable Lateral Raises", sets: 3, repsMin: 12, repsMax: 15, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["shoulders"] },
+                    { id: "b-face-pulls", name: "Face Pulls", sets: 3, repsMin: 12, repsMax: 15, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["rear_shoulders", "upper_back"] },
+                    { id: "b-dead-bug", name: "Dead Bug of Bird Dog", sets: 2, repsMin: 10, repsMax: 12, restSeconds: 45, exerciseType: "bodyweight_reps", category: "core", muscleGroups: ["core"] },
+                    { id: "b-tricep-dips", name: "Tricep Dips of Cable Tricep Pushdown", sets: 2, repsMin: 10, repsMax: 12, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["triceps"] }
+                ]
+            }
+        ]
+    },
+    {
+        id: "preset_home_bodyweight",
+        planId: "home-bodyweight-starter",
+        schemaVersion: "2.0",
+        name: "Full Body Thuis & Lichaamsgewicht",
+        description: "Effectieve full body training zonder dat je gewichten of apparaten nodig hebt. Ideaal om thuis te starten met krachttraining en een stabiele routine op te bouwen.",
+        author: "GoFitness Coach",
+        version: "2.0.0",
+        targetAudience: "beginner",
+        level: "Beginner",
+        goal: "Basiskracht en conditie thuis opbouwen",
+        schedule: {
+            frequencyType: "sessions_per_week",
+            targetSessionsPerWeek: 3,
+            defaultSessionOrder: ["home-full-body-1", "home-full-body-2"],
+            recommendedPattern: "3x per week met minstens 1 rustdag ertussen",
+            minRecoveryHours: 48,
+            estimatedWeeklyMinutes: 105
+        },
+        progressionGlobalRules: {
+            primaryMethod: "double_progression",
+            description: "Bouw eerst het aantal herhalingen en hold-tijd op met een goede uitvoering voordat je naar zwaardere varianten gaat."
+        },
+        recoveryRules: {
+            minGlobalRecoveryHours: 48,
+            muscleGroupRecoveryHours: {
+                chest: 48,
+                back: 48,
+                legs: 48,
+                core: 24,
+                shoulders: 48
+            }
+        },
+        equipment: ["Eigen lichaamsgewicht", "Mat"],
+        sessions: [
+            {
+                id: "home-full-body-1",
+                sessionId: "home-full-body-1",
+                name: "Thuis Sessie A (Benen & Borst Focus)",
+                description: "Krachttraining voor benen, borst, triceps en core met lichaamsgewicht.",
+                estimatedDurationMinutes: 35,
+                exercises: [
+                    { id: "home-squats", name: "Barbell Back Squat", alternatives: ["Bodyweight Squat", "Air Squat"], sets: 3, repsMin: 12, repsMax: 20, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["legs", "glutes"] },
+                    { id: "home-pushups", name: "Push-Up", sets: 3, repsMin: 8, repsMax: 15, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["chest", "triceps", "shoulders"] },
+                    { id: "home-lunges", name: "Bulgarian Split Squat", alternatives: ["Walking Lunges", "Bodyweight Lunges"], sets: 3, repsMin: 10, repsMax: 15, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["legs", "glutes"] },
+                    { id: "home-plank", name: "Plank", sets: 3, durationSecondsMin: 30, durationSecondsMax: 60, restSeconds: 45, exerciseType: "duration", category: "isometric", muscleGroups: ["core"] },
+                    { id: "home-dips", name: "Chest / Tricep Dips", alternatives: ["Chair Dips", "Bench Dips"], sets: 3, repsMin: 8, repsMax: 12, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["triceps", "chest"] }
+                ]
+            },
+            {
+                id: "home-full-body-2",
+                sessionId: "home-full-body-2",
+                name: "Thuis Sessie B (Rug, Schouders & Core)",
+                description: "Balans, schouderstabiliteit en corekracht zonder gewichten.",
+                estimatedDurationMinutes: 35,
+                exercises: [
+                    { id: "home-pullup-row", name: "Pull-Up / Chin-Up", alternatives: ["Doorframe Row", "Towel Row", "Inverted Row"], sets: 3, repsMin: 8, repsMax: 12, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["back", "biceps"] },
+                    { id: "home-glute-bridge", name: "Conventional Deadlift", alternatives: ["Glute Bridge", "Single-Leg Glute Bridge"], sets: 3, repsMin: 12, repsMax: 20, restSeconds: 45, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["glutes", "legs"] },
+                    { id: "home-pike-pushups", name: "Overhead Press (OHP)", alternatives: ["Pike Push-Up", "Elevated Pike Push-Up"], sets: 3, repsMin: 6, repsMax: 12, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["shoulders", "triceps"] },
+                    { id: "home-side-plank", name: "Plank", alternatives: ["Side Plank"], sets: 2, durationSecondsMin: 20, durationSecondsMax: 45, restSeconds: 45, exerciseType: "duration", category: "isometric", muscleGroups: ["core"] }
+                ]
+            }
+        ]
+    },
+    {
+        id: "preset_upper_lower_split",
+        planId: "upper-lower-4day-split",
+        schemaVersion: "2.0",
+        name: "Upper / Lower Split (4 Dagen)",
+        description: "Klassieke en effectieve 4-daagse split voor wie 4 keer per week wil trainen. Afwisseling tussen Bovenlichaam en Onderlichaam voor maximale progressie en optimaal herstel.",
+        author: "GoFitness Coach",
+        version: "2.0.0",
+        targetAudience: "intermediate",
+        level: "Gemiddeld",
+        goal: "Spiermassa en krachtopbouw",
+        schedule: {
+            frequencyType: "sessions_per_week",
+            targetSessionsPerWeek: 4,
+            defaultSessionOrder: ["upper-a", "lower-a", "upper-b", "lower-b"],
+            recommendedPattern: "Ma: Upper A, Di: Lower A, Do: Upper B, Vr: Lower B",
+            minRecoveryHours: 48,
+            estimatedWeeklyMinutes: 180
+        },
+        progressionGlobalRules: {
+            primaryMethod: "double_progression",
+            description: "Hanteer progressive overload: probeer wekelijks herhalingen of gewicht te verhogen binnen de range."
+        },
+        recoveryRules: {
+            minGlobalRecoveryHours: 48,
+            muscleGroupRecoveryHours: {
+                chest: 48,
+                back: 48,
+                legs: 72,
+                glutes: 72,
+                shoulders: 48,
+                biceps: 48,
+                triceps: 48,
+                core: 24
+            }
+        },
+        equipment: ["Barbell", "Dumbbells", "Kabelstation", "Machines"],
+        sessions: [
+            {
+                id: "upper-a",
+                sessionId: "upper-a",
+                name: "Upper Body A (Krachttraining)",
+                description: "Zware compound bewegingen voor borst, rug, schouders en armen.",
+                estimatedDurationMinutes: 45,
+                exercises: [
+                    { id: "u-a-bench", name: "Barbell Bench Press", sets: 4, repsMin: 6, repsMax: 10, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["chest", "triceps", "shoulders"] },
+                    { id: "u-a-row", name: "Barbell Bent Over Row", sets: 4, repsMin: 6, repsMax: 10, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "biceps"] },
+                    { id: "u-a-ohp", name: "Overhead Press (OHP)", sets: 3, repsMin: 8, repsMax: 10, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["shoulders", "triceps"] },
+                    { id: "u-a-pulldown", name: "Lat Pulldown", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "biceps"] },
+                    { id: "u-a-curls", name: "Dumbbell Bicep Curls", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["biceps"] },
+                    { id: "u-a-dips", name: "Chest / Tricep Dips", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["triceps", "chest"] }
+                ]
+            },
+            {
+                id: "lower-a",
+                sessionId: "lower-a",
+                name: "Lower Body A (Squat Focus)",
+                description: "Focus op quadriceps, hamstrings, glutes en core.",
+                estimatedDurationMinutes: 45,
+                exercises: [
+                    { id: "l-a-squat", name: "Barbell Back Squat", sets: 4, repsMin: 6, repsMax: 10, restSeconds: 120, exerciseType: "weight_reps", category: "compound", muscleGroups: ["legs", "glutes"] },
+                    { id: "l-a-rdl", name: "Romanian Deadlift (RDL)", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["legs", "glutes", "back"] },
+                    { id: "l-a-legpress", name: "Leg Press", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["legs", "glutes"] },
+                    { id: "l-a-legcurl", name: "Lying Leg Curl", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["legs"] },
+                    { id: "l-a-plank", name: "Plank", sets: 3, durationSecondsMin: 30, durationSecondsMax: 60, restSeconds: 45, exerciseType: "duration", category: "isometric", muscleGroups: ["core"] }
+                ]
+            },
+            {
+                id: "upper-b",
+                sessionId: "upper-b",
+                name: "Upper Body B (Hypertrofie)",
+                description: "Hogere herhalingen voor maximale spiergroei en schouderdefinitie.",
+                estimatedDurationMinutes: 45,
+                exercises: [
+                    { id: "u-b-incline", name: "Incline Dumbbell Press", sets: 4, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["chest", "shoulders", "triceps"] },
+                    { id: "u-b-pullup", name: "Pull-Up / Chin-Up", sets: 3, repsMin: 6, repsMax: 12, restSeconds: 90, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["back", "biceps"] },
+                    { id: "u-b-latraise", name: "Dumbbell Lateral Raise", sets: 4, repsMin: 12, repsMax: 15, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["shoulders"] },
+                    { id: "u-b-cable-row", name: "Seated Row", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "biceps"] },
+                    { id: "u-b-fly", name: "Dumbbell Chest Fly", sets: 3, repsMin: 12, repsMax: 15, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["chest"] }
+                ]
+            },
+            {
+                id: "lower-b",
+                sessionId: "lower-b",
+                name: "Lower Body B (Deadlift Focus)",
+                description: "Posterior chain focus met deadlifts en split squats.",
+                estimatedDurationMinutes: 45,
+                exercises: [
+                    { id: "l-b-deadlift", name: "Conventional Deadlift", sets: 3, repsMin: 5, repsMax: 8, restSeconds: 120, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "legs", "glutes"] },
+                    { id: "l-b-splitsquat", name: "Bulgarian Split Squat", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["legs", "glutes"] },
+                    { id: "l-b-legext", name: "Leg Extension", sets: 3, repsMin: 10, repsMax: 15, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["legs"] },
+                    { id: "l-b-legcurl", name: "Lying Leg Curl", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["legs"] },
+                    { id: "l-b-core", name: "Dead Bug of Bird Dog", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 45, exerciseType: "bodyweight_reps", category: "core", muscleGroups: ["core"] }
+                ]
+            }
+        ]
+    }
+];
+
 class DataStore {
     constructor() {
         // Only load if localStorage is defined (useful for testing environments)
@@ -957,6 +1195,8 @@ const app = {
 
         if (this.activeWorkout) {
             if (pickerWrapper) pickerWrapper.classList.add('hidden');
+            const choosePresetsBtn = document.getElementById('btn-home-presets');
+            if (choosePresetsBtn) choosePresetsBtn.classList.add('hidden');
             setCardText("Sessie in uitvoering", this.activeWorkout.session.name, "Je was al bezig met deze sessie. Pak hem weer op!");
             if (btnStart) {
                 btnStart.textContent = "Hervat Nu";
@@ -967,56 +1207,90 @@ const app = {
             const activePlan = store.getActivePlan();
             const recSession = this.getRecommendedSession();
 
-            if (pickerWrapper && sessionSelect) {
-                pickerWrapper.classList.remove('hidden');
-
-                let optionsHtml = '';
-                if (activePlan && activePlan.sessions && activePlan.sessions.length > 0) {
-                    optionsHtml += activePlan.sessions.map(s => {
-                        const sId = s.id || s.sessionId;
-                        const isRec = recSession && sId === (recSession.session.id || recSession.session.sessionId);
-                        const label = isRec ? `${this.escapeHTML(s.name)} (Aanbevolen)` : this.escapeHTML(s.name);
-                        return `<option value="${this.escapeHTML(sId)}"${isRec ? ' selected' : ''}>${label}</option>`;
-                    }).join('');
-                }
-                optionsHtml += `<option value="custom_session"${(!activePlan || !activePlan.sessions || activePlan.sessions.length === 0) ? ' selected' : ''}>➕ Vrije Sessie</option>`;
-
-                sessionSelect.innerHTML = optionsHtml;
-
-                const updateCardForSelectedSession = () => {
-                    const chosenVal = sessionSelect.value;
-                    if (chosenVal === 'custom_session') {
-                        setCardText("Vrije Sessie", "Vrije Sessie", "Start een blanco training zonder vaste oefeningen. Voeg tijdens het trainen oefeningen toe.");
-                        if (btnStart) {
-                            btnStart.textContent = "Start Vrije Sessie";
-                            btnStart.disabled = false;
-                            btnStart.onclick = () => this.startCustomWorkout();
-                        }
-                    } else if (activePlan) {
-                        const chosenSession = activePlan.sessions.find(s => (s.id || s.sessionId) === chosenVal);
-                        if (!chosenSession) return;
-                        const isRecChoice = recSession && (chosenSession.id || chosenSession.sessionId) === (recSession.session.id || recSession.session.sessionId);
-                        setCardText(
-                            isRecChoice ? "Aanbevolen Sessie" : "Gekozen Sessie",
-                            chosenSession.name,
-                            isRecChoice ? recSession.reason : `Handmatig gekozen uit schema (${activePlan.name}).`
-                        );
-                        if (btnStart) {
-                            btnStart.textContent = "Start Nu";
-                            btnStart.disabled = false;
-                            btnStart.onclick = () => this.startWorkout(chosenSession, activePlan);
-                        }
-                    }
-                };
-
-                sessionSelect.onchange = updateCardForSelectedSession;
-                updateCardForSelectedSession();
-            } else {
-                setCardText("Vrije Sessie", "Vrije Sessie", "Start een blanco training zonder vaste oefeningen.");
+            if (!activePlan && store.plans.length === 0) {
+                if (pickerWrapper) pickerWrapper.classList.add('hidden');
+                setCardText(
+                    "⚡ Direct Starten",
+                    "Beginner Gym + Lichaamsgewicht Mix",
+                    "Start direct met ons 3-daagse Full Body beginnersschema (Full Body A & B) of kies een ander schema uit de preset bibliotheek."
+                );
                 if (btnStart) {
-                    btnStart.textContent = "Start Vrije Sessie";
+                    btnStart.textContent = "⚡ Start Beginnersschema";
                     btnStart.disabled = false;
-                    btnStart.onclick = () => this.startCustomWorkout();
+                    btnStart.onclick = () => this.loadPresetPlan('preset_beginner_gym_mix', true);
+                }
+                let choosePresetsBtn = document.getElementById('btn-home-presets');
+                if (!choosePresetsBtn && btnStart && btnStart.parentNode) {
+                    choosePresetsBtn = document.createElement('button');
+                    choosePresetsBtn.id = 'btn-home-presets';
+                    choosePresetsBtn.className = 'btn-secondary mt-2 w-full';
+                    choosePresetsBtn.innerHTML = '<span class="material-icons-round" style="font-size:1.1rem; vertical-align:middle; margin-right:4px;">auto_stories</span> Kies uit Preset Bibliotheek';
+                    choosePresetsBtn.onclick = () => {
+                        this.navigate('plans');
+                        setTimeout(() => {
+                            const pEl = document.getElementById('preset-plans-container');
+                            if (pEl) pEl.scrollIntoView({ behavior: 'smooth' });
+                        }, 100);
+                    };
+                    btnStart.parentNode.insertBefore(choosePresetsBtn, btnStart.nextSibling);
+                } else if (choosePresetsBtn) {
+                    choosePresetsBtn.classList.remove('hidden');
+                }
+            } else {
+                const choosePresetsBtn = document.getElementById('btn-home-presets');
+                if (choosePresetsBtn) choosePresetsBtn.classList.add('hidden');
+
+                if (pickerWrapper && sessionSelect) {
+                    pickerWrapper.classList.remove('hidden');
+
+                    let optionsHtml = '';
+                    if (activePlan && activePlan.sessions && activePlan.sessions.length > 0) {
+                        optionsHtml += activePlan.sessions.map(s => {
+                            const sId = s.id || s.sessionId;
+                            const isRec = recSession && sId === (recSession.session.id || recSession.session.sessionId);
+                            const label = isRec ? `${this.escapeHTML(s.name)} (Aanbevolen)` : this.escapeHTML(s.name);
+                            return `<option value="${this.escapeHTML(sId)}"${isRec ? ' selected' : ''}>${label}</option>`;
+                        }).join('');
+                    }
+                    optionsHtml += `<option value="custom_session"${(!activePlan || !activePlan.sessions || activePlan.sessions.length === 0) ? ' selected' : ''}>➕ Vrije Sessie</option>`;
+
+                    sessionSelect.innerHTML = optionsHtml;
+
+                    const updateCardForSelectedSession = () => {
+                        const chosenVal = sessionSelect.value;
+                        if (chosenVal === 'custom_session') {
+                            setCardText("Vrije Sessie", "Vrije Sessie", "Start een blanco training zonder vaste oefeningen. Voeg tijdens het trainen oefeningen toe.");
+                            if (btnStart) {
+                                btnStart.textContent = "Start Vrije Sessie";
+                                btnStart.disabled = false;
+                                btnStart.onclick = () => this.startCustomWorkout();
+                            }
+                        } else if (activePlan) {
+                            const chosenSession = activePlan.sessions.find(s => (s.id || s.sessionId) === chosenVal);
+                            if (!chosenSession) return;
+                            const isRecChoice = recSession && (chosenSession.id || chosenSession.sessionId) === (recSession.session.id || recSession.session.sessionId);
+                            setCardText(
+                                isRecChoice ? "Aanbevolen Sessie" : "Gekozen Sessie",
+                                chosenSession.name,
+                                isRecChoice ? recSession.reason : `Handmatig gekozen uit schema (${activePlan.name}).`
+                            );
+                            if (btnStart) {
+                                btnStart.textContent = "Start Nu";
+                                btnStart.disabled = false;
+                                btnStart.onclick = () => this.startWorkout(chosenSession, activePlan);
+                            }
+                        }
+                    };
+
+                    sessionSelect.onchange = updateCardForSelectedSession;
+                    updateCardForSelectedSession();
+                } else {
+                    setCardText("Vrije Sessie", "Vrije Sessie", "Start een blanco training zonder vaste oefeningen.");
+                    if (btnStart) {
+                        btnStart.textContent = "Start Vrije Sessie";
+                        btnStart.disabled = false;
+                        btnStart.onclick = () => this.startCustomWorkout();
+                    }
                 }
             }
         }
@@ -1057,7 +1331,11 @@ const app = {
     },
 
     renderPlans() {
+        this.renderPresets();
+        this.renderAIGenerator();
+
         const list = document.getElementById('plans-list');
+        if (!list) return;
         list.innerHTML = '';
 
         // Vrije Sessie kaart altijd bovenaan tonen in Schema's view
@@ -1077,7 +1355,7 @@ const app = {
         if(store.plans.length === 0) {
             const emptyNote = document.createElement('p');
             emptyNote.className = 'text-muted mt-2';
-            emptyNote.textContent = 'Nog geen vaste schema\'s geïmporteerd. Importeer een schema of start een Vrije Sessie!';
+            emptyNote.textContent = 'Nog geen eigen schema\'s geïmporteerd. Kies een schema uit de Preset Bibliotheek hierboven of importeer een bestand!';
             list.appendChild(emptyNote);
         } else {
             const sortedPlans = [...store.plans].sort((a, b) => {
@@ -1192,6 +1470,337 @@ const app = {
         }
 
         this.renderExerciseLibrary();
+    },
+
+    renderPresets() {
+        const container = document.getElementById('preset-plans-container');
+        if (!container) return;
+
+        const isExpanded = this._presetsExpanded !== undefined ? this._presetsExpanded : (store.plans.length === 0);
+
+        container.innerHTML = `
+            <div class="glass-panel">
+                <div class="preset-section-header" onclick="app.togglePresetsExpanded()">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="material-icons-round text-accent" style="font-size:1.4rem;">auto_stories</span>
+                        <div>
+                            <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Preset Bibliotheek</h3>
+                            <p class="text-sm text-muted mt-1">Kant-en-klare, beproefde startschema's</p>
+                        </div>
+                    </div>
+                    <span class="material-icons-round text-muted" style="font-size:1.3rem;">${isExpanded ? 'expand_less' : 'expand_more'}</span>
+                </div>
+                <div class="flex-col gap-3 mt-3 ${isExpanded ? '' : 'hidden'}" id="preset-plans-list">
+                    ${PRESET_PLANS.map(p => {
+                        const existing = store.plans.find(ep => ep.id === p.id || ep.planId === p.planId || (ep.name && ep.name.toLowerCase().trim() === p.name.toLowerCase().trim()));
+                        const isActive = existing && store.activePlanId === existing.id;
+                        const isAdded = !!existing;
+
+                        const tags = [];
+                        if (p.schedule && p.schedule.targetSessionsPerWeek) tags.push(`${p.schedule.targetSessionsPerWeek}x / week`);
+                        if (p.level) tags.push(p.level);
+
+                        let actionBtnHtml = '';
+                        if (isActive) {
+                            actionBtnHtml = `<span class="preset-badge success"><span class="material-icons-round" style="font-size:0.9rem;">check_circle</span> Actief</span>`;
+                        } else if (isAdded) {
+                            actionBtnHtml = `
+                                <button class="btn-secondary" style="padding:5px 12px; font-size:0.8rem;" onclick="app.setActivePlan('${this.escapeHTML(existing.id)}')">
+                                    Maak Actief
+                                </button>
+                            `;
+                        } else {
+                            actionBtnHtml = `
+                                <button class="btn-primary" style="padding:5px 12px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px;" onclick="app.loadPresetPlan('${this.escapeHTML(p.id)}')">
+                                    <span class="material-icons-round" style="font-size:1rem;">add</span> Gebruik dit schema
+                                </button>
+                            `;
+                        }
+
+                        return `
+                            <div class="preset-card flex-col gap-2">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                                    <div style="flex:1; min-width:0;">
+                                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                            <strong style="font-size:0.95rem; color:var(--text-primary);">${this.escapeHTML(p.name)}</strong>
+                                            ${tags.map(t => `<span class="preset-badge">${this.escapeHTML(t)}</span>`).join('')}
+                                        </div>
+                                        <p class="text-sm text-muted mt-1">${this.escapeHTML(p.description)}</p>
+                                    </div>
+                                    <div style="flex-shrink:0;">
+                                        ${actionBtnHtml}
+                                    </div>
+                                </div>
+                                <div class="text-sm text-muted" style="border-top:1px solid rgba(255,255,255,0.05); padding-top:6px; margin-top:2px;">
+                                    <strong>Sessies:</strong> ${this.escapeHTML(p.sessions.map(s => s.name).join(' • '))}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    },
+
+    togglePresetsExpanded() {
+        const isCurrent = this._presetsExpanded !== undefined ? this._presetsExpanded : (store.plans.length === 0);
+        this._presetsExpanded = !isCurrent;
+        this.renderPresets();
+    },
+
+    renderAIGenerator() {
+        const panel = document.getElementById('ai-generator-panel');
+        if (!panel) return;
+
+        panel.className = 'glass-panel ai-assistant-card';
+        panel.innerHTML = `
+            <div style="display:flex; align-items:flex-start; gap:12px;">
+                <div class="stat-icon-wrapper text-accent" style="width:40px; height:40px; flex-shrink:0; background:rgba(59,130,246,0.15); border-radius:10px; display:grid; place-items:center;">
+                    <span class="material-icons-round" style="font-size:1.4rem;">smart_toy</span>
+                </div>
+                <div style="flex:1; min-width:0;">
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                        <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.05rem;">Maak een persoonlijk schema met AI</h3>
+                        <span class="preset-badge" style="background:rgba(16, 185, 129, 0.12); color:var(--status-green); border-color:rgba(16, 185, 129, 0.25);">ChatGPT &bull; Claude &bull; Gemini</span>
+                    </div>
+                    <p class="text-sm text-muted mt-1">
+                        Laat een AI een schema op maat genereren dat 100% aansluit op onze ${store.getExerciseLibrary().length} library-oefeningen.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="actions-row mt-3">
+                <button class="btn-primary flex-1" onclick="app.copyAIPrompt()" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:0.85rem; padding:8px 12px;">
+                    <span class="material-icons-round" style="font-size:1.1rem;">content_copy</span> Kopieer AI Prompt
+                </button>
+                <button class="btn-secondary flex-1" onclick="app.downloadTemplateJSON()" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:0.85rem; padding:8px 12px;">
+                    <span class="material-icons-round" style="font-size:1.1rem;">download</span> Download Template
+                </button>
+            </div>
+
+            <div style="margin-top:10px; border-top:1px solid rgba(255,255,255,0.06); padding-top:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden'); const ic = this.querySelector('.ai-help-icon'); if(ic) ic.textContent = this.nextElementSibling.classList.contains('hidden') ? 'help_outline' : 'expand_less';">
+                    <span class="text-sm text-accent" style="display:flex; align-items:center; gap:4px; font-weight:600;">
+                        <span class="material-icons-round ai-help-icon" style="font-size:1.1rem;">help_outline</span> Hoe werkt dit in 3 stappen?
+                    </span>
+                    <span class="text-sm text-muted" style="font-size:0.75rem;">Uitleg</span>
+                </div>
+                <div class="text-sm text-muted mt-2 hidden" style="line-height:1.5; background:rgba(0,0,0,0.15); padding:10px 12px; border-radius:8px;">
+                    <ol style="margin-left:18px; display:flex; flex-direction:column; gap:6px;">
+                        <li>Klik op <strong>Kopieer AI Prompt</strong> en open <a href="https://chatgpt.com" target="_blank" rel="noopener" style="color:var(--accent-color); text-decoration:underline;">ChatGPT</a> of <a href="https://claude.ai" target="_blank" rel="noopener" style="color:var(--accent-color); text-decoration:underline;">Claude</a>.</li>
+                        <li>Plak de prompt en vul je eigen wensen in (bijv. aantal dagen per week, blessures of trainingslocatie).</li>
+                        <li>Kopieer de gegenereerde JSON code, kom terug naar GoFitness en klik bovenaan op <strong>Importeer</strong>!</li>
+                    </ol>
+                </div>
+            </div>
+        `;
+    },
+
+    loadPresetPlan(presetId, autoStartSession = false) {
+        const preset = PRESET_PLANS.find(p => p.id === presetId || p.planId === presetId);
+        if (!preset) {
+            this.showToast("Preset schema niet gevonden.", "error");
+            return null;
+        }
+
+        // Zoek of dit schema al aanwezig is
+        let existingPlan = store.plans.find(p => 
+            p.id === preset.id || 
+            p.planId === preset.planId || 
+            (p.name && preset.name && p.name.toLowerCase().trim() === preset.name.toLowerCase().trim())
+        );
+
+        if (!existingPlan) {
+            // Clone preset en geef uniek ID
+            const newPlan = JSON.parse(JSON.stringify(preset));
+            newPlan.id = store.generateId('plan');
+            store.plans.push(newPlan);
+            existingPlan = newPlan;
+        }
+
+        store.activePlanId = existingPlan.id;
+        store.save();
+        this.renderPlans();
+        this.renderHome();
+
+        if (autoStartSession && existingPlan.sessions && existingPlan.sessions.length > 0) {
+            this.showToast(`Schema '${existingPlan.name}' geactiveerd!`, "success");
+            this.startWorkout(existingPlan.sessions[0], existingPlan);
+        } else {
+            this.showToast(`Schema '${existingPlan.name}' toegevoegd en geactiveerd!`, "success");
+        }
+
+        return existingPlan;
+    },
+
+    getAIPromptText() {
+        const lib = store.getExerciseLibrary();
+        
+        // Groepeer oefeningen overzichtelijk per categorie/spiergroep
+        const exerciseLines = lib.map(ex => {
+            const mg = Array.isArray(ex.muscleGroups) ? ex.muscleGroups.join(', ') : '';
+            const type = ex.exerciseType || 'weight_reps';
+            const cat = ex.category || 'compound';
+            return `- "${ex.name}" [Type: ${type}, Categorie: ${cat}, Spiergroepen: ${mg || 'n.v.t.'}]`;
+        }).join('\n');
+
+        return `Je bent een professionele krachttraining coach en schema-expert. Maak een trainingsschema op maat dat 100% compatibel is met de GoFitness app.
+
+GEBRUIKERSINFORMATIE / WENSEN:
+- Trainingsdoel: Basiskracht en spiermassa opbouwen
+- Frequentie: 3x per week (A-B-A / B-A-B rotatie of vaste dagen)
+- Beschikbare apparatuur: Sportschool (halters, barbells, kabels en machines) en lichaamsgewicht
+- Ervaringsniveau: Beginner tot gemiddeld
+- Specifieke wensen/blessures: Geen (pas dit naar wens aan)
+
+EISEN EN INSTRUCTIES VOOR DE UITVOER:
+1. Lever UITSLUITEND een valide JSON-object op (geen inleidende tekst, geen markdown toelichting buiten de JSON codeblock, alleen pure JSON).
+2. Gebruik exact de onderstaande GoFitness Schema v2.0 JSON structuur.
+3. Koppel de oefeningen in de sessies bij voorkeur aan de onderstaande bestaande GoFitness Library oefeningen voor een naadloze match met PR-tracking en statistieken.
+
+GOFITNESS OEFENINGENBIBLIOTHEEK (Gebruik bij voorkeur deze exacte namen):
+${exerciseLines}
+
+GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
+{
+  "schemaVersion": "2.0",
+  "name": "Beginner Gym + Lichaamsgewicht Mix",
+  "description": "Gebalanceerd 2-daags full body schema voor beginners (3x per week in A-B-A / B-A-B rotatie).",
+  "level": "Beginner",
+  "goal": "Basiskracht en trainingsroutine opbouwen",
+  "targetAudience": "beginner",
+  "schedule": {
+    "frequencyType": "sessions_per_week",
+    "targetSessionsPerWeek": 3,
+    "defaultSessionOrder": ["full-body-a", "full-body-b"],
+    "recommendedPattern": "A-B-A, volgende week B-A-B",
+    "minRecoveryHours": 48
+  },
+  "progressionGlobalRules": {
+    "primaryMethod": "double_progression",
+    "description": "Verhoog eerst herhalingen binnen de range. Zodra maximale herhalingen in alle sets gehaald zijn, verhoog je het gewicht met een kleine stap."
+  },
+  "recoveryRules": {
+    "minGlobalRecoveryHours": 48,
+    "muscleGroupRecoveryHours": {
+      "chest": 48,
+      "back": 48,
+      "legs": 72,
+      "glutes": 48,
+      "shoulders": 48,
+      "biceps": 48,
+      "triceps": 48,
+      "core": 24
+    }
+  },
+  "equipment": ["Leg Press", "Bench Press", "Dumbbells", "Lat Pulldown"],
+  "sessions": [
+    {
+      "id": "full-body-a",
+      "sessionId": "full-body-a",
+      "name": "Full Body A",
+      "description": "Basissessie met nadruk op grote bewegingen, rugwerk, schouders en biceps.",
+      "exercises": [
+        {
+          "id": "a-leg-press-or-squat",
+          "name": "Leg Press of Squat",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 12,
+          "restSeconds": 90,
+          "exerciseType": "weight_reps",
+          "category": "compound",
+          "muscleGroups": ["legs", "glutes"]
+        },
+        {
+          "id": "a-bench-press",
+          "name": "Barbell Bench Press",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 12,
+          "restSeconds": 90,
+          "exerciseType": "weight_reps",
+          "category": "compound",
+          "muscleGroups": ["chest", "triceps", "shoulders"]
+        },
+        {
+          "id": "a-lat-pulldown",
+          "name": "Lat Pulldown",
+          "sets": 3,
+          "repsMin": 8,
+          "repsMax": 12,
+          "restSeconds": 90,
+          "exerciseType": "weight_reps",
+          "category": "compound",
+          "muscleGroups": ["back", "biceps"]
+        },
+        {
+          "id": "a-pushups",
+          "name": "Push-Up",
+          "sets": 2,
+          "repsMin": 8,
+          "repsMax": 15,
+          "restSeconds": 60,
+          "exerciseType": "bodyweight_reps",
+          "category": "bodyweight",
+          "muscleGroups": ["chest", "triceps", "shoulders"]
+        },
+        {
+          "id": "a-plank",
+          "name": "Plank",
+          "sets": 3,
+          "durationSecondsMin": 20,
+          "durationSecondsMax": 40,
+          "restSeconds": 45,
+          "exerciseType": "duration",
+          "category": "isometric",
+          "muscleGroups": ["core"]
+        }
+      ]
+    }
+  ]
+}`;
+    },
+
+    async copyAIPrompt() {
+        const text = this.getAIPromptText();
+        try {
+            if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+                this.showToast("AI Prompt gekopieerd naar klembord!", "success");
+                return;
+            }
+        } catch (e) {
+            console.warn("Clipboard API error:", e);
+        }
+
+        // Fallback via textarea
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            this.showToast("AI Prompt gekopieerd naar klembord!", "success");
+        } catch (err) {
+            this.showToast("Kon prompt niet kopiëren.", "error");
+        }
+    },
+
+    downloadTemplateJSON() {
+        const template = PRESET_PLANS[0];
+        const shareable = JSON.parse(JSON.stringify(template));
+        delete shareable.id;
+        const json = JSON.stringify(shareable, null, 2);
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(json);
+        const dlAnchorElem = document.createElement('a');
+        dlAnchorElem.setAttribute("href", dataStr);
+        dlAnchorElem.setAttribute("download", "gofitness_schema_template.json");
+        dlAnchorElem.click();
+        this.showToast("Template JSON gedownload!", "success");
     },
 
     renderProgress() {
@@ -5642,5 +6251,5 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !(typeof
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { DataStore, app, store, html, rawHtml };
+    module.exports = { DataStore, app, store, html, rawHtml, PRESET_PLANS, DEFAULT_EXERCISES };
 }
