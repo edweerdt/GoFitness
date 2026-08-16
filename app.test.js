@@ -3227,7 +3227,31 @@ describe('add and remove sets during workout', () => {
             expect(bicepEntry.maxKg).toBe(14);
         });
     });
+
+    describe('GOF-23: Sessie Header minder hoog', () => {
+        it('should have reduced vertical padding for .workout-header in style.css compared to .top-nav', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const cssPath = path.join(__dirname, 'style.css');
+            const cssContent = fs.readFileSync(cssPath, 'utf8');
+
+            // .workout-header should have 12px vertical padding (reduced from 20px by ~1/3)
+            expect(cssContent).toMatch(/\.workout-header\s*\{[^}]*padding:\s*12px\s+20px;/);
+            // .top-nav should maintain its standard 20px padding
+            expect(cssContent).toMatch(/\.top-nav\s*\{[^}]*padding:\s*20px;/);
+        });
+
+        it('should have .workout-header element in the workout view in index.html', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const htmlPath = path.join(__dirname, 'index.html');
+            const htmlContent = fs.readFileSync(htmlPath, 'utf8');
+
+            expect(htmlContent).toContain('<header class="workout-header">');
+        });
+    });
 });
+
 
 
 
