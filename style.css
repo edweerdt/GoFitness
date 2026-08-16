@@ -1190,3 +1190,65 @@ button:disabled {
     background: var(--surface-color);
 }
 
+/* QR Code Scanner Overlay */
+.qr-scanner-reticle {
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.reticle-corner {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-color: var(--accent-color);
+    border-style: solid;
+    border-width: 0;
+}
+
+.reticle-corner.top-left {
+    top: 0; left: 0;
+    border-top-width: 3px;
+    border-left-width: 3px;
+    border-top-left-radius: 8px;
+}
+.reticle-corner.top-right {
+    top: 0; right: 0;
+    border-top-width: 3px;
+    border-right-width: 3px;
+    border-top-right-radius: 8px;
+}
+.reticle-corner.bottom-left {
+    bottom: 0; left: 0;
+    border-bottom-width: 3px;
+    border-left-width: 3px;
+    border-bottom-left-radius: 8px;
+}
+.reticle-corner.bottom-right {
+    bottom: 0; right: 0;
+    border-bottom-width: 3px;
+    border-right-width: 3px;
+    border-bottom-right-radius: 8px;
+}
+
+.scanner-laser-line {
+    position: absolute;
+    top: 0;
+    left: 4px;
+    right: 4px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #00e5ff, var(--accent-color), transparent);
+    box-shadow: 0 0 8px #00e5ff;
+    animation: qrScanLaser 2s infinite ease-in-out alternate;
+}
+
+@keyframes qrScanLaser {
+    0% { top: 6px; opacity: 0.8; }
+    100% { top: 170px; opacity: 0.8; }
+}
+
+

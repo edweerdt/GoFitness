@@ -750,6 +750,12 @@ const app = {
         this.renderPlans();
         this.renderProgress();
         this.renderAchievements();
+
+        // 1-Klik deellink detectie bij opstarten en bij hash-wijziging
+        if (typeof window !== 'undefined') {
+            this.checkUrlForImportedPlan();
+            window.addEventListener('hashchange', () => this.checkUrlForImportedPlan());
+        }
     },
 
     toggleTheme() {
@@ -5116,59 +5122,135 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         }
     },
 
-    // Deelt een schema als JSON via de Web Share API, met klembord en download als fallback
-    async sharePlan(planId) {
+    // --- 1-KLIK DEELLINKS & QR-CODES VOOR SCHEMA'S ---
+
+    activeSharePlanId: null,
+    planToImportFromLink: null,
+    qrScannerStream: null,
+    qrScannerAnimId: null,
+
+    encodePlanForUrl(plan) {
+        if (!plan) return '';
+        const clean = { ...plan };
+        delete clean.id;
+        const json = JSON.stringify(clean);
+        try {
+            if (typeof TextEncoder !== 'undefined') {
+                const bytes = new TextEncoder().encode(json);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                if (typeof btoa !== 'undefined') {
+                    return encodeURIComponent(btoa(binary));
+                }
+            }
+        } catch (e) {}
+        return encodeURIComponent(json);
+    },
+
+    decodePlanFromUrl(encodedStr) {
+        if (!encodedStr) return null;
+        try {
+            let decoded = decodeURIComponent(encodedStr);
+            try {
+                if (typeof atob !== 'undefined') {
+                    const binary = atob(decoded);
+                    if (typeof TextDecoder !== 'undefined') {
+                        const bytes = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                        decoded = new TextDecoder().decode(bytes);
+                    } else {
+                        decoded = binary;
+                    }
+                }
+            } catch (b64Err) {}
+
+            const data = JSON.parse(decoded);
+            DataStore.validatePlanSchema(data);
+            return data;
+        } catch (e) {
+            console.warn('Kon schema niet decoderen uit URL/QR:', e);
+            return null;
+        }
+    },
+
+    getPlanShareUrl(planId) {
+        const plan = store.plans.find(p => p.id === planId);
+        if (!plan) return '';
+        const enc = this.encodePlanForUrl(plan);
+        const origin = (typeof window !== 'undefined' && window.location) ? (window.location.origin + window.location.pathname) : 'https://gofitness.app/';
+        return `${origin}#plan=${enc}`;
+    },
+
+    openSharePlanModal(planId) {
         const plan = store.plans.find(p => p.id === planId);
         if (!plan) return;
 
-        // Interne id niet meegeven; de ontvanger krijgt bij import een eigen id
-        const shareable = { ...plan };
-        delete shareable.id;
-        const json = JSON.stringify(shareable, null, 2);
-        const fileName = `${String(plan.name || 'schema').toLowerCase().replace(/[^a-z0-9]+/g, '_')}.json`;
+        this.activeSharePlanId = planId;
+        const modal = document.getElementById('modal-share-plan');
+        const titleEl = document.getElementById('share-plan-modal-title');
+        const subtitleEl = document.getElementById('share-plan-modal-subtitle');
+        const canvas = document.getElementById('share-plan-qr-canvas');
 
-        // 1. Probeer Web Share API (eerst als bestand, dan als tekst bij permission/support errors)
-        if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-            let file = null;
-            try {
-                if (typeof File !== 'undefined') {
-                    file = new File([json], fileName, { type: 'application/json' });
-                }
-            } catch (fileErr) {}
+        if (titleEl) titleEl.textContent = `Schema Delen: ${plan.name}`;
+        if (subtitleEl) subtitleEl.textContent = `Scan met de camera van een andere telefoon of deel de directe link:`;
 
-            if (file && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({ files: [file], title: plan.name });
-                    return;
-                } catch (shareFileErr) {
-                    if (shareFileErr && shareFileErr.name === 'AbortError') return; // gebruiker annuleerde het delen
-                    // Bij Permission denied / NotAllowedError of type blocking, val door naar tekst-share of klembord
-                }
-            }
+        const shareUrl = this.getPlanShareUrl(planId);
 
-            try {
-                await navigator.share({ title: plan.name, text: json });
-                return;
-            } catch (shareTextErr) {
-                if (shareTextErr && shareTextErr.name === 'AbortError') return; // gebruiker annuleerde het delen
-                // Val door naar klembord / download
+        if (canvas) {
+            const qrGen = (typeof QRGenerator !== 'undefined') ? QRGenerator : (typeof global !== 'undefined' ? global.QRGenerator : null);
+            if (qrGen && typeof qrGen.drawToCanvas === 'function') {
+                qrGen.drawToCanvas(canvas, shareUrl, { size: 240, margin: 12 });
             }
         }
 
-        // 2. Fallback: Klembord
+        if (modal) modal.classList.remove('hidden');
+    },
+
+    hideSharePlanModal() {
+        this.activeSharePlanId = null;
+        const modal = document.getElementById('modal-share-plan');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    async sharePlanLink(planId = null) {
+        const id = planId || this.activeSharePlanId;
+        const plan = store.plans.find(p => p.id === id);
+        if (!plan) return;
+
+        const shareUrl = this.getPlanShareUrl(id);
+        const title = `Fitness Schema: ${plan.name}`;
+        const text = `Bekijk en importeer mijn fitness-schema "${plan.name}" in GoFitness:`;
+
+        if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+            try {
+                await navigator.share({ title, text, url: shareUrl });
+                return;
+            } catch (e) {
+                if (e && e.name === 'AbortError') return;
+            }
+        }
+
+        // Fallback: kopiëren
+        this.copyPlanLink(id);
+    },
+
+    async copyPlanLink(planId = null) {
+        const id = planId || this.activeSharePlanId;
+        const plan = store.plans.find(p => p.id === id);
+        if (!plan) return;
+
+        const shareUrl = this.getPlanShareUrl(id);
         if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
             try {
-                await navigator.clipboard.writeText(json);
-                this.showToast('Schema-JSON gekopieerd naar het klembord!', 'success');
+                await navigator.clipboard.writeText(shareUrl);
+                this.showToast('1-Klik deellink gekopieerd naar het klembord!', 'success');
                 return;
-            } catch (clipErr) {
-                // Val door naar document.execCommand of download
-            }
+            } catch (e) {}
         }
 
         try {
             const textarea = document.createElement('textarea');
-            textarea.value = json;
+            textarea.value = shareUrl;
             textarea.style.position = 'fixed';
             textarea.style.opacity = '0';
             document.body.appendChild(textarea);
@@ -5177,13 +5259,285 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             const success = document.execCommand('copy');
             document.body.removeChild(textarea);
             if (success) {
-                this.showToast('Schema-JSON gekopieerd naar het klembord!', 'success');
+                this.showToast('1-Klik deellink gekopieerd naar het klembord!', 'success');
                 return;
             }
-        } catch (execErr) {}
+        } catch (e) {}
 
-        // 3. Fallback: Download JSON bestand
-        this.downloadPlan(planId);
+        this.showToast('Link kon niet worden gekopieerd.', 'error');
+    },
+
+    downloadActiveSharePlan() {
+        if (this.activeSharePlanId) {
+            this.downloadPlan(this.activeSharePlanId);
+        }
+    },
+
+    // Opent de interactieve modal met QR-code en deellink
+    async sharePlan(planId) {
+        this.openSharePlanModal(planId);
+    },
+
+    // --- DEEP LINK ONTVANGST & 1-KLIK IMPORT PROMPT ---
+
+    checkUrlForImportedPlan() {
+        if (typeof window === 'undefined' || !window.location || !window.location.hash) return;
+        const hash = window.location.hash;
+        let planData = null;
+
+        if (hash.startsWith('#plan=')) {
+            const encoded = hash.slice(6);
+            planData = this.decodePlanFromUrl(encoded);
+        } else if (hash.startsWith('#import=')) {
+            const encoded = hash.slice(8);
+            planData = this.decodePlanFromUrl(encoded);
+        }
+
+        if (planData) {
+            this.showPlanImportPromptModal(planData);
+        }
+    },
+
+    showPlanImportPromptModal(planData) {
+        this.planToImportFromLink = planData;
+        const modal = document.getElementById('modal-confirm-import-link');
+        const previewEl = document.getElementById('link-import-preview');
+
+        if (previewEl) {
+            previewEl.textContent = ''; // Clear existing content safely
+
+            const nameEl = document.createElement('div');
+            nameEl.style.fontSize = '0.95rem';
+            nameEl.style.fontWeight = '700';
+            nameEl.style.color = 'var(--text-primary)';
+            nameEl.style.marginBottom = '6px';
+            nameEl.textContent = planData.name || 'Schema';
+            previewEl.appendChild(nameEl);
+
+            if (planData.description) {
+                const descEl = document.createElement('p');
+                descEl.className = 'text-sm text-muted';
+                descEl.style.marginBottom = '8px';
+                descEl.textContent = planData.description;
+                previewEl.appendChild(descEl);
+            }
+
+            const totalEx = (planData.sessions || []).reduce((sum, s) => sum + (s.exercises ? s.exercises.length : 0), 0);
+            const statsEl = document.createElement('div');
+            statsEl.className = 'text-sm text-muted';
+            statsEl.style.marginBottom = '8px';
+            statsEl.textContent = `Sessies: ${(planData.sessions || []).length} | Totaal oefeningen: ${totalEx}`;
+            previewEl.appendChild(statsEl);
+
+            const sessionsBox = document.createElement('div');
+            sessionsBox.style.background = 'rgba(0,0,0,0.2)';
+            sessionsBox.style.padding = '8px 10px';
+            sessionsBox.style.borderRadius = '8px';
+            sessionsBox.style.maxHeight = '160px';
+            sessionsBox.style.overflowY = 'auto';
+
+            (planData.sessions || []).forEach(s => {
+                const row = document.createElement('div');
+                row.style.fontSize = '0.85rem';
+                row.style.marginTop = '4px';
+
+                const strongEl = document.createElement('strong');
+                strongEl.textContent = `• ${s.name || 'Sessie'}: `;
+                row.appendChild(strongEl);
+
+                const spanEl = document.createElement('span');
+                spanEl.className = 'text-muted';
+                const exNames = (s.exercises || []).map(e => e.name).slice(0, 3).join(', ');
+                const extraCount = (s.exercises || []).length > 3 ? ` en +${(s.exercises || []).length - 3} meer` : '';
+                spanEl.textContent = exNames + extraCount;
+                row.appendChild(spanEl);
+
+                sessionsBox.appendChild(row);
+            });
+
+            previewEl.appendChild(sessionsBox);
+        }
+
+        if (modal) modal.classList.remove('hidden');
+    },
+
+    hidePlanImportPromptModal() {
+        this.planToImportFromLink = null;
+        const modal = document.getElementById('modal-confirm-import-link');
+        if (modal) modal.classList.add('hidden');
+
+        // URL hash opschonen zonder page refresh
+        if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
+            window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        }
+    },
+
+    confirmImportFromLink() {
+        if (!this.planToImportFromLink) return;
+        const plan = this.planToImportFromLink;
+        this.executeImport(plan);
+        this.hidePlanImportPromptModal();
+        this.navigate('plans');
+    },
+
+    // --- QR-CODE SCANNER MET CAMERA & BARCODE DETECTOR ---
+
+    async startQrScanner() {
+        const modal = document.getElementById('modal-qr-scanner');
+        const video = document.getElementById('qr-scanner-video');
+        const statusEl = document.getElementById('qr-scanner-status');
+
+        if (modal) modal.classList.remove('hidden');
+        if (statusEl) statusEl.textContent = 'Camera initialiseren...';
+
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            if (statusEl) statusEl.textContent = 'Camera niet ondersteund. Kies een foto van de QR-code.';
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            });
+            this.qrScannerStream = stream;
+            if (video) {
+                video.srcObject = stream;
+                await video.play();
+                if (statusEl) statusEl.textContent = 'Richt camera op de QR-code';
+                this.runQrScanLoop();
+            }
+        } catch (err) {
+            console.warn('Camera toegang geweigerd of mislukt:', err);
+            if (statusEl) statusEl.textContent = 'Geen cameratoegang. Kies een foto van de QR-code.';
+        }
+    },
+
+    stopQrScanner() {
+        if (this.qrScannerAnimId) {
+            cancelAnimationFrame(this.qrScannerAnimId);
+            this.qrScannerAnimId = null;
+        }
+        if (this.qrScannerStream) {
+            try {
+                this.qrScannerStream.getTracks().forEach(t => t.stop());
+            } catch (e) {}
+            this.qrScannerStream = null;
+        }
+        const video = document.getElementById('qr-scanner-video');
+        if (video) {
+            video.srcObject = null;
+        }
+        const modal = document.getElementById('modal-qr-scanner');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    runQrScanLoop() {
+        const video = document.getElementById('qr-scanner-video');
+        const statusEl = document.getElementById('qr-scanner-status');
+
+        if (!video || !this.qrScannerStream || video.readyState < 2) {
+            this.qrScannerAnimId = requestAnimationFrame(() => this.runQrScanLoop());
+            return;
+        }
+
+        if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+            try {
+                const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+                detector.detect(video).then(barcodes => {
+                    if (barcodes && barcodes.length > 0) {
+                        const raw = barcodes[0].rawValue;
+                        if (this.processQrScannedText(raw)) {
+                            this.stopQrScanner();
+                            return;
+                        }
+                    }
+                    if (this.qrScannerStream) {
+                        this.qrScannerAnimId = requestAnimationFrame(() => this.runQrScanLoop());
+                    }
+                }).catch(() => {
+                    if (this.qrScannerStream) {
+                        this.qrScannerAnimId = requestAnimationFrame(() => this.runQrScanLoop());
+                    }
+                });
+                return;
+            } catch (e) {}
+        }
+
+        // Als BarcodeDetector niet aanwezig is in deze browser
+        if (statusEl) statusEl.textContent = 'Live scanner vereist Chromium/Android of kies een foto.';
+    },
+
+    processQrScannedText(rawText) {
+        if (!rawText) return false;
+        let planData = null;
+
+        // Check of rawText een URL met hash is
+        if (rawText.includes('#plan=')) {
+            const part = rawText.split('#plan=')[1];
+            planData = this.decodePlanFromUrl(part);
+        } else if (rawText.includes('#import=')) {
+            const part = rawText.split('#import=')[1];
+            planData = this.decodePlanFromUrl(part);
+        } else {
+            // Check of raw text een encoded string of JSON is
+            planData = this.decodePlanFromUrl(rawText);
+            if (!planData) {
+                try {
+                    const parsed = JSON.parse(rawText);
+                    DataStore.validatePlanSchema(parsed);
+                    planData = parsed;
+                } catch (e) {}
+            }
+        }
+
+        if (planData) {
+            this.showPlanImportPromptModal(planData);
+            return true;
+        }
+        return false;
+    },
+
+    async handleQrImageFile(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const statusEl = document.getElementById('qr-scanner-status');
+        if (statusEl) statusEl.textContent = 'Afbeelding analyseren...';
+
+        if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+            try {
+                const img = new Image();
+                img.onload = async () => {
+                    try {
+                        const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+                        const barcodes = await detector.detect(img);
+                        if (barcodes && barcodes.length > 0) {
+                            const raw = barcodes[0].rawValue;
+                            if (this.processQrScannedText(raw)) {
+                                this.stopQrScanner();
+                                return;
+                            }
+                        }
+                        if (statusEl) statusEl.textContent = 'Geen QR-code herkend in deze afbeelding.';
+                    } catch (err) {
+                        if (statusEl) statusEl.textContent = 'Fout bij analyseren afbeelding.';
+                    }
+                };
+                img.src = URL.createObjectURL(file);
+                return;
+            } catch (err) {}
+        }
+
+        // Fallback: lees JSON direct als bestand
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            if (this.processQrScannedText(evt.target.result)) {
+                this.stopQrScanner();
+            } else {
+                if (statusEl) statusEl.textContent = 'Geen geldig schema gevonden in het bestand.';
+            }
+        };
+        reader.readAsText(file);
     },
 
     openShareStatsModal() {

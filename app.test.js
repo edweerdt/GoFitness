@@ -1,4 +1,4 @@
-const { DataStore, app, store, html, rawHtml } = require('./app');
+const { DataStore, app, store, html, rawHtml, PRESET_PLANS } = require('./app');
 
 describe('DataStore', () => {
     let mockLocalStorage;
@@ -1346,12 +1346,43 @@ describe('exercise progress', () => {
     });
 });
 
-describe('sharePlan', () => {
+describe('sharePlan & 1-Click Deep Links / QR Code', () => {
     beforeEach(() => {
-        store.plans = [{ id: 'p1', name: 'Mijn Schema', sessions: [] }];
+        store.plans = [{
+            id: 'p1',
+            name: 'Mijn Schema (Test & Kracht)',
+            description: 'Schema met speciale karakters: é, ö, ü!',
+            sessions: [
+                {
+                    id: 's1',
+                    name: 'Sessie A',
+                    exercises: [{ name: 'Bankdrukken', sets: 3, reps: '8-10' }]
+                }
+            ]
+        }];
         store.activePlanId = 'p1';
         store.logs = [];
-        document.body.innerHTML = '<div id="toast-container"></div>';
+        document.body.innerHTML = `
+            <div id="toast-container"></div>
+            <div id="modal-overlay" class="modal-overlay hidden"></div>
+            <div id="modal-share-plan" class="modal-overlay hidden">
+                <h3 id="share-plan-modal-title"></h3>
+                <p id="share-plan-modal-subtitle"></p>
+                <canvas id="share-plan-qr-canvas"></canvas>
+            </div>
+            <div id="modal-qr-scanner" class="modal-overlay hidden">
+                <video id="qr-scanner-video"></video>
+                <div id="qr-scanner-status"></div>
+                <input type="file" id="qr-file-input">
+            </div>
+            <div id="modal-confirm-import-link" class="modal-overlay hidden">
+                <div id="link-import-preview"></div>
+                <button id="btn-confirm-link-import"></button>
+            </div>
+            <div id="view-plans" class="view">
+                <div id="plans-list"></div>
+            </div>
+        `;
         try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
         try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
         try { delete global.navigator.clipboard; } catch(e) { global.navigator.clipboard = undefined; }
@@ -1363,96 +1394,98 @@ describe('sharePlan', () => {
         try { delete global.navigator.clipboard; } catch(e) { global.navigator.clipboard = undefined; }
     });
 
-    it('should share as a file when navigator.canShare with files is supported', async () => {
-        const share = jest.fn().mockResolvedValue();
-        const canShare = jest.fn().mockReturnValue(true);
-        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
-        Object.defineProperty(global.navigator, 'canShare', { value: canShare, configurable: true, writable: true });
+    it('should encode plan into URL-safe string and decode it back identically', () => {
+        const plan = store.plans[0];
+        const encoded = app.encodePlanForUrl(plan);
+        expect(typeof encoded).toBe('string');
+        expect(encoded.length).toBeGreaterThan(10);
 
-        await app.sharePlan('p1');
-
-        expect(canShare).toHaveBeenCalledTimes(1);
-        expect(share).toHaveBeenCalledTimes(1);
-        const arg = share.mock.calls[0][0];
-        expect(arg.title).toBe('Mijn Schema');
-        expect(arg.files).toBeDefined();
-        expect(arg.files.length).toBe(1);
+        const decoded = app.decodePlanFromUrl(encoded);
+        expect(decoded).not.toBeNull();
+        expect(decoded.name).toBe(plan.name);
+        expect(decoded.description).toBe(plan.description);
+        expect(decoded.sessions.length).toBe(1);
+        expect(decoded.sessions[0].exercises[0].name).toBe('Bankdrukken');
+        // id should not be in encoded payload
+        expect(decoded.id).toBeUndefined();
     });
 
-    it('should fallback to sharing text when file sharing throws NotAllowedError', async () => {
-        const share = jest.fn()
-            .mockRejectedValueOnce(new DOMException('Permission denied', 'NotAllowedError'))
-            .mockResolvedValueOnce();
-        const canShare = jest.fn().mockReturnValue(true);
-        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
-        Object.defineProperty(global.navigator, 'canShare', { value: canShare, configurable: true, writable: true });
+    it('should open share plan modal and generate QR code on canvas', () => {
+        const modal = document.getElementById('modal-share-plan');
+        const titleEl = document.getElementById('share-plan-modal-title');
+        const canvas = document.getElementById('share-plan-qr-canvas');
 
-        await app.sharePlan('p1');
+        app.openSharePlanModal('p1');
 
-        expect(share).toHaveBeenCalledTimes(2);
-        const textArg = share.mock.calls[1][0];
-        expect(textArg.title).toBe('Mijn Schema');
-        expect(textArg.text).toContain('"name": "Mijn Schema"');
+        expect(modal.classList.contains('hidden')).toBe(false);
+        expect(titleEl.textContent).toContain('Mijn Schema');
+        expect(app.activeSharePlanId).toBe('p1');
     });
 
-    it('should fallback to clipboard when Web Share throws Permission denied or fails', async () => {
-        const share = jest.fn().mockRejectedValue(new DOMException('Permission denied', 'NotAllowedError'));
-        const writeText = jest.fn().mockResolvedValue();
-        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
-        Object.defineProperty(global.navigator, 'clipboard', { value: { writeText }, configurable: true, writable: true });
-
-        await app.sharePlan('p1');
-
-        expect(writeText).toHaveBeenCalledTimes(1);
-        expect(writeText.mock.calls[0][0]).toContain('Mijn Schema');
-    });
-
-    it('should not fallback or show errors when user cancels share (AbortError)', async () => {
-        const share = jest.fn().mockRejectedValue(new DOMException('User cancelled', 'AbortError'));
-        const writeText = jest.fn().mockResolvedValue();
-        Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
-        Object.defineProperty(global.navigator, 'clipboard', { value: { writeText }, configurable: true, writable: true });
-
-        await app.sharePlan('p1');
-
-        expect(writeText).not.toHaveBeenCalled();
-    });
-
-    it('should share the plan JSON without the internal id via the Web Share API text share', async () => {
+    it('should trigger navigator.share with 1-click URL when sharePlanLink is called', async () => {
         const share = jest.fn().mockResolvedValue();
         Object.defineProperty(global.navigator, 'share', { value: share, configurable: true, writable: true });
 
-        await app.sharePlan('p1');
+        await app.sharePlanLink('p1');
 
         expect(share).toHaveBeenCalledTimes(1);
         const arg = share.mock.calls[0][0];
-        expect(arg.title).toBe('Mijn Schema');
-        expect(arg.text).toContain('"name": "Mijn Schema"');
-        expect(arg.text).not.toContain('"id"');
+        expect(arg.title).toContain('Mijn Schema');
+        expect(arg.url).toContain('#plan=');
     });
 
-    it('should copy the JSON to the clipboard when Web Share is unavailable', async () => {
-        try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
-        try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
+    it('should copy 1-click URL to clipboard when copyPlanLink is called', async () => {
         const writeText = jest.fn().mockResolvedValue();
         Object.defineProperty(global.navigator, 'clipboard', { value: { writeText }, configurable: true, writable: true });
 
-        await app.sharePlan('p1');
+        await app.copyPlanLink('p1');
 
         expect(writeText).toHaveBeenCalledTimes(1);
-        expect(writeText.mock.calls[0][0]).toContain('Mijn Schema');
+        expect(writeText.mock.calls[0][0]).toContain('#plan=');
     });
 
-    it('should fallback to downloadPlan when Web Share and clipboard are unavailable', async () => {
-        try { delete global.navigator.share; } catch(e) { global.navigator.share = undefined; }
-        try { delete global.navigator.canShare; } catch(e) { global.navigator.canShare = undefined; }
-        try { delete global.navigator.clipboard; } catch(e) { global.navigator.clipboard = undefined; }
-        const downloadSpy = jest.spyOn(app, 'downloadPlan').mockImplementation(() => {});
+    it('should detect #plan= hash on URL and show 1-click import prompt modal', () => {
+        const plan = store.plans[0];
+        const encoded = app.encodePlanForUrl(plan);
+        window.location.hash = `#plan=${encoded}`;
 
-        await app.sharePlan('p1');
+        app.checkUrlForImportedPlan();
 
-        expect(downloadSpy).toHaveBeenCalledWith('p1');
-        downloadSpy.mockRestore();
+        const confirmModal = document.getElementById('modal-confirm-import-link');
+        const previewEl = document.getElementById('link-import-preview');
+
+        expect(confirmModal.classList.contains('hidden')).toBe(false);
+        expect(previewEl.innerHTML).toContain('Mijn Schema');
+        expect(app.planToImportFromLink).not.toBeNull();
+    });
+
+    it('should confirm and import plan from link when confirmImportFromLink is clicked', () => {
+        const newPlanData = {
+            name: 'Nieuw Gedeeld Schema',
+            sessions: [{ name: 'Sessie 1', exercises: [{ name: 'Squat', sets: 3 }] }]
+        };
+        app.showPlanImportPromptModal(newPlanData);
+        expect(app.planToImportFromLink).toEqual(newPlanData);
+
+        const importSpy = jest.spyOn(store, 'importPlan');
+        app.confirmImportFromLink();
+
+        expect(importSpy).toHaveBeenCalledWith(newPlanData);
+        expect(app.planToImportFromLink).toBeNull();
+        expect(document.getElementById('modal-confirm-import-link').classList.contains('hidden')).toBe(true);
+        importSpy.mockRestore();
+    });
+
+    it('should process scanned QR text and trigger import prompt', () => {
+        const plan = store.plans[0];
+        const encoded = app.encodePlanForUrl(plan);
+        const qrText = `https://gofitness.app/#plan=${encoded}`;
+
+        const handled = app.processQrScannedText(qrText);
+        expect(handled).toBe(true);
+
+        const confirmModal = document.getElementById('modal-confirm-import-link');
+        expect(confirmModal.classList.contains('hidden')).toBe(false);
     });
 
     it('should download plan as JSON file via downloadPlan', () => {
