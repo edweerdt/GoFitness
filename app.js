@@ -5304,23 +5304,58 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const previewEl = document.getElementById('link-import-preview');
 
         if (previewEl) {
+            previewEl.textContent = ''; // Clear existing content safely
+
+            const nameEl = document.createElement('div');
+            nameEl.style.fontSize = '0.95rem';
+            nameEl.style.fontWeight = '700';
+            nameEl.style.color = 'var(--text-primary)';
+            nameEl.style.marginBottom = '6px';
+            nameEl.textContent = planData.name || 'Schema';
+            previewEl.appendChild(nameEl);
+
+            if (planData.description) {
+                const descEl = document.createElement('p');
+                descEl.className = 'text-sm text-muted';
+                descEl.style.marginBottom = '8px';
+                descEl.textContent = planData.description;
+                previewEl.appendChild(descEl);
+            }
+
             const totalEx = (planData.sessions || []).reduce((sum, s) => sum + (s.exercises ? s.exercises.length : 0), 0);
-            const sessionsSummary = (planData.sessions || []).map(s => {
+            const statsEl = document.createElement('div');
+            statsEl.className = 'text-sm text-muted';
+            statsEl.style.marginBottom = '8px';
+            statsEl.textContent = `Sessies: ${(planData.sessions || []).length} | Totaal oefeningen: ${totalEx}`;
+            previewEl.appendChild(statsEl);
+
+            const sessionsBox = document.createElement('div');
+            sessionsBox.style.background = 'rgba(0,0,0,0.2)';
+            sessionsBox.style.padding = '8px 10px';
+            sessionsBox.style.borderRadius = '8px';
+            sessionsBox.style.maxHeight = '160px';
+            sessionsBox.style.overflowY = 'auto';
+
+            (planData.sessions || []).forEach(s => {
+                const row = document.createElement('div');
+                row.style.fontSize = '0.85rem';
+                row.style.marginTop = '4px';
+
+                const strongEl = document.createElement('strong');
+                strongEl.textContent = `• ${s.name || 'Sessie'}: `;
+                row.appendChild(strongEl);
+
+                const spanEl = document.createElement('span');
+                spanEl.className = 'text-muted';
                 const exNames = (s.exercises || []).map(e => e.name).slice(0, 3).join(', ');
                 const extraCount = (s.exercises || []).length > 3 ? ` en +${(s.exercises || []).length - 3} meer` : '';
-                return `<div style="font-size:0.85rem; margin-top:4px;"><strong>• ${this.escapeHTML(s.name)}</strong>: <span class="text-muted">${this.escapeHTML(exNames + extraCount)}</span></div>`;
-            }).join('');
+                spanEl.textContent = exNames + extraCount;
+                row.appendChild(spanEl);
 
-            previewEl.innerHTML = `
-                <div style="font-size:0.95rem; font-weight:700; color:var(--text-primary); margin-bottom:6px;">${this.escapeHTML(planData.name)}</div>
-                ${planData.description ? `<p class="text-sm text-muted" style="margin-bottom:8px;">${this.escapeHTML(planData.description)}</p>` : ''}
-                <div class="text-sm text-muted" style="margin-bottom:8px;">
-                    <strong>Sessies:</strong> ${(planData.sessions || []).length} | <strong>Totaal oefeningen:</strong> ${totalEx}
-                </div>
-                <div style="background:rgba(0,0,0,0.2); padding:8px 10px; border-radius:8px; max-height:160px; overflow-y:auto;">
-                    ${sessionsSummary}
-                </div>
-            `;
+                sessionsBox.appendChild(row);
+            });
+
+            previewEl.appendChild(sessionsBox);
         }
 
         if (modal) modal.classList.remove('hidden');
