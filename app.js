@@ -4468,7 +4468,46 @@ const app = {
         dlAnchorElem.click();
     },
 
-    // Deelt een schema als JSON via de Web Share API, met klembord als fallback
+    downloadPlan(planId) {
+        const plan = store.plans.find(p => p.id === planId);
+        if (!plan) return;
+
+        const shareable = { ...plan };
+        delete shareable.id;
+        const json = JSON.stringify(shareable, null, 2);
+        const fileName = `${String(plan.name || 'schema').toLowerCase().replace(/[^a-z0-9]+/g, '_')}.json`;
+
+        try {
+            if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                if (this.showToast) this.showToast('Schema gedownload als JSON bestand!', 'success');
+                return;
+            }
+        } catch (e) {}
+
+        try {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(json);
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", fileName);
+            document.body.appendChild(dlAnchorElem);
+            dlAnchorElem.click();
+            document.body.removeChild(dlAnchorElem);
+            if (this.showToast) this.showToast('Schema gedownload als JSON bestand!', 'success');
+        } catch (err) {
+            if (this.showToast) this.showToast('Download mislukt: ' + (err.message || err), 'error');
+        }
+    },
+
+    // Deelt een schema als JSON via de Web Share API, met klembord en download als fallback
     async sharePlan(planId) {
         const plan = store.plans.find(p => p.id === planId);
         if (!plan) return;
@@ -4479,32 +4518,63 @@ const app = {
         const json = JSON.stringify(shareable, null, 2);
         const fileName = `${String(plan.name || 'schema').toLowerCase().replace(/[^a-z0-9]+/g, '_')}.json`;
 
-        try {
-            if (typeof navigator !== 'undefined' && navigator.share) {
-                let file = null;
-                try {
-                    if (typeof File !== 'undefined') {
-                        file = new File([json], fileName, { type: 'application/json' });
-                    }
-                } catch (fileErr) {}
-
-                if (file && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-                    await navigator.share({ files: [file], title: plan.name });
-                } else {
-                    await navigator.share({ title: plan.name, text: json });
+        // 1. Probeer Web Share API (eerst als bestand, dan als tekst bij permission/support errors)
+        if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+            let file = null;
+            try {
+                if (typeof File !== 'undefined') {
+                    file = new File([json], fileName, { type: 'application/json' });
                 }
-                return;
+            } catch (fileErr) {}
+
+            if (file && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({ files: [file], title: plan.name });
+                    return;
+                } catch (shareFileErr) {
+                    if (shareFileErr && shareFileErr.name === 'AbortError') return; // gebruiker annuleerde het delen
+                    // Bij Permission denied / NotAllowedError of type blocking, val door naar tekst-share of klembord
+                }
             }
-            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+
+            try {
+                await navigator.share({ title: plan.name, text: json });
+                return;
+            } catch (shareTextErr) {
+                if (shareTextErr && shareTextErr.name === 'AbortError') return; // gebruiker annuleerde het delen
+                // Val door naar klembord / download
+            }
+        }
+
+        // 2. Fallback: Klembord
+        if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            try {
                 await navigator.clipboard.writeText(json);
                 this.showToast('Schema-JSON gekopieerd naar het klembord!', 'success');
                 return;
+            } catch (clipErr) {
+                // Val door naar document.execCommand of download
             }
-            this.showToast('Delen wordt niet ondersteund in deze browser.', 'error');
-        } catch (e) {
-            if (e && e.name === 'AbortError') return; // gebruiker annuleerde het delen
-            this.showToast('Delen mislukt: ' + (e.message || e), 'error');
         }
+
+        try {
+            const textarea = document.createElement('textarea');
+            textarea.value = json;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            const success = document.execCommand('copy');
+            document.body.removeChild(textarea);
+            if (success) {
+                this.showToast('Schema-JSON gekopieerd naar het klembord!', 'success');
+                return;
+            }
+        } catch (execErr) {}
+
+        // 3. Fallback: Download JSON bestand
+        this.downloadPlan(planId);
     },
 
     openShareStatsModal() {
