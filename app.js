@@ -5134,23 +5134,60 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const clean = { ...plan };
         delete clean.id;
         const json = JSON.stringify(clean);
+
+        // Synchronous fallback bytes
+        let fallbackResult = '';
         try {
             if (typeof TextEncoder !== 'undefined') {
                 const bytes = new TextEncoder().encode(json);
                 let binary = '';
                 for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
                 if (typeof btoa !== 'undefined') {
-                    return encodeURIComponent(btoa(binary));
+                    fallbackResult = encodeURIComponent(btoa(binary));
                 }
             }
         } catch (e) {}
-        return encodeURIComponent(json);
+        if (!fallbackResult) fallbackResult = encodeURIComponent(json);
+
+        // If Web Streams CompressionStream is available, return a Promise for async compression
+        if (typeof CompressionStream !== 'undefined' && typeof Blob !== 'undefined' && typeof Response !== 'undefined') {
+            try {
+                const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('deflate'));
+                return new Response(stream).arrayBuffer().then(buf => {
+                    const bytes = new Uint8Array(buf);
+                    let binary = '';
+                    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                    return 'z:' + encodeURIComponent(btoa(binary));
+                }).catch(() => fallbackResult);
+            } catch (e) {}
+        }
+
+        return fallbackResult;
     },
 
     decodePlanFromUrl(encodedStr) {
         if (!encodedStr) return null;
         try {
             let decoded = decodeURIComponent(encodedStr);
+            if (decoded.startsWith('z:')) {
+                decoded = decoded.slice(2);
+                if (typeof atob !== 'undefined') {
+                    const binary = atob(decoded);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                    if (typeof DecompressionStream !== 'undefined' && typeof Blob !== 'undefined' && typeof Response !== 'undefined') {
+                        try {
+                            const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+                            return new Response(stream).text().then(text => {
+                                const data = JSON.parse(text);
+                                DataStore.validatePlanSchema(data);
+                                return data;
+                            }).catch(() => null);
+                        } catch (e) {}
+                    }
+                }
+            }
+
             try {
                 if (typeof atob !== 'undefined') {
                     const binary = atob(decoded);
@@ -5173,37 +5210,58 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         }
     },
 
-    getPlanShareUrl(planId) {
-        const plan = store.plans.find(p => p.id === planId);
+    async getPlanShareUrl(planId) {
+        const plan = store.plans.find(p => p.id === planId || (p.planId && p.planId === planId));
         if (!plan) return '';
-        const enc = this.encodePlanForUrl(plan);
+        const enc = await Promise.resolve(this.encodePlanForUrl(plan));
         const origin = (typeof window !== 'undefined' && window.location) ? (window.location.origin + window.location.pathname) : 'https://gofitness.app/';
         return `${origin}#plan=${enc}`;
     },
 
-    openSharePlanModal(planId) {
-        const plan = store.plans.find(p => p.id === planId);
-        if (!plan) return;
+    async openSharePlanModal(planId) {
+        const plan = store.plans.find(p => p.id === planId || (p.planId && p.planId === planId));
+        if (!plan) {
+            this.showToast('Schema niet gevonden.', 'error');
+            return;
+        }
 
-        this.activeSharePlanId = planId;
+        this.activeSharePlanId = plan.id;
         const modal = document.getElementById('modal-share-plan');
         const titleEl = document.getElementById('share-plan-modal-title');
         const subtitleEl = document.getElementById('share-plan-modal-subtitle');
         const canvas = document.getElementById('share-plan-qr-canvas');
+        const qrContainer = document.getElementById('share-plan-qr-container');
+        const qrNotice = document.getElementById('share-plan-qr-notice');
 
         if (titleEl) titleEl.textContent = `Schema Delen: ${plan.name}`;
         if (subtitleEl) subtitleEl.textContent = `Scan met de camera van een andere telefoon of deel de directe link:`;
 
-        const shareUrl = this.getPlanShareUrl(planId);
-
-        if (canvas) {
-            const qrGen = (typeof QRGenerator !== 'undefined') ? QRGenerator : (typeof global !== 'undefined' ? global.QRGenerator : null);
-            if (qrGen && typeof qrGen.drawToCanvas === 'function') {
-                qrGen.drawToCanvas(canvas, shareUrl, { size: 240, margin: 12 });
-            }
-        }
-
+        // Direct de modal tonen zodat de gebruiker instant respons heeft
         if (modal) modal.classList.remove('hidden');
+
+        try {
+            const shareUrl = await this.getPlanShareUrl(plan.id);
+
+            if (canvas) {
+                const qrGen = (typeof QRGenerator !== 'undefined') ? QRGenerator : (typeof global !== 'undefined' ? global.QRGenerator : null);
+                if (qrGen && typeof qrGen.drawToCanvas === 'function') {
+                    try {
+                        qrGen.drawToCanvas(canvas, shareUrl, { size: 240, margin: 12 });
+                        if (qrContainer) qrContainer.style.display = 'inline-flex';
+                        if (qrNotice) qrNotice.classList.add('hidden');
+                    } catch (qrErr) {
+                        console.warn('QR code kon niet worden getekend:', qrErr);
+                        if (qrContainer) qrContainer.style.display = 'none';
+                        if (qrNotice) {
+                            qrNotice.textContent = 'Dit schema is te groot voor een QR-code. Gebruik de knoppen hieronder om direct de link te delen of het schema te downloaden.';
+                            qrNotice.classList.remove('hidden');
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Fout bij voorbereiden van schema share URL:', err);
+        }
     },
 
     hideSharePlanModal() {
@@ -5214,10 +5272,10 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
     async sharePlanLink(planId = null) {
         const id = planId || this.activeSharePlanId;
-        const plan = store.plans.find(p => p.id === id);
+        const plan = store.plans.find(p => p.id === id || (p.planId && p.planId === id));
         if (!plan) return;
 
-        const shareUrl = this.getPlanShareUrl(id);
+        const shareUrl = await this.getPlanShareUrl(plan.id);
         const title = `Fitness Schema: ${plan.name}`;
         const text = `Bekijk en importeer mijn fitness-schema "${plan.name}" in GoFitness:`;
 
@@ -5236,10 +5294,10 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
     async copyPlanLink(planId = null) {
         const id = planId || this.activeSharePlanId;
-        const plan = store.plans.find(p => p.id === id);
+        const plan = store.plans.find(p => p.id === id || (p.planId && p.planId === id));
         if (!plan) return;
 
-        const shareUrl = this.getPlanShareUrl(id);
+        const shareUrl = await this.getPlanShareUrl(plan.id);
         if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
             try {
                 await navigator.clipboard.writeText(shareUrl);
@@ -5275,22 +5333,22 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
     // Opent de interactieve modal met QR-code en deellink
     async sharePlan(planId) {
-        this.openSharePlanModal(planId);
+        await this.openSharePlanModal(planId);
     },
 
     // --- DEEP LINK ONTVANGST & 1-KLIK IMPORT PROMPT ---
 
-    checkUrlForImportedPlan() {
+    async checkUrlForImportedPlan() {
         if (typeof window === 'undefined' || !window.location || !window.location.hash) return;
         const hash = window.location.hash;
         let planData = null;
 
         if (hash.startsWith('#plan=')) {
             const encoded = hash.slice(6);
-            planData = this.decodePlanFromUrl(encoded);
+            planData = await Promise.resolve(this.decodePlanFromUrl(encoded));
         } else if (hash.startsWith('#import=')) {
             const encoded = hash.slice(8);
-            planData = this.decodePlanFromUrl(encoded);
+            planData = await Promise.resolve(this.decodePlanFromUrl(encoded));
         }
 
         if (planData) {
@@ -5467,20 +5525,20 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (statusEl) statusEl.textContent = 'Live scanner vereist Chromium/Android of kies een foto.';
     },
 
-    processQrScannedText(rawText) {
+    async processQrScannedText(rawText) {
         if (!rawText) return false;
         let planData = null;
 
         // Check of rawText een URL met hash is
         if (rawText.includes('#plan=')) {
             const part = rawText.split('#plan=')[1];
-            planData = this.decodePlanFromUrl(part);
+            planData = await Promise.resolve(this.decodePlanFromUrl(part));
         } else if (rawText.includes('#import=')) {
             const part = rawText.split('#import=')[1];
-            planData = this.decodePlanFromUrl(part);
+            planData = await Promise.resolve(this.decodePlanFromUrl(part));
         } else {
             // Check of raw text een encoded string of JSON is
-            planData = this.decodePlanFromUrl(rawText);
+            planData = await Promise.resolve(this.decodePlanFromUrl(rawText));
             if (!planData) {
                 try {
                     const parsed = JSON.parse(rawText);
@@ -5513,7 +5571,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         const barcodes = await detector.detect(img);
                         if (barcodes && barcodes.length > 0) {
                             const raw = barcodes[0].rawValue;
-                            if (this.processQrScannedText(raw)) {
+                            const success = await this.processQrScannedText(raw);
+                            if (success) {
                                 this.stopQrScanner();
                                 return;
                             }
@@ -5530,8 +5589,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         // Fallback: lees JSON direct als bestand
         const reader = new FileReader();
-        reader.onload = (evt) => {
-            if (this.processQrScannedText(evt.target.result)) {
+        reader.onload = async (evt) => {
+            const success = await this.processQrScannedText(evt.target.result);
+            if (success) {
                 this.stopQrScanner();
             } else {
                 if (statusEl) statusEl.textContent = 'Geen geldig schema gevonden in het bestand.';
