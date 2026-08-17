@@ -5254,11 +5254,79 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         }
     },
 
+    generateShortShareCode() {
+        const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+        let code = 'GF-';
+        for (let i = 0; i < 4; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+    },
+
+    async publishPlanToCloud(plan) {
+        if (!plan) return null;
+        const db = (typeof getDb === 'function') ? getDb() : ((typeof firebase !== 'undefined' && firebase.firestore) ? firebase.firestore() : null);
+        if (!db) return null;
+
+        try {
+            const code = (plan.shareCode && typeof plan.shareCode === 'string' && plan.shareCode.startsWith('GF-')) 
+                ? plan.shareCode 
+                : this.generateShortShareCode();
+            const cleaned = this.cleanPlanForSharing(plan);
+            const docRef = db.collection('shared_plans').doc(code);
+            await docRef.set({
+                plan: cleaned,
+                name: plan.name || 'Schema',
+                createdAt: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) 
+                    ? firebase.firestore.FieldValue.serverTimestamp() 
+                    : new Date().toISOString()
+            });
+            plan.shareCode = code;
+            store.save();
+            return code;
+        } catch (e) {
+            console.warn('Kon schema niet publiceren naar Firestore cloud:', e);
+            return null;
+        }
+    },
+
+    async fetchPlanFromCloud(code) {
+        if (!code) return null;
+        const db = (typeof getDb === 'function') ? getDb() : ((typeof firebase !== 'undefined' && firebase.firestore) ? firebase.firestore() : null);
+        if (!db) return null;
+
+        try {
+            const cleanCode = code.trim().toUpperCase();
+            const docRef = db.collection('shared_plans').doc(cleanCode);
+            const snap = await docRef.get();
+            if (snap && snap.exists) {
+                const data = snap.data();
+                if (data && data.plan) {
+                    DataStore.validatePlanSchema(data.plan);
+                    return data.plan;
+                }
+            }
+        } catch (e) {
+            console.warn('Kon schema niet ophalen uit Firestore cloud:', e);
+        }
+        return null;
+    },
+
     async getPlanShareUrl(planId) {
         const plan = store.plans.find(p => p.id === planId || (p.planId && p.planId === planId));
         if (!plan) return '';
-        const enc = await Promise.resolve(this.encodePlanForUrl(plan));
         const origin = (typeof window !== 'undefined' && window.location) ? (window.location.origin + window.location.pathname) : 'https://gofitness.app/';
+
+        // Probeer eerst een super compacte cloud share code te genereren (GF-XXXX)
+        try {
+            const shortCode = await this.publishPlanToCloud(plan);
+            if (shortCode) {
+                return `${origin}#p=${shortCode}`;
+            }
+        } catch (e) {}
+
+        // Offline fallback: gecomprimeerde URL-safe deep link
+        const enc = await Promise.resolve(this.encodePlanForUrl(plan));
         return `${origin}#plan=${enc}`;
     },
 
@@ -5387,7 +5455,14 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const hash = window.location.hash;
         let planData = null;
 
-        if (hash.startsWith('#plan=')) {
+        if (hash.startsWith('#p=')) {
+            const shortCode = hash.slice(3).split('&')[0];
+            planData = await this.fetchPlanFromCloud(shortCode);
+            if (!planData) {
+                this.showToast('Gedeeld schema kon niet worden gevonden of is verlopen.', 'error');
+                return;
+            }
+        } else if (hash.startsWith('#plan=')) {
             const encoded = hash.slice(6);
             planData = await Promise.resolve(this.decodePlanFromUrl(encoded));
         } else if (hash.startsWith('#import=')) {
@@ -5574,12 +5649,21 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         let planData = null;
 
         // Check of rawText een URL met hash is
-        if (rawText.includes('#plan=')) {
-            const part = rawText.split('#plan=')[1];
+        if (rawText.includes('#p=')) {
+            const part = rawText.split('#p=')[1].split('&')[0];
+            planData = await this.fetchPlanFromCloud(part);
+            if (!planData) {
+                this.showToast('Gedeeld schema kon niet worden gevonden.', 'error');
+                return false;
+            }
+        } else if (rawText.includes('#plan=')) {
+            const part = rawText.split('#plan=')[1].split('&')[0];
             planData = await Promise.resolve(this.decodePlanFromUrl(part));
         } else if (rawText.includes('#import=')) {
-            const part = rawText.split('#import=')[1];
+            const part = rawText.split('#import=')[1].split('&')[0];
             planData = await Promise.resolve(this.decodePlanFromUrl(part));
+        } else if (rawText.trim().startsWith('GF-')) {
+            planData = await this.fetchPlanFromCloud(rawText.trim());
         } else {
             // Check of raw text een encoded string of JSON is
             planData = await Promise.resolve(this.decodePlanFromUrl(rawText));
