@@ -5129,10 +5129,49 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     qrScannerStream: null,
     qrScannerAnimId: null,
 
+    cleanPlanForSharing(plan) {
+        if (!plan) return null;
+        return {
+            schemaVersion: plan.schemaVersion || '2.0',
+            name: plan.name || 'Schema',
+            description: plan.description || undefined,
+            level: plan.level || undefined,
+            goal: plan.goal || undefined,
+            targetAudience: plan.targetAudience || undefined,
+            schedule: plan.schedule || undefined,
+            progressionGlobalRules: plan.progressionGlobalRules || undefined,
+            recoveryRules: plan.recoveryRules || undefined,
+            sessions: (plan.sessions || []).map(s => {
+                const sess = {
+                    name: s.name || 'Sessie'
+                };
+                if (s.description) sess.description = s.description;
+                if (s.estimatedDurationMinutes) sess.estimatedDurationMinutes = s.estimatedDurationMinutes;
+                if (s.warmup) sess.warmup = s.warmup;
+                if (s.cooldown) sess.cooldown = s.cooldown;
+                sess.exercises = (s.exercises || []).map(e => {
+                    const ex = { name: e.name || 'Oefening' };
+                    if (e.sets !== undefined) ex.sets = e.sets;
+                    if (e.repsMin !== undefined) ex.repsMin = e.repsMin;
+                    if (e.repsMax !== undefined) ex.repsMax = e.repsMax;
+                    if (e.restSeconds !== undefined) ex.restSeconds = e.restSeconds;
+                    if (e.exerciseType) ex.exerciseType = e.exerciseType;
+                    if (e.category) ex.category = e.category;
+                    if (e.weightKg !== undefined) ex.weightKg = e.weightKg;
+                    if (e.durationSecondsMin !== undefined) ex.durationSecondsMin = e.durationSecondsMin;
+                    if (e.durationSecondsMax !== undefined) ex.durationSecondsMax = e.durationSecondsMax;
+                    if (e.durationSeconds !== undefined) ex.durationSeconds = e.durationSeconds;
+                    if (e.notes) ex.notes = e.notes;
+                    return ex;
+                });
+                return sess;
+            })
+        };
+    },
+
     encodePlanForUrl(plan) {
         if (!plan) return '';
-        const clean = { ...plan };
-        delete clean.id;
+        const clean = this.cleanPlanForSharing(plan);
         const json = JSON.stringify(clean);
 
         // Synchronous fallback bytes
@@ -5143,7 +5182,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 let binary = '';
                 for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
                 if (typeof btoa !== 'undefined') {
-                    fallbackResult = encodeURIComponent(btoa(binary));
+                    fallbackResult = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
                 }
             }
         } catch (e) {}
@@ -5157,7 +5196,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     const bytes = new Uint8Array(buf);
                     let binary = '';
                     for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-                    return 'z:' + encodeURIComponent(btoa(binary));
+                    const safeB64 = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                    return 'z:' + safeB64;
                 }).catch(() => fallbackResult);
             } catch (e) {}
         }
@@ -5169,28 +5209,32 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (!encodedStr) return null;
         try {
             let decoded = decodeURIComponent(encodedStr);
-            if (decoded.startsWith('z:')) {
-                decoded = decoded.slice(2);
-                if (typeof atob !== 'undefined') {
-                    const binary = atob(decoded);
-                    const bytes = new Uint8Array(binary.length);
-                    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                    if (typeof DecompressionStream !== 'undefined' && typeof Blob !== 'undefined' && typeof Response !== 'undefined') {
-                        try {
-                            const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
-                            return new Response(stream).text().then(text => {
-                                const data = JSON.parse(text);
-                                DataStore.validatePlanSchema(data);
-                                return data;
-                            }).catch(() => null);
-                        } catch (e) {}
-                    }
+            const isCompressed = decoded.startsWith('z:');
+            let b64 = isCompressed ? decoded.slice(2) : decoded;
+
+            // Restore standard base64 from URL-safe base64
+            b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+            while (b64.length % 4 !== 0) b64 += '=';
+
+            if (isCompressed && typeof atob !== 'undefined') {
+                const binary = atob(b64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                if (typeof DecompressionStream !== 'undefined' && typeof Blob !== 'undefined' && typeof Response !== 'undefined') {
+                    try {
+                        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+                        return new Response(stream).text().then(text => {
+                            const data = JSON.parse(text);
+                            DataStore.validatePlanSchema(data);
+                            return data;
+                        }).catch(() => null);
+                    } catch (e) {}
                 }
             }
 
             try {
                 if (typeof atob !== 'undefined') {
-                    const binary = atob(decoded);
+                    const binary = atob(b64);
                     if (typeof TextDecoder !== 'undefined') {
                         const bytes = new Uint8Array(binary.length);
                         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
