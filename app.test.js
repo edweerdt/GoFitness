@@ -1504,6 +1504,56 @@ describe('sharePlan & 1-Click Deep Links / QR Code', () => {
         expect(clickSpy).toHaveBeenCalled();
         document.createElement.mockRestore();
     });
+
+    it('should generate short share code and publish to cloud when Firestore is available', async () => {
+        const mockSet = jest.fn().mockResolvedValue();
+        const mockDoc = jest.fn().mockReturnValue({ set: mockSet });
+        const mockCollection = jest.fn().mockReturnValue({ doc: mockDoc });
+        const mockDb = { collection: mockCollection };
+
+        global.getDb = jest.fn().mockReturnValue(mockDb);
+
+        const plan = store.plans[0];
+        const code = await app.publishPlanToCloud(plan);
+
+        expect(code).toMatch(/^GF-[A-Z0-9]{4}$/);
+        expect(mockCollection).toHaveBeenCalledWith('shared_plans');
+        expect(mockDoc).toHaveBeenCalledWith(code);
+        expect(mockSet).toHaveBeenCalledTimes(1);
+        expect(plan.shareCode).toBe(code);
+
+        const shareUrl = await app.getPlanShareUrl('p1');
+        expect(shareUrl).toContain(`#p=${code}`);
+
+        delete global.getDb;
+    });
+
+    it('should fetch plan from cloud and show import modal when #p= shortcode is opened', async () => {
+        const cloudPlan = {
+            schemaVersion: '2.0',
+            name: 'Cloud Workout Plan',
+            sessions: [{ name: 'Sessie 1', exercises: [{ name: 'Bench Press', sets: 3 }] }]
+        };
+
+        const mockGet = jest.fn().mockResolvedValue({ exists: true, data: () => ({ plan: cloudPlan }) });
+        const mockDoc = jest.fn().mockReturnValue({ get: mockGet });
+        const mockCollection = jest.fn().mockReturnValue({ doc: mockDoc });
+        const mockDb = { collection: mockCollection };
+
+        global.getDb = jest.fn().mockReturnValue(mockDb);
+
+        window.location.hash = '#p=GF-9K2M';
+        await app.checkUrlForImportedPlan();
+
+        const confirmModal = document.getElementById('modal-confirm-import-link');
+        const previewEl = document.getElementById('link-import-preview');
+
+        expect(confirmModal.classList.contains('hidden')).toBe(false);
+        expect(previewEl.textContent).toContain('Cloud Workout Plan');
+        expect(app.planToImportFromLink).toEqual(cloudPlan);
+
+        delete global.getDb;
+    });
 });
 
 describe('wake lock', () => {
