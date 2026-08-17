@@ -1444,18 +1444,18 @@ describe('sharePlan & 1-Click Deep Links / QR Code', () => {
         expect(writeText.mock.calls[0][0]).toContain('#plan=');
     });
 
-    it('should detect #plan= hash on URL and show 1-click import prompt modal', () => {
+    it('should detect #plan= hash on URL and show 1-click import prompt modal', async () => {
         const plan = store.plans[0];
-        const encoded = app.encodePlanForUrl(plan);
+        const encoded = await app.encodePlanForUrl(plan);
         window.location.hash = `#plan=${encoded}`;
 
-        app.checkUrlForImportedPlan();
+        await app.checkUrlForImportedPlan();
 
         const confirmModal = document.getElementById('modal-confirm-import-link');
         const previewEl = document.getElementById('link-import-preview');
 
         expect(confirmModal.classList.contains('hidden')).toBe(false);
-        expect(previewEl.innerHTML).toContain('Mijn Schema');
+        expect(previewEl.textContent).toContain('Mijn Schema');
         expect(app.planToImportFromLink).not.toBeNull();
     });
 
@@ -1476,12 +1476,12 @@ describe('sharePlan & 1-Click Deep Links / QR Code', () => {
         importSpy.mockRestore();
     });
 
-    it('should process scanned QR text and trigger import prompt', () => {
+    it('should process scanned QR text and trigger import prompt', async () => {
         const plan = store.plans[0];
-        const encoded = app.encodePlanForUrl(plan);
+        const encoded = await app.encodePlanForUrl(plan);
         const qrText = `https://gofitness.app/#plan=${encoded}`;
 
-        const handled = app.processQrScannedText(qrText);
+        const handled = await app.processQrScannedText(qrText);
         expect(handled).toBe(true);
 
         const confirmModal = document.getElementById('modal-confirm-import-link');

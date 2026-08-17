@@ -524,9 +524,10 @@
                 </div>
                 <p id="share-plan-modal-subtitle" class="text-sm text-muted" style="margin-bottom:16px;">Scan met een andere telefoon of deel de directe link:</p>
                 
-                <div style="background: #ffffff; padding: 14px; border-radius: 16px; display: inline-flex; justify-content: center; align-items: center; margin: 0 auto 16px auto; box-shadow: 0 8px 24px rgba(0,0,0,0.35);">
+                <div id="share-plan-qr-container" style="background: #ffffff; padding: 14px; border-radius: 16px; display: inline-flex; justify-content: center; align-items: center; margin: 0 auto 16px auto; box-shadow: 0 8px 24px rgba(0,0,0,0.35);">
                     <canvas id="share-plan-qr-canvas" style="display:block; max-width:100%; height:auto; border-radius: 8px;"></canvas>
                 </div>
+                <div id="share-plan-qr-notice" class="text-sm text-muted hidden" style="background: rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; margin-bottom: 16px; line-height: 1.4;"></div>
 
                 <div class="flex-col gap-2 mt-2">
                     <button class="btn-primary w-full" id="btn-share-plan-native" onclick="app.sharePlanLink()" style="display:inline-flex; align-items:center; justify-content:center; gap:8px;">
