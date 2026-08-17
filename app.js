@@ -1480,60 +1480,68 @@ const app = {
 
         container.innerHTML = `
             <div class="glass-panel">
-                <div class="preset-section-header" onclick="app.togglePresetsExpanded()">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span class="material-icons-round text-accent" style="font-size:1.4rem;">auto_stories</span>
-                        <div>
-                            <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Preset Bibliotheek</h3>
-                            <p class="text-sm text-muted mt-1">Kant-en-klare, beproefde startschema's</p>
-                        </div>
+                <div class="preset-section-header" onclick="app.togglePresetsExpanded()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                    <div>
+                        <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Preset Bibliotheek</h3>
+                        <p class="text-sm text-muted mt-1">Kant-en-klare, beproefde startschema's</p>
                     </div>
                     <span class="material-icons-round text-muted" style="font-size:1.3rem;">${isExpanded ? 'expand_less' : 'expand_more'}</span>
                 </div>
-                <div class="flex-col gap-3 mt-3 ${isExpanded ? '' : 'hidden'}" id="preset-plans-list">
+                <div class="flex-col gap-3 mt-4 ${isExpanded ? '' : 'hidden'}" id="preset-plans-list">
                     ${PRESET_PLANS.map(p => {
                         const existing = store.plans.find(ep => ep.id === p.id || ep.planId === p.planId || (ep.name && ep.name.toLowerCase().trim() === p.name.toLowerCase().trim()));
                         const isActive = existing && store.activePlanId === existing.id;
                         const isAdded = !!existing;
-
-                        const tags = [];
-                        if (p.schedule && p.schedule.targetSessionsPerWeek) tags.push(`${p.schedule.targetSessionsPerWeek}x / week`);
-                        if (p.level) tags.push(p.level);
-
-                        let actionBtnHtml = '';
-                        if (isActive) {
-                            actionBtnHtml = `<span class="preset-badge success"><span class="material-icons-round" style="font-size:0.9rem;">check_circle</span> Actief</span>`;
-                        } else if (isAdded) {
-                            actionBtnHtml = `
-                                <button class="btn-secondary" style="padding:5px 12px; font-size:0.8rem;" onclick="app.setActivePlan('${this.escapeHTML(existing.id)}')">
-                                    Maak Actief
-                                </button>
-                            `;
-                        } else {
-                            actionBtnHtml = `
-                                <button class="btn-primary" style="padding:5px 12px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px;" onclick="app.loadPresetPlan('${this.escapeHTML(p.id)}')">
-                                    <span class="material-icons-round" style="font-size:1rem;">add</span> Gebruik dit schema
-                                </button>
-                            `;
-                        }
+                        const targetSessions = p.schedule ? p.schedule.targetSessionsPerWeek : null;
 
                         return `
-                            <div class="preset-card flex-col gap-2">
-                                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                                    <div style="flex:1; min-width:0;">
-                                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                                            <strong style="font-size:0.95rem; color:var(--text-primary);">${this.escapeHTML(p.name)}</strong>
-                                            ${tags.map(t => `<span class="preset-badge">${this.escapeHTML(t)}</span>`).join('')}
-                                        </div>
-                                        <p class="text-sm text-muted mt-1">${this.escapeHTML(p.description)}</p>
+                            <div style="background: rgba(0,0,0,0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%; gap:8px;">
+                                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1; min-width:0;">
+                                        <h4 style="color:var(--text-primary); font-size:1.05rem; line-height:1.2; margin:0; font-weight:600;">${this.escapeHTML(p.name)}</h4>
+                                        ${p.level ? `<span class="status-badge" style="padding:2px 8px; font-size:0.7rem;">${this.escapeHTML(p.level)}</span>` : ''}
+                                        ${targetSessions ? `<span class="status-badge" style="padding:2px 8px; font-size:0.7rem;">${targetSessions}x / week</span>` : ''}
                                     </div>
-                                    <div style="flex-shrink:0;">
-                                        ${actionBtnHtml}
+                                    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                                        ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
                                     </div>
                                 </div>
-                                <div class="text-sm text-muted" style="border-top:1px solid rgba(255,255,255,0.05); padding-top:6px; margin-top:2px;">
-                                    <strong>Sessies:</strong> ${this.escapeHTML(p.sessions.map(s => s.name).join(' • '))}
+
+                                <p class="text-sm text-muted" style="line-height:1.4; margin:0;">${this.escapeHTML(p.description)}</p>
+
+                                <div style="background: rgba(0,0,0,0.02); border-top: 1px solid var(--border-color); padding-top: 8px; margin-top: 2px;">
+                                    <div style="font-weight:600; font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; margin-bottom: 6px;">
+                                        Sessies in dit schema (${p.sessions.length})
+                                    </div>
+                                    <div class="flex-col gap-2">
+                                        ${p.sessions.map(s => {
+                                            const exCount = (s.exercises || []).length;
+                                            const exNames = (s.exercises || []).map(ex => this.escapeHTML(ex.name)).join(', ');
+                                            return `
+                                                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface-color); border: 1px solid var(--border-color); padding:8px 12px; border-radius:8px;">
+                                                    <div style="min-width:0; flex:1;">
+                                                        <div style="font-weight:500; font-size:0.85rem; color:var(--text-primary);">${this.escapeHTML(s.name)}</div>
+                                                        <div class="text-sm text-muted" style="font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}: ${exNames}</div>
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
                                 </div>
+
+                                ${!isActive ? `
+                                    <div style="margin-top: 4px;">
+                                        ${isAdded ? `
+                                            <button class="btn-secondary w-full" style="padding:7px 14px; font-size:0.85rem;" onclick="app.setActivePlan('${this.escapeHTML(existing.id)}')">
+                                                Maak Actief
+                                            </button>
+                                        ` : `
+                                            <button class="btn-primary w-full" style="padding:7px 14px; font-size:0.85rem; display:inline-flex; align-items:center; justify-content:center; gap:6px;" onclick="app.loadPresetPlan('${this.escapeHTML(p.id)}')">
+                                                <span class="material-icons-round" style="font-size:1.1rem;">add</span> Gebruik dit schema
+                                            </button>
+                                        `}
+                                    </div>
+                                ` : ''}
                             </div>
                         `;
                     }).join('')}
@@ -1552,45 +1560,39 @@ const app = {
         const panel = document.getElementById('ai-generator-panel');
         if (!panel) return;
 
-        panel.className = 'glass-panel ai-assistant-card mt-4';
         panel.innerHTML = `
-            <div style="display:flex; align-items:flex-start; gap:12px;">
-                <div class="stat-icon-wrapper text-accent" style="width:40px; height:40px; flex-shrink:0; background:rgba(59,130,246,0.12); border-radius:10px; display:grid; place-items:center;">
-                    <span class="material-icons-round" style="font-size:1.4rem;">smart_toy</span>
-                </div>
-                <div style="flex:1; min-width:0;">
-                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                        <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.05rem;">Maak een persoonlijk schema met AI</h3>
-                        <span class="preset-badge" style="background:rgba(16, 185, 129, 0.12); color:var(--status-green); border-color:rgba(16, 185, 129, 0.25);">ChatGPT &bull; Claude &bull; Gemini</span>
+            <div class="glass-panel">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">AI Schema Assistent</h3>
+                        <p class="text-sm text-muted mt-1">Genereer een persoonlijk schema op maat met ChatGPT of Claude</p>
                     </div>
-                    <p class="text-sm text-muted mt-1">
-                        Laat een AI een schema op maat genereren dat 100% aansluit op onze ${store.getExerciseLibrary().length} library-oefeningen.
-                    </p>
+                    <span class="status-badge green" style="padding:2px 8px; font-size:0.7rem; white-space:nowrap;">Schema v2.0</span>
                 </div>
-            </div>
-            
-            <div class="actions-row mt-3">
-                <button class="btn-primary flex-1" onclick="app.copyAIPrompt()" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:0.85rem; padding:8px 12px;">
-                    <span class="material-icons-round" style="font-size:1.1rem;">content_copy</span> Kopieer AI Prompt
-                </button>
-                <button class="btn-secondary flex-1" onclick="app.downloadTemplateJSON()" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:0.85rem; padding:8px 12px;">
-                    <span class="material-icons-round" style="font-size:1.1rem;">download</span> Download Template
-                </button>
-            </div>
 
-            <div style="margin-top:10px; border-top:1px solid var(--border-color); padding-top:8px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden'); const ic = this.querySelector('.ai-help-icon'); if(ic) ic.textContent = this.nextElementSibling.classList.contains('hidden') ? 'help_outline' : 'expand_less';">
-                    <span class="text-sm text-accent" style="display:flex; align-items:center; gap:4px; font-weight:600;">
-                        <span class="material-icons-round ai-help-icon" style="font-size:1.1rem;">help_outline</span> Hoe werkt dit in 3 stappen?
-                    </span>
-                    <span class="text-sm text-muted" style="font-size:0.75rem;">Uitleg</span>
+                <div class="actions-row mt-4">
+                    <button class="btn-primary flex-1" onclick="app.copyAIPrompt()" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:0.85rem; padding:8px 12px;">
+                        <span class="material-icons-round" style="font-size:1.1rem;">content_copy</span> Kopieer AI Prompt
+                    </button>
+                    <button class="btn-secondary flex-1" onclick="app.downloadTemplateJSON()" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:0.85rem; padding:8px 12px;">
+                        <span class="material-icons-round" style="font-size:1.1rem;">download</span> Download Template
+                    </button>
                 </div>
-                <div class="text-sm text-muted mt-2 hidden ai-help-content">
-                    <ol style="margin-left:18px; display:flex; flex-direction:column; gap:6px;">
-                        <li>Klik op <strong>Kopieer AI Prompt</strong> en open <a href="https://chatgpt.com" target="_blank" rel="noopener" style="color:var(--accent-color); text-decoration:underline;">ChatGPT</a> of <a href="https://claude.ai" target="_blank" rel="noopener" style="color:var(--accent-color); text-decoration:underline;">Claude</a>.</li>
-                        <li>Plak de prompt en vul je eigen wensen in (bijv. aantal dagen per week, blessures of trainingslocatie).</li>
-                        <li>Kopieer de gegenereerde JSON code, kom terug naar GoFitness en klik bovenaan op <strong>Importeer</strong>!</li>
-                    </ol>
+
+                <div style="margin-top:12px; border-top:1px solid var(--border-color); padding-top:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden'); const ic = this.querySelector('.ai-help-icon'); if(ic) ic.textContent = this.nextElementSibling.classList.contains('hidden') ? 'help_outline' : 'expand_less';">
+                        <span class="text-sm text-accent" style="display:flex; align-items:center; gap:4px; font-weight:600;">
+                            <span class="material-icons-round ai-help-icon" style="font-size:1.1rem;">help_outline</span> Hoe werkt dit in 3 stappen?
+                        </span>
+                        <span class="text-sm text-muted" style="font-size:0.75rem;">Uitleg</span>
+                    </div>
+                    <div class="text-sm text-muted mt-2 hidden" style="line-height:1.5; background:rgba(0,0,0,0.03); border:1px solid var(--border-color); padding:10px 14px; border-radius:8px;">
+                        <ol style="margin-left:18px; display:flex; flex-direction:column; gap:6px;">
+                            <li>Klik op <strong>Kopieer AI Prompt</strong> en open <a href="https://chatgpt.com" target="_blank" rel="noopener" style="color:var(--accent-color); text-decoration:underline;">ChatGPT</a> of <a href="https://claude.ai" target="_blank" rel="noopener" style="color:var(--accent-color); text-decoration:underline;">Claude</a>.</li>
+                            <li>Plak de prompt en vul je eigen trainingswensen in (bijv. aantal dagen, blessures of apparatuur).</li>
+                            <li>Kopieer de gegenereerde JSON code, kom terug naar GoFitness en klik bovenaan op <strong>Importeer</strong>!</li>
+                        </ol>
+                    </div>
                 </div>
             </div>
         `;
