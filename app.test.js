@@ -3574,7 +3574,7 @@ describe('add and remove sets during workout', () => {
             expect(presetContainer.innerHTML).toContain('Full Body Thuis &amp; Lichaamsgewicht');
             expect(presetContainer.innerHTML).toContain('Upper / Lower Split (4 Dagen)');
 
-            expect(aiPanel.innerHTML).toContain('Maak een persoonlijk schema met AI');
+            expect(aiPanel.innerHTML).toContain('AI Schema Assistent');
             expect(aiPanel.innerHTML).toContain('Kopieer AI Prompt');
             expect(aiPanel.innerHTML).toContain('Download Template');
         });
@@ -3588,25 +3588,26 @@ describe('add and remove sets during workout', () => {
             expect(app._presetsExpanded).toBe(false);
         });
 
-        it('should check index.html for correct structure and moved sync-panel', () => {
+        it('should check index.html for correct structure with plans-list above presets and moved sync-panel', () => {
             const fs = require('fs');
             const path = require('path');
             const htmlPath = path.join(__dirname, 'index.html');
             const htmlContent = fs.readFileSync(htmlPath, 'utf8');
 
+            expect(htmlContent).toContain('id="plans-list"');
             expect(htmlContent).toContain('id="preset-plans-container"');
             expect(htmlContent).toContain('id="ai-generator-panel"');
             expect(htmlContent).toContain('id="sync-panel"');
 
+            const plansListIdx = htmlContent.indexOf('id="plans-list"');
             const presetIdx = htmlContent.indexOf('id="preset-plans-container"');
             const aiIdx = htmlContent.indexOf('id="ai-generator-panel"');
-            const plansListIdx = htmlContent.indexOf('id="plans-list"');
             const libIdx = htmlContent.indexOf('id="exercise-library-list"');
             const syncIdx = htmlContent.indexOf('id="sync-panel"');
 
+            expect(presetIdx).toBeGreaterThan(plansListIdx);
             expect(aiIdx).toBeGreaterThan(presetIdx);
-            expect(plansListIdx).toBeGreaterThan(aiIdx);
-            expect(libIdx).toBeGreaterThan(plansListIdx);
+            expect(libIdx).toBeGreaterThan(aiIdx);
             expect(syncIdx).toBeGreaterThan(libIdx); // Sync panel is moved to the bottom!
         });
     });
