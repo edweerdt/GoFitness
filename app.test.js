@@ -3661,6 +3661,79 @@ describe('add and remove sets during workout', () => {
             expect(syncIdx).toBeGreaterThan(libIdx); // Sync panel is moved to the bottom!
         });
     });
+
+    describe('Keyboard dismissal and focus handling on set completion', () => {
+        beforeEach(() => {
+            document.body.innerHTML = `
+                <div id="workout-exercise-list">
+                    <div class="set-row">
+                        <input class="weight-input" data-ex="0" data-set="0" data-type="weight" value="50" />
+                        <input class="weight-input" data-ex="0" data-set="0" data-type="reps" value="10" />
+                    </div>
+                    <div class="set-row">
+                        <input class="weight-input" data-ex="0" data-set="1" data-type="weight" value="50" />
+                        <input class="weight-input" data-ex="0" data-set="1" data-type="reps" value="" />
+                    </div>
+                </div>
+                <div id="rest-timer" class="hidden"><span id="rest-timer-label"></span></div>
+            `;
+            app.activeWorkout = {
+                id: 'workout_focus_test',
+                exercises: [
+                    {
+                        name: 'Squat',
+                        sets: 2,
+                        setsCompleted: [false, false],
+                        weights: ['50', '50'],
+                        actualReps: ['10', ''],
+                        restSeconds: 60
+                    }
+                ]
+            };
+        });
+
+        it('should move focus to reps input when Enter is pressed on weight in the same set', () => {
+            const weightInput = document.querySelector('input[data-ex="0"][data-set="0"][data-type="weight"]');
+            const repsInput = document.querySelector('input[data-ex="0"][data-set="0"][data-type="reps"]');
+            const repsFocusSpy = jest.spyOn(repsInput, 'focus');
+
+            app.handleInputEnter({ target: weightInput }, 0, 0, 'weight');
+
+            expect(repsFocusSpy).toHaveBeenCalled();
+            repsFocusSpy.mockRestore();
+        });
+
+        it('should mark set completed, start rest timer, and blur activeElement without focusing next set when Enter is pressed on reps', () => {
+            const repsInput = document.querySelector('input[data-ex="0"][data-set="0"][data-type="reps"]');
+            repsInput.focus();
+            const nextSetWeightInput = document.querySelector('input[data-ex="0"][data-set="1"][data-type="weight"]');
+            const nextSetFocusSpy = jest.spyOn(nextSetWeightInput, 'focus');
+            const blurSpy = jest.spyOn(repsInput, 'blur');
+
+            app.handleInputEnter({ target: repsInput }, 0, 0, 'reps');
+
+            expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(true);
+            expect(app.restTimer).not.toBeNull();
+            expect(nextSetFocusSpy).not.toHaveBeenCalled();
+            expect(blurSpy).toHaveBeenCalled();
+
+            nextSetFocusSpy.mockRestore();
+            blurSpy.mockRestore();
+            app.stopRestTimer();
+        });
+
+        it('should blur active element when toggleSet is called', () => {
+            const input = document.querySelector('input[data-ex="0"][data-set="0"][data-type="reps"]');
+            input.focus();
+            const blurSpy = jest.spyOn(input, 'blur');
+
+            app.toggleSet(0, 0);
+
+            expect(blurSpy).toHaveBeenCalled();
+            blurSpy.mockRestore();
+            app.stopRestTimer();
+        });
+    });
 });
 
 
