@@ -589,9 +589,55 @@
 
                 <div class="modal-actions">
                     <button class="btn-secondary flex-1" onclick="app.hidePlanImportPromptModal()">Annuleren</button>
-                    <button class="btn-primary flex-1" id="btn-confirm-link-import" onclick="app.confirmImportFromLink()">
-                        <span class="material-icons-round">download_done</span> Importeer Nu
+                    <button class="btn-primary flex-1" onclick="app.confirmPlanImportFromLink()">
+                        <span class="material-icons-round">download</span>Importeren
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Oefening Vervangen / Substitutie -->
+        <div id="modal-substitute-exercise" class="modal-overlay hidden">
+            <div class="modal-content glass-panel" style="max-width: 520px; width: 100%; max-height: 85vh; display:flex; flex-direction:column; padding: 20px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                    <div>
+                        <div class="text-xs text-muted" style="text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">🔄 Oefening Vervangen</div>
+                        <h3 style="margin:2px 0 0 0; text-transform:none; color:var(--text-primary); font-size:1.15rem;" id="sub-modal-target-name">Barbell Back Squat</h3>
+                    </div>
+                    <button class="icon-btn" onclick="app.hideSubstitutionModal()"><span class="material-icons-round">close</span></button>
+                </div>
+
+                <div id="sub-modal-target-meta" style="margin-bottom:12px; display:flex; gap:6px; flex-wrap:wrap;"></div>
+
+                <!-- Filter Chips -->
+                <div class="sub-filter-container" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;">
+                    <button class="sub-filter-chip active" id="sub-chip-location" onclick="app.toggleSubFilter('location')">
+                        <span class="material-icons-round" style="font-size:0.9rem;">home</span> <span id="sub-chip-location-text">Alle Locaties</span>
+                    </button>
+                    <button class="sub-filter-chip" id="sub-chip-axial" onclick="app.toggleSubFilter('axial')">
+                        <span class="material-icons-round" style="font-size:0.9rem;">shield</span> <span id="sub-chip-axial-text">Rug Sparen</span>
+                    </button>
+                    <button class="sub-filter-chip" id="sub-chip-equipment" onclick="app.toggleSubFilter('equipment')">
+                        <span class="material-icons-round" style="font-size:0.9rem;">fitness_center</span> <span id="sub-chip-equipment-text">Materiaal: Alle</span>
+                    </button>
+                </div>
+
+                <!-- Zoekbalk -->
+                <div style="position:relative; margin-bottom:12px;">
+                    <span class="material-icons-round text-muted" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:1.1rem;">search</span>
+                    <input type="text" id="sub-modal-search" class="search-input w-full" placeholder="Zoek in alle 107 oefeningen..." style="padding-left:36px;" oninput="app.renderSubstitutionModalResults()">
+                </div>
+
+                <!-- Resultatenlijst -->
+                <div id="sub-modal-results-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; padding-right:2px; min-height:160px; max-height:42vh;">
+                </div>
+
+                <!-- Scope selectie (bij actieve workout) -->
+                <div id="sub-modal-scope-container" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; margin-top:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <label id="sub-modal-save-plan-label" style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:var(--text-muted); cursor:pointer;">
+                        <input type="checkbox" id="sub-modal-save-to-plan"> Ook permanent opslaan in schema
+                    </label>
+                    <button class="btn-secondary" style="padding:4px 12px; font-size:0.85rem;" onclick="app.hideSubstitutionModal()">Sluiten</button>
                 </div>
             </div>
         </div>
@@ -602,6 +648,8 @@
     
     <script src="qr.js"></script>
     <script src="firebase-config.js"></script>
+    <script src="exercises.js"></script>
+    <script src="substitutionEngine.js"></script>
     <script src="app.js"></script>
     <script src="sync.js"></script>
     <script src="friends.js"></script>
