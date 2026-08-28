@@ -3993,6 +3993,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     },
 
     toggleSet(exIndex, setIndex) {
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
         const ex = this.activeWorkout.exercises[exIndex];
         const isTurningOn = !ex.setsCompleted[setIndex];
         ex.setsCompleted[setIndex] = isTurningOn;
@@ -4408,41 +4411,17 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             }
         }
 
-        // Find next target input in DOM before re-rendering
-        const allInputs = Array.from(document.querySelectorAll('#workout-exercise-list input.weight-input'));
-        const currentIndex = allInputs.indexOf(inputEl);
-        let nextTarget = null;
-        if (currentIndex !== -1 && currentIndex + 1 < allInputs.length) {
-            const nextEl = allInputs[currentIndex + 1];
-            if (nextEl && nextEl.dataset) {
-                nextTarget = {
-                    ex: nextEl.dataset.ex,
-                    set: nextEl.dataset.set,
-                    type: nextEl.dataset.type
-                };
-            }
+        // Sluit het virtuele toetsenbord door de focus weg te halen (blur)
+        // zodat het toetsenbord niet ongewenst opent voor een volgende set/oefening
+        if (inputEl && typeof inputEl.blur === 'function') {
+            inputEl.blur();
+        }
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
         }
 
         // Re-render workout exercises to display updated checked status and rest timers
         this.renderWorkoutExercises();
-
-        // Restore focus to the target input in the newly rendered DOM
-        if (nextTarget) {
-            const selector = `#workout-exercise-list input.weight-input[data-ex="${nextTarget.ex}"][data-set="${nextTarget.set}"][data-type="${nextTarget.type}"]`;
-            const focusNext = () => {
-                const nextInputEl = document.querySelector(selector);
-                if (nextInputEl) {
-                    nextInputEl.focus();
-                    if (typeof nextInputEl.select === 'function') nextInputEl.select();
-                }
-            };
-            focusNext();
-            setTimeout(focusNext, 50);
-        } else {
-            if (document.activeElement && typeof document.activeElement.blur === 'function') {
-                document.activeElement.blur();
-            }
-        }
     },
 
     showFinishModal() {
