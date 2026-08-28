@@ -1271,6 +1271,8 @@ const app = {
                                 btnStart.disabled = false;
                                 btnStart.onclick = () => this.startCustomWorkout();
                             }
+                            const bar = document.getElementById('home-quick-adapt-bar');
+                            if (bar) bar.classList.add('hidden');
                         } else if (activePlan) {
                             const chosenSession = activePlan.sessions.find(s => (s.id || s.sessionId) === chosenVal);
                             if (!chosenSession) return;
@@ -1284,6 +1286,24 @@ const app = {
                                 btnStart.textContent = "Start Nu";
                                 btnStart.disabled = false;
                                 btnStart.onclick = () => this.startWorkout(chosenSession, activePlan);
+                            }
+
+                            let quickAdaptBar = document.getElementById('home-quick-adapt-bar');
+                            if (!quickAdaptBar && btnStart && btnStart.parentNode) {
+                                quickAdaptBar = document.createElement('div');
+                                quickAdaptBar.id = 'home-quick-adapt-bar';
+                                quickAdaptBar.className = 'quick-adapt-bar';
+                                quickAdaptBar.innerHTML = `
+                                    <button class="quick-adapt-btn" onclick="app.quickConvertAndStartSession('home')" title="Vervang apparaten automatisch door thuis-geschikte oefeningen">
+                                        <span class="material-icons-round" style="font-size:1rem; color:#60a5fa;">home</span> Thuis omzetten
+                                    </button>
+                                    <button class="quick-adapt-btn" onclick="app.quickConvertAndStartSession('axial')" title="Vervang zware rugbelasting automatisch door rugsparende alternatieven">
+                                        <span class="material-icons-round" style="font-size:1rem; color:#34d399;">shield</span> Rug ontlasten
+                                    </button>
+                                `;
+                                btnStart.parentNode.insertBefore(quickAdaptBar, btnStart.nextSibling);
+                            } else if (quickAdaptBar) {
+                                quickAdaptBar.classList.remove('hidden');
                             }
                         }
                     };
@@ -1416,14 +1436,29 @@ const app = {
                                     const exCount = (s.exercises || []).length;
                                     const exNames = (s.exercises || []).map(ex => this.formatClickableExerciseName(ex.name)).join(', ');
                                     return `
-                                        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.03); padding:8px 12px; border-radius:8px;">
-                                            <div style="min-width:0; flex:1; margin-right:8px;">
-                                                <div style="font-weight:500; font-size:0.9rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${this.escapeHTML(s.name)}</div>
-                                                <div class="text-sm text-muted">${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}${exNames ? ': ' + exNames : ''}</div>
+                                        <div style="background:rgba(0,0,0,0.03); padding:8px 12px; border-radius:8px;">
+                                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                                <div style="min-width:0; flex:1; margin-right:8px;">
+                                                    <div style="font-weight:500; font-size:0.9rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${this.escapeHTML(s.name)}</div>
+                                                    <div class="text-sm text-muted">${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}</div>
+                                                </div>
+                                                <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;" onclick="app.startWorkoutBySessionId('${this.escapeHTML(p.id)}', '${sId}')" title="Start sessie">
+                                                    <span class="material-icons-round" style="font-size:1rem;">play_arrow</span> Start
+                                                </button>
                                             </div>
-                                            <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;" onclick="app.startWorkoutBySessionId('${this.escapeHTML(p.id)}', '${sId}')" title="Start sessie">
-                                                <span class="material-icons-round" style="font-size:1rem;">play_arrow</span> Start
-                                            </button>
+                                            <div class="mt-2 flex-col gap-1" style="border-top:1px solid rgba(255,255,255,0.04); padding-top:6px;">
+                                                ${(s.exercises || []).map((ex, exIdx) => {
+                                                    const safeExName = this.escapeHTML(ex.name);
+                                                    return `
+                                                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.82rem; color:var(--text-primary); padding: 2px 0;">
+                                                            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:8px;">• ${safeExName}</span>
+                                                            <button class="btn-secondary" style="padding:1px 6px; font-size:0.7rem; display:inline-flex; align-items:center; gap:2px; flex-shrink:0;" onclick="app.openSubstitutionModalForPlan('${this.escapeHTML(p.id)}', '${sId}', ${exIdx})" title="Vervang in schema">
+                                                                <span class="material-icons-round" style="font-size:0.75rem;">swap_horiz</span> Wissel
+                                                            </button>
+                                                        </div>
+                                                    `;
+                                                }).join('')}
+                                            </div>
                                         </div>
                                     `;
                                 }).join('')}
@@ -3865,9 +3900,14 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         <div style="margin-bottom:4px;">${badgesHtml}</div>
                         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-top:2px;">
                             <div class="exercise-meta" style="margin:0;">${app.escapeHTML(metaString)}</div>
-                            <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;" onclick="app.showExerciseHistoryModal('${safeExName}')">
-                                <span class="material-icons-round" style="font-size:0.85rem;">history</span> Alle Historie
-                            </button>
+                            <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+                                <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;" onclick="app.openSubstitutionModalForActiveWorkout(${exIndex})" title="Vervang deze oefening met een alternatief">
+                                    <span class="material-icons-round" style="font-size:0.85rem;">swap_horiz</span> Vervang
+                                </button>
+                                <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;" onclick="app.showExerciseHistoryModal('${safeExName}')">
+                                    <span class="material-icons-round" style="font-size:0.85rem;">history</span> Alle Historie
+                                </button>
+                            </div>
                         </div>
                         ${notesHtml}
                         ${delayBarHtml}
@@ -6770,6 +6810,379 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         }
 
         container.innerHTML = html;
+    },
+
+    // =========================================================================
+    // EXERCISE SUBSTITUTION & ADAPTATION METHODS
+    // =========================================================================
+
+    initSubstitutionEngine() {
+        if (!this.substitutionEngine) {
+            let EngineClass = (typeof SubstitutionEngine !== 'undefined') ? SubstitutionEngine : null;
+            let list = (typeof EXERCISE_DATABASE !== 'undefined' && EXERCISE_DATABASE.exercises) ? EXERCISE_DATABASE.exercises : null;
+
+            if (!EngineClass && typeof require !== 'undefined') {
+                try {
+                    const engineMod = require('./substitutionEngine');
+                    EngineClass = engineMod.SubstitutionEngine || engineMod;
+                } catch (e) {}
+            }
+
+            if (!list && typeof require !== 'undefined') {
+                try {
+                    const exMod = require('./exercises');
+                    list = exMod.exercises || (exMod.EXERCISE_DATABASE && exMod.EXERCISE_DATABASE.exercises);
+                } catch (e) {}
+            }
+
+            if (!list && typeof DEFAULT_EXERCISES !== 'undefined') {
+                list = DEFAULT_EXERCISES;
+            }
+
+            if (EngineClass && list) {
+                this.substitutionEngine = new EngineClass(list);
+            }
+        }
+        return this.substitutionEngine;
+    },
+
+    subModalState: {
+        targetExerciseName: '',
+        targetExerciseId: '',
+        exIndex: null,
+        planId: null,
+        sessionId: null,
+        context: {
+            location: 'any',
+            maxAxialLoad: null,
+            availableEquipment: null
+        },
+        mode: 'activeWorkout'
+    },
+
+    openSubstitutionModalForActiveWorkout(exIndex) {
+        if (!this.activeWorkout || !this.activeWorkout.exercises || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+        const exName = ex.chosenVariation || ex.name;
+
+        this.subModalState = {
+            targetExerciseName: exName,
+            targetExerciseId: ex.id || ex.canonicalId || '',
+            exIndex: exIndex,
+            planId: this.activeWorkout.planId || null,
+            sessionId: (this.activeWorkout.session && (this.activeWorkout.session.id || this.activeWorkout.session.sessionId)) || null,
+            context: {
+                location: 'any',
+                maxAxialLoad: null,
+                availableEquipment: null
+            },
+            mode: 'activeWorkout'
+        };
+
+        const savePlanLabel = document.getElementById('sub-modal-save-plan-label');
+        if (savePlanLabel) savePlanLabel.style.display = this.activeWorkout.planId ? 'flex' : 'none';
+
+        this.showSubstitutionModal();
+    },
+
+    openSubstitutionModalForPlan(planId, sessionId, exIndex) {
+        const plan = store.plans.find(p => p.id === planId);
+        if (!plan || !plan.sessions) return;
+        const session = plan.sessions.find(s => (s.id || s.sessionId) === sessionId);
+        if (!session || !session.exercises || !session.exercises[exIndex]) return;
+        const ex = session.exercises[exIndex];
+
+        this.subModalState = {
+            targetExerciseName: ex.name,
+            targetExerciseId: ex.id || '',
+            exIndex: exIndex,
+            planId: planId,
+            sessionId: sessionId,
+            context: {
+                location: 'any',
+                maxAxialLoad: null,
+                availableEquipment: null
+            },
+            mode: 'plan'
+        };
+
+        const savePlanLabel = document.getElementById('sub-modal-save-plan-label');
+        if (savePlanLabel) savePlanLabel.style.display = 'none';
+
+        this.showSubstitutionModal();
+    },
+
+    showSubstitutionModal() {
+        this.initSubstitutionEngine();
+        const modal = document.getElementById('modal-substitute-exercise');
+        if (!modal) return;
+
+        const targetTitle = document.getElementById('sub-modal-target-name');
+        if (targetTitle) targetTitle.textContent = this.subModalState.targetExerciseName;
+
+        const targetMeta = document.getElementById('sub-modal-target-meta');
+        if (targetMeta) {
+            const exObj = this.substitutionEngine ? this.substitutionEngine.getExercise(this.subModalState.targetExerciseName) : null;
+            if (exObj) {
+                targetMeta.innerHTML = `
+                    <span class="sub-tag" style="background:rgba(59,130,246,0.2); color:#60a5fa;">${this.escapeHTML(exObj.category)}</span>
+                    <span class="sub-tag">${this.escapeHTML(exObj.movement_pattern)}</span>
+                    <span class="sub-tag">${this.escapeHTML(exObj.type)}</span>
+                    <span class="sub-tag">Axiaal: ${this.escapeHTML(exObj.axial_load)}</span>
+                `;
+            } else {
+                targetMeta.innerHTML = '';
+            }
+        }
+
+        const searchInput = document.getElementById('sub-modal-search');
+        if (searchInput) searchInput.value = '';
+
+        this.updateSubFilterChipUI();
+        this.renderSubstitutionModalResults();
+
+        modal.classList.remove('hidden');
+    },
+
+    hideSubstitutionModal() {
+        const modal = document.getElementById('modal-substitute-exercise');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    toggleSubFilter(filterType) {
+        if (filterType === 'location') {
+            const cur = this.subModalState.context.location;
+            this.subModalState.context.location = (cur === 'home') ? 'any' : 'home';
+        } else if (filterType === 'axial') {
+            const cur = this.subModalState.context.maxAxialLoad;
+            this.subModalState.context.maxAxialLoad = (cur === 'Laag') ? null : 'Laag';
+        } else if (filterType === 'equipment') {
+            const cur = this.subModalState.context.availableEquipment;
+            if (!cur) {
+                this.subModalState.context.availableEquipment = ['dumbbell', 'bench', 'bodyweight'];
+            } else if (cur.includes('dumbbell')) {
+                this.subModalState.context.availableEquipment = ['bodyweight'];
+            } else {
+                this.subModalState.context.availableEquipment = null;
+            }
+        }
+
+        this.updateSubFilterChipUI();
+        this.renderSubstitutionModalResults();
+    },
+
+    updateSubFilterChipUI() {
+        const locChip = document.getElementById('sub-chip-location');
+        const locText = document.getElementById('sub-chip-location-text');
+        const axialChip = document.getElementById('sub-chip-axial');
+        const equipChip = document.getElementById('sub-chip-equipment');
+        const equipText = document.getElementById('sub-chip-equipment-text');
+
+        if (locChip && locText) {
+            const isHome = this.subModalState.context.location === 'home';
+            locChip.classList.toggle('active', isHome);
+            locText.textContent = isHome ? 'Alleen Thuis' : 'Alle Locaties';
+        }
+
+        if (axialChip) {
+            const isAxial = this.subModalState.context.maxAxialLoad !== null;
+            axialChip.classList.toggle('active', isAxial);
+        }
+
+        if (equipChip && equipText) {
+            const eq = this.subModalState.context.availableEquipment;
+            if (!eq) {
+                equipChip.classList.remove('active');
+                equipText.textContent = 'Materiaal: Alle';
+            } else if (eq.includes('dumbbell')) {
+                equipChip.classList.add('active');
+                equipText.textContent = 'Dumbbells / Bank';
+            } else {
+                equipChip.classList.add('active');
+                equipText.textContent = 'Alleen Bodyweight';
+            }
+        }
+    },
+
+    renderSubstitutionModalResults() {
+        const container = document.getElementById('sub-modal-results-list');
+        if (!container) return;
+
+        this.initSubstitutionEngine();
+        const searchInput = document.getElementById('sub-modal-search');
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+        const targetName = this.subModalState.targetExerciseName;
+        const context = { ...this.subModalState.context };
+
+        let items = [];
+
+        if (query) {
+            const allMatches = (this.substitutionEngine && this.substitutionEngine.exercises) ? Array.from(this.substitutionEngine.exercises.values()) : [];
+            const filtered = allMatches.filter(ex => {
+                const nameMatch = ex.name.toLowerCase().includes(query) || (ex.aliases || []).some(a => a.toLowerCase().includes(query));
+                const muscleMatch = (ex.primary_muscles || []).some(m => m.toLowerCase().includes(query));
+                const patternMatch = (ex.movement_pattern || '').toLowerCase().includes(query);
+                return nameMatch || muscleMatch || patternMatch;
+            });
+
+            items = filtered.slice(0, 10).map(ex => ({
+                exercise: ex,
+                score: 100,
+                matchReasons: ['Zoekresultaat']
+            }));
+        } else if (this.substitutionEngine) {
+            items = this.substitutionEngine.getSubstitutes(targetName, context, 8);
+        }
+
+        if (items.length === 0) {
+            container.innerHTML = `
+                <div style="text-align:center; padding:24px 12px; color:var(--text-muted);">
+                    <span class="material-icons-round" style="font-size:2rem; opacity:0.5; margin-bottom:6px;">search_off</span>
+                    <p class="text-sm">Geen passende alternatieven gevonden voor deze filters.</p>
+                    <button class="btn-secondary mt-2" style="font-size:0.8rem; padding:4px 10px;" onclick="app.subModalState.context={location:'any',maxAxialLoad:null,availableEquipment:null}; app.updateSubFilterChipUI(); app.renderSubstitutionModalResults();">Reset Filters</button>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = items.map(item => {
+            const ex = item.exercise;
+            const safeId = this.escapeHTML(ex.id);
+            const safeName = this.escapeHTML(ex.name);
+            const reasonsHtml = (item.matchReasons || []).slice(0, 2).map(r => `
+                <div class="sub-reason-item">
+                    <span class="material-icons-round" style="font-size:0.85rem; color:#60a5fa;">check_circle</span>
+                    <span>${this.escapeHTML(r)}</span>
+                </div>
+            `).join('');
+
+            return `
+                <div class="sub-card">
+                    <div class="sub-card-header">
+                        <div style="flex:1; min-width:0;">
+                            <div class="sub-card-title">${safeName}</div>
+                            <div class="sub-tags mt-1">
+                                <span class="sub-tag" style="background:rgba(59,130,246,0.15); color:#60a5fa;">${this.escapeHTML(ex.movement_pattern)}</span>
+                                <span class="sub-tag">${this.escapeHTML(ex.type)}</span>
+                                <span class="sub-tag">Axiaal: ${this.escapeHTML(ex.axial_load)}</span>
+                                ${ex.is_home_friendly ? '<span class="sub-tag" style="background:rgba(16,185,129,0.15); color:#34d399;">🏠 Thuis</span>' : ''}
+                            </div>
+                        </div>
+                        <button class="btn-primary" style="padding:5px 12px; font-size:0.8rem; flex-shrink:0;" onclick="app.applySubstitution('${safeId}')">
+                            Kies
+                        </button>
+                    </div>
+                    ${reasonsHtml ? `<div class="sub-reasons mt-1">${reasonsHtml}</div>` : ''}
+                </div>
+            `;
+        }).join('');
+    },
+
+    applySubstitution(newExerciseId) {
+        this.initSubstitutionEngine();
+        const newEx = this.substitutionEngine ? this.substitutionEngine.getExercise(newExerciseId) : null;
+        if (!newEx) return;
+
+        const oldName = this.subModalState.targetExerciseName;
+        const newName = newEx.name;
+
+        if (this.subModalState.mode === 'activeWorkout') {
+            const exIndex = this.subModalState.exIndex;
+            if (this.activeWorkout && this.activeWorkout.exercises && this.activeWorkout.exercises[exIndex]) {
+                const ex = this.activeWorkout.exercises[exIndex];
+                ex.name = newName;
+                ex.chosenVariation = newName;
+                ex.id = newEx.id;
+                ex.category = newEx.type.toLowerCase();
+                ex.movementPattern = newEx.movement_pattern;
+                ex.muscleGroups = (newEx.primary_muscles || []).map(m => m.toLowerCase());
+
+                const saveToPlanCheckbox = document.getElementById('sub-modal-save-to-plan');
+                if (saveToPlanCheckbox && saveToPlanCheckbox.checked && this.subModalState.planId && this.subModalState.sessionId) {
+                    const plan = store.plans.find(p => p.id === this.subModalState.planId);
+                    if (plan && plan.sessions) {
+                        const session = plan.sessions.find(s => (s.id || s.sessionId) === this.subModalState.sessionId);
+                        if (session && session.exercises && session.exercises[exIndex]) {
+                            session.exercises[exIndex].name = newName;
+                            session.exercises[exIndex].id = newEx.id;
+                            store.savePlans();
+                        }
+                    }
+                }
+
+                store.saveActiveWorkoutState(this.activeWorkout);
+                this.renderWorkoutExercises();
+                this.showToast(`🔄 Oefening vervangen door ${newName}`);
+            }
+        } else if (this.subModalState.mode === 'plan') {
+            const { planId, sessionId, exIndex } = this.subModalState;
+            const plan = store.plans.find(p => p.id === planId);
+            if (plan && plan.sessions) {
+                const session = plan.sessions.find(s => (s.id || s.sessionId) === sessionId);
+                if (session && session.exercises && session.exercises[exIndex]) {
+                    session.exercises[exIndex].name = newName;
+                    session.exercises[exIndex].id = newEx.id;
+                    store.savePlans();
+                    this.renderPlans();
+                    this.showToast(`🔄 ${oldName} permanent vervangen door ${newName} in ${session.name}`);
+                }
+            }
+        }
+
+        this.hideSubstitutionModal();
+    },
+
+    quickConvertAndStartSession(mode) {
+        this.initSubstitutionEngine();
+        const activePlan = store.getActivePlan();
+        const sessionSelect = document.getElementById('home-session-select');
+        const chosenVal = sessionSelect ? sessionSelect.value : null;
+
+        if (!activePlan || !activePlan.sessions) return;
+        const baseSession = activePlan.sessions.find(s => (s.id || s.sessionId) === chosenVal) || activePlan.sessions[0];
+        if (!baseSession) return;
+
+        const convertedSession = JSON.parse(JSON.stringify(baseSession));
+        let convertedCount = 0;
+
+        const context = (mode === 'home') 
+            ? { location: 'home', availableEquipment: ['dumbbell', 'bench', 'bodyweight'] }
+            : { location: 'gym', maxAxialLoad: 'Laag' };
+
+        convertedSession.exercises = (convertedSession.exercises || []).map(ex => {
+            const exObj = this.substitutionEngine ? this.substitutionEngine.getExercise(ex.name) : null;
+            let shouldReplace = false;
+
+            if (mode === 'home') {
+                if (exObj && exObj.is_home_friendly === false) shouldReplace = true;
+            } else if (mode === 'axial') {
+                if (exObj && (exObj.axial_load === 'Hoog' || exObj.axial_load === 'Gemiddeld')) shouldReplace = true;
+            }
+
+            if (shouldReplace && this.substitutionEngine) {
+                const subs = this.substitutionEngine.getSubstitutes(ex.name, context, 1);
+                if (subs.length > 0) {
+                    convertedCount++;
+                    const topSub = subs[0].exercise;
+                    return {
+                        ...ex,
+                        name: topSub.name,
+                        chosenVariation: topSub.name,
+                        id: topSub.id,
+                        category: topSub.type.toLowerCase(),
+                        notes: [`Aangepast voor ${mode === 'home' ? 'thuis workout' : 'rugontlasting'} (${ex.name} ➔ ${topSub.name})`]
+                    };
+                }
+            }
+            return ex;
+        });
+
+        const label = mode === 'home' ? '🏠 Thuis-workout' : '🛡️ Rugsparende workout';
+        convertedSession.name = `${baseSession.name} (${label})`;
+
+        this.startWorkout(convertedSession, activePlan);
+        this.showToast(`${label} gestart! (${convertedCount} oefeningen aangepast)`);
     }
 };
 
