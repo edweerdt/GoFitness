@@ -1337,9 +1337,9 @@ button:disabled {
 
 /* Quick Alternatives 1-Click Pills */
 .quick-alternatives-container {
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(99, 102, 241, 0.05) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 12px;
     padding: 8px 10px;
     margin-top: 8px;
 }
@@ -1353,10 +1353,10 @@ button:disabled {
 
 .quick-alternatives-title {
     font-size: 0.72rem;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--text-muted);
+    color: var(--accent-color);
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -1367,7 +1367,7 @@ button:disabled {
     border: none;
     color: var(--accent-color);
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     padding: 2px 4px;
     display: inline-flex;
@@ -1396,7 +1396,7 @@ button:disabled {
 
 .quick-alt-pill {
     background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 20px;
     padding: 4px 10px;
     font-size: 0.78rem;
@@ -1424,8 +1424,9 @@ button:disabled {
 
 .quick-alt-tag {
     font-size: 0.65rem;
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text-muted);
+    font-weight: 600;
+    background: rgba(59, 130, 246, 0.15);
+    color: #93c5fd;
     padding: 1px 5px;
     border-radius: 4px;
     margin-left: 2px;
@@ -1434,7 +1435,7 @@ button:disabled {
 .quick-alt-search-icon {
     font-size: 0.85rem !important;
     color: var(--text-muted);
-    opacity: 0.6;
+    opacity: 0.7;
     padding: 2px 4px;
     border-radius: 4px;
     margin-left: 4px;
@@ -1448,6 +1449,74 @@ button:disabled {
     color: var(--accent-color);
     opacity: 1;
     background: rgba(255, 255, 255, 0.15);
+}
+
+/* Light theme overrides */
+.theme-light .quick-alternatives-container,
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark) .quick-alternatives-container {
+        background: linear-gradient(135deg, #f0f7ff 0%, #e0e7ff 100%);
+        border: 1px solid #bfdbfe;
+        box-shadow: 0 1px 3px rgba(59, 130, 246, 0.08);
+    }
+    :root:not(.theme-dark) .quick-alternatives-title {
+        color: #1d4ed8;
+    }
+    :root:not(.theme-dark) .quick-alt-more-btn {
+        color: #2563eb;
+    }
+    :root:not(.theme-dark) .quick-alt-pill {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        color: #1e293b;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    :root:not(.theme-dark) .quick-alt-pill:hover {
+        background: #eff6ff;
+        border-color: #3b82f6;
+        color: #1d4ed8;
+    }
+    :root:not(.theme-dark) .quick-alt-tag {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+    :root:not(.theme-dark) .quick-alt-search-icon {
+        color: #64748b;
+        opacity: 0.8;
+    }
+    :root:not(.theme-dark) .quick-alt-search-icon:hover {
+        color: #2563eb;
+        background: #dbeafe;
+    }
+}
+.theme-light .quick-alternatives-title {
+    color: #1d4ed8;
+}
+.theme-light .quick-alt-more-btn {
+    color: #2563eb;
+}
+.theme-light .quick-alt-pill {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.theme-light .quick-alt-pill:hover {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    color: #1d4ed8;
+}
+.theme-light .quick-alt-tag {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+.theme-light .quick-alt-search-icon {
+    color: #64748b;
+    opacity: 0.8;
+}
+.theme-light .quick-alt-search-icon:hover {
+    color: #2563eb;
+    background: #dbeafe;
 }
 
 

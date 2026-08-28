@@ -6474,16 +6474,22 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     },
 
     // --- Variation helpers ---
-    getExerciseVariations(ex) {
-        if (!ex) return [];
+    getExerciseVariations(exOrName) {
+        if (!exOrName) return [];
+        if (typeof exOrName === 'string') {
+            if (/\s+(?:of|or|\/)\s+/i.test(exOrName)) {
+                return exOrName.split(/\s+(?:of|or|\/)\s+/i).map(s => s.trim()).filter(Boolean);
+            }
+            return [];
+        }
         // 1. Explicit choice variations set on exercise
-        if (Array.isArray(ex.availableVariations) && ex.availableVariations.length > 1) {
-            return ex.availableVariations;
+        if (Array.isArray(exOrName.availableVariations) && exOrName.availableVariations.length > 1) {
+            return exOrName.availableVariations;
         }
         // 2. Choice exercises defined with " of " or " or " in name (e.g. "Goblet Squat of Leg Press")
-        const nameStr = String(ex.name || '');
-        if (/\s+(?:of|or)\s+/i.test(nameStr)) {
-            const parts = nameStr.split(/\s+(?:of|or)\s+/i).map(s => s.trim()).filter(Boolean);
+        const nameStr = String(exOrName.name || '');
+        if (/\s+(?:of|or|\/)\s+/i.test(nameStr)) {
+            const parts = nameStr.split(/\s+(?:of|or|\/)\s+/i).map(s => s.trim()).filter(Boolean);
             if (parts.length > 1) return parts;
         }
         return [];
@@ -7204,17 +7210,27 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         const activeName = (ex.chosenVariation || ex.name || '').trim();
         const baseName = (ex.name || '').trim();
-        const variations = this.getExerciseVariations ? this.getExerciseVariations(baseName) : [];
+        const variations = this.getExerciseVariations ? this.getExerciseVariations(ex) : [];
 
-        // Tokens to strictly exclude (active name, base name, variations)
+        // Tokens to strictly exclude (active name, base name, variations, and split choices)
         const excludeTokens = new Set();
-        excludeTokens.add(activeName.toLowerCase().trim());
-        excludeTokens.add(baseName.toLowerCase().trim());
-        variations.forEach(v => excludeTokens.add(v.toLowerCase().trim()));
+        const normKey = s => typeof normalizeExerciseName === 'function' ? normalizeExerciseName(s) : String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-        const normKey = s => typeof normalizeExerciseName === 'function' ? normalizeExerciseName(s) : String(s || '').toLowerCase().trim();
-        excludeTokens.add(normKey(activeName));
-        excludeTokens.add(normKey(baseName));
+        const addExclude = s => {
+            if (!s || typeof s !== 'string') return;
+            const clean = s.trim().toLowerCase();
+            if (clean) {
+                excludeTokens.add(clean);
+                excludeTokens.add(normKey(clean));
+            }
+        };
+
+        addExclude(activeName);
+        addExclude(baseName);
+        variations.forEach(v => addExclude(v));
+
+        baseName.split(/\s+(?:of|or|\/)\s+/i).forEach(p => addExclude(p));
+        activeName.split(/\s+(?:of|or|\/)\s+/i).forEach(p => addExclude(p));
 
         const resultList = [];
         const seenKeys = new Set();
