@@ -198,7 +198,7 @@ describe('Exercise Database & SubstitutionEngine Tests', () => {
             <button id="btn-start-session">Start Nu</button>
           </div>
           <div id="view-workout" class="view">
-            <div id="active-exercises-list"></div>
+            <div id="workout-exercise-list"></div>
           </div>
           <div id="view-plans" class="view">
             <div id="plans-list"></div>
@@ -286,6 +286,34 @@ describe('Exercise Database & SubstitutionEngine Tests', () => {
           expect(['Geen', 'Laag']).toContain(exObj.axial_load);
         }
       }
+    });
+
+    test('getQuickAlternativesForExercise toont geen redundante eigen naam of variaties', () => {
+      const ex = {
+        name: 'Leg Press of Squat',
+        chosenVariation: 'Leg Press',
+        alternatives: ['Leg Press', 'Barbell Squat', 'Goblet Squat']
+      };
+
+      const quickAlts = app.getQuickAlternativesForExercise(ex);
+      expect(quickAlts.length).toBeGreaterThan(0);
+
+      const altNames = quickAlts.map(a => a.name.toLowerCase());
+      expect(altNames).not.toContain('leg press');
+      expect(altNames).not.toContain('squat');
+      expect(altNames).not.toContain('leg press of squat');
+    });
+
+    test('quickSwapActiveExercise wisselt direct van oefening en behoudt workout state', () => {
+      app.startWorkout(store.plans[0].sessions[0], store.plans[0]);
+      
+      app.quickSwapActiveExercise(0, 'Goblet Squat');
+      expect(app.activeWorkout.exercises[0].name).toBe('Goblet Squat');
+      expect(app.activeWorkout.exercises[0].chosenVariation).toBe('Goblet Squat');
+
+      const cardContainer = document.getElementById('workout-exercise-list');
+      expect(cardContainer.innerHTML).toContain('Goblet Squat');
+      expect(cardContainer.querySelector('.quick-alternatives-container')).not.toBeNull();
     });
   });
 });
