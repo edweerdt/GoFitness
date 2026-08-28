@@ -1451,8 +1451,42 @@ button:disabled {
     background: rgba(255, 255, 255, 0.15);
 }
 
-/* Light theme overrides */
-.theme-light .quick-alternatives-container,
+/* Light Theme Overrides (Explicit .theme-light & System Auto Mode) */
+.theme-light .quick-alternatives-container {
+    background: linear-gradient(135deg, #f0f7ff 0%, #e0e7ff 100%);
+    border: 1px solid #bfdbfe;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.08);
+}
+.theme-light .quick-alternatives-title {
+    color: #1d4ed8;
+}
+.theme-light .quick-alt-more-btn {
+    color: #2563eb;
+}
+.theme-light .quick-alt-pill {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.theme-light .quick-alt-pill:hover {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    color: #1d4ed8;
+}
+.theme-light .quick-alt-tag {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+.theme-light .quick-alt-search-icon {
+    color: #64748b;
+    opacity: 0.8;
+}
+.theme-light .quick-alt-search-icon:hover {
+    color: #2563eb;
+    background: #dbeafe;
+}
+
 @media (prefers-color-scheme: light) {
     :root:not(.theme-dark) .quick-alternatives-container {
         background: linear-gradient(135deg, #f0f7ff 0%, #e0e7ff 100%);
@@ -1488,35 +1522,6 @@ button:disabled {
         color: #2563eb;
         background: #dbeafe;
     }
-}
-.theme-light .quick-alternatives-title {
-    color: #1d4ed8;
-}
-.theme-light .quick-alt-more-btn {
-    color: #2563eb;
-}
-.theme-light .quick-alt-pill {
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    color: #1e293b;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-}
-.theme-light .quick-alt-pill:hover {
-    background: #eff6ff;
-    border-color: #3b82f6;
-    color: #1d4ed8;
-}
-.theme-light .quick-alt-tag {
-    background: #dbeafe;
-    color: #1d4ed8;
-}
-.theme-light .quick-alt-search-icon {
-    color: #64748b;
-    opacity: 0.8;
-}
-.theme-light .quick-alt-search-icon:hover {
-    color: #2563eb;
-    background: #dbeafe;
 }
 
 
