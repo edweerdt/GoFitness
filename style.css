@@ -1431,5 +1431,24 @@ button:disabled {
     margin-left: 2px;
 }
 
+.quick-alt-search-icon {
+    font-size: 0.85rem !important;
+    color: var(--text-muted);
+    opacity: 0.6;
+    padding: 2px 4px;
+    border-radius: 4px;
+    margin-left: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+.quick-alt-search-icon:hover {
+    color: var(--accent-color);
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.15);
+}
+
 
 

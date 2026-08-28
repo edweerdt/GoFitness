@@ -3695,6 +3695,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                         <span class="material-icons-round" style="font-size:0.8rem; opacity:0.7;">cached</span>
                                         <span>${safeName}</span>
                                         ${alt.badge ? `<span class="quick-alt-tag">${app.escapeHTML(alt.badge)}</span>` : ''}
+                                        <span class="quick-alt-search-icon material-icons-round" onclick="event.stopPropagation(); app.triggerExerciseSearch('${safeName}', event, this)" title="Zoek video/uitleg van ${safeName}">search</span>
                                     </button>
                                 `;
                             }).join('')}
