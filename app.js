@@ -3672,26 +3672,35 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 notesHtml += `<div class="text-sm text-muted mt-2">${app.escapeHTML(ex.notes)}</div>`;
             }
 
-            if (ex.alternatives && ex.alternatives.length > 0) {
-                const variationTokens = new Set(variations.map(v => v.toLowerCase().trim()));
-                const uniqueAlts = ex.alternatives.filter(a => {
-                    const norm = String(a || '').toLowerCase().trim();
-                    return norm && !variationTokens.has(norm);
-                });
-                if (uniqueAlts.length > 0) {
-                    const altLinks = uniqueAlts.map(a => app.formatClickableExerciseName(a)).join(', ');
-                    notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${altLinks}</div>`;
-                }
-            } else if (ex.optionalAlternatives && ex.optionalAlternatives.length > 0) {
-                const variationTokens = new Set(variations.map(v => v.toLowerCase().trim()));
-                const uniqueAlts = ex.optionalAlternatives.filter(a => {
-                    const norm = String(a || '').toLowerCase().trim();
-                    return norm && !variationTokens.has(norm);
-                });
-                if (uniqueAlts.length > 0) {
-                    const altLinks = uniqueAlts.map(a => app.formatClickableExerciseName(a)).join(', ');
-                    notesHtml += `<div class="text-sm text-muted mt-2"><strong>Alternatieven:</strong> ${altLinks}</div>`;
-                }
+            // Quick Alternatives: 1-Click Interactive Badges
+            const quickAlts = app.getQuickAlternativesForExercise(ex);
+            let quickAltsHtml = '';
+            if (quickAlts && quickAlts.length > 0) {
+                quickAltsHtml = `
+                    <div class="quick-alternatives-container mt-2">
+                        <div class="quick-alternatives-header">
+                            <span class="quick-alternatives-title">
+                                <span class="material-icons-round" style="font-size:0.85rem; color:var(--accent-color); vertical-align:-1px;">swap_horiz</span> Direct wisselen:
+                            </span>
+                            <button class="quick-alt-more-btn" onclick="app.openSubstitutionModalForActiveWorkout(${exIndex})" title="Alle opties en filters bekijken">
+                                Meer opties <span class="material-icons-round" style="font-size:0.8rem; vertical-align:-1px;">arrow_forward</span>
+                            </button>
+                        </div>
+                        <div class="quick-alternatives-pills">
+                            ${quickAlts.map(alt => {
+                                const safeName = app.escapeHTML(alt.name);
+                                const safeId = app.escapeHTML(alt.id || alt.name);
+                                return `
+                                    <button class="quick-alt-pill" onclick="app.quickSwapActiveExercise(${exIndex}, '${safeId}')" title="Wissel direct naar ${safeName}">
+                                        <span class="material-icons-round" style="font-size:0.8rem; opacity:0.7;">cached</span>
+                                        <span>${safeName}</span>
+                                        ${alt.badge ? `<span class="quick-alt-tag">${app.escapeHTML(alt.badge)}</span>` : ''}
+                                    </button>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
             }
 
             // Progressive-overload-advies op basis van de vorige sessie
@@ -3912,6 +3921,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                             </div>
                         </div>
                         ${notesHtml}
+                        ${quickAltsHtml}
                         ${delayBarHtml}
                     </div>
                 </div>
@@ -7185,6 +7195,110 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         this.startWorkout(convertedSession, activePlan);
         this.showToast(`${label} gestart! (${convertedCount} oefeningen aangepast)`);
+    },
+
+    getQuickAlternativesForExercise(ex) {
+        if (!ex) return [];
+        this.initSubstitutionEngine();
+
+        const activeName = (ex.chosenVariation || ex.name || '').trim();
+        const baseName = (ex.name || '').trim();
+        const variations = this.getExerciseVariations ? this.getExerciseVariations(baseName) : [];
+
+        // Tokens to strictly exclude (active name, base name, variations)
+        const excludeTokens = new Set();
+        excludeTokens.add(activeName.toLowerCase().trim());
+        excludeTokens.add(baseName.toLowerCase().trim());
+        variations.forEach(v => excludeTokens.add(v.toLowerCase().trim()));
+
+        const normKey = s => typeof normalizeExerciseName === 'function' ? normalizeExerciseName(s) : String(s || '').toLowerCase().trim();
+        excludeTokens.add(normKey(activeName));
+        excludeTokens.add(normKey(baseName));
+
+        const resultList = [];
+        const seenKeys = new Set();
+
+        // 1. Curated explicit alternatives from exercise schema/definition
+        const rawExplicit = (ex.alternatives && ex.alternatives.length > 0) 
+            ? ex.alternatives 
+            : (ex.optionalAlternatives || []);
+
+        for (const alt of rawExplicit) {
+            if (!alt || typeof alt !== 'string') continue;
+            const clean = alt.trim();
+            const lower = clean.toLowerCase();
+            const nKey = normKey(clean);
+
+            if (excludeTokens.has(lower) || excludeTokens.has(nKey) || seenKeys.has(nKey)) continue;
+
+            const dbEx = this.substitutionEngine ? this.substitutionEngine.getExercise(clean) : null;
+            seenKeys.add(nKey);
+            resultList.push({
+                id: dbEx ? dbEx.id : clean,
+                name: dbEx ? dbEx.name : clean,
+                badge: dbEx ? (dbEx.type || dbEx.movement_pattern || '') : ''
+            });
+
+            if (resultList.length >= 4) break;
+        }
+
+        // 2. Supplement from SubstitutionEngine if fewer than 3 alternatives
+        if (resultList.length < 4 && this.substitutionEngine) {
+            const engineSubs = this.substitutionEngine.getSubstitutes(activeName, {}, 6);
+            for (const sub of engineSubs) {
+                const subEx = sub.exercise;
+                const nKey = normKey(subEx.name);
+                const lower = subEx.name.toLowerCase().trim();
+
+                if (excludeTokens.has(lower) || excludeTokens.has(nKey) || seenKeys.has(nKey)) continue;
+
+                seenKeys.add(nKey);
+                resultList.push({
+                    id: subEx.id,
+                    name: subEx.name,
+                    badge: subEx.type || subEx.movement_pattern || ''
+                });
+
+                if (resultList.length >= 4) break;
+            }
+        }
+
+        return resultList;
+    },
+
+    quickSwapActiveExercise(exIndex, newExerciseIdOrName) {
+        if (!this.activeWorkout || !this.activeWorkout.exercises || !this.activeWorkout.exercises[exIndex]) return;
+        this.initSubstitutionEngine();
+
+        const ex = this.activeWorkout.exercises[exIndex];
+
+        let targetName = newExerciseIdOrName;
+        let targetId = newExerciseIdOrName;
+        let targetPattern = '';
+        let targetCategory = '';
+        let targetMuscles = [];
+
+        if (this.substitutionEngine) {
+            const dbEx = this.substitutionEngine.getExercise(newExerciseIdOrName);
+            if (dbEx) {
+                targetName = dbEx.name;
+                targetId = dbEx.id;
+                targetPattern = dbEx.movement_pattern;
+                targetCategory = (dbEx.type || '').toLowerCase();
+                targetMuscles = (dbEx.primary_muscles || []).map(m => m.toLowerCase());
+            }
+        }
+
+        ex.name = targetName;
+        ex.chosenVariation = targetName;
+        ex.id = targetId;
+        if (targetPattern) ex.movementPattern = targetPattern;
+        if (targetCategory) ex.category = targetCategory;
+        if (targetMuscles.length > 0) ex.muscleGroups = targetMuscles;
+
+        store.saveActiveWorkoutState(this.activeWorkout);
+        this.renderWorkoutExercises();
+        this.showToast(`🔄 Gewisseld naar ${targetName}`);
     }
 };
 
