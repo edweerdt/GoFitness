@@ -385,27 +385,109 @@ button:disabled {
 /* Exercise Card */
 .exercise-card {
     padding: 16px;
+    border-radius: var(--border-radius);
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .exercise-header {
+    width: 100%;
+    min-width: 0;
+    display: block;
+}
+
+.exercise-header-main {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.exercise-title-row {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
 }
 
 .exercise-title {
-    font-weight: 600;
+    font-weight: 700;
     font-size: 1.1rem;
+    line-height: 1.3;
+    color: var(--text-primary);
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+}
+
+.exercise-actions-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.exercise-action-btn {
+    padding: 3px 8px !important;
+    font-size: 0.75rem !important;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    border-radius: 8px;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.exercise-action-btn:hover {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.exercise-action-btn .material-icons-round {
+    font-size: 0.85rem !important;
+}
+
+.theme-light .exercise-action-btn,
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark) .exercise-action-btn {
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        color: #374151;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    :root:not(.theme-dark) .exercise-action-btn:hover {
+        background: #eff6ff;
+        border-color: #3b82f6;
+        color: #1d4ed8;
+    }
+}
+
+.exercise-meta-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
 }
 
 .exercise-meta {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: var(--text-muted);
-    margin-top: 4px;
 }
 
 .exercise-body {
-    margin-top: 16px;
+    margin-top: 14px;
 }
 
 .set-row {
@@ -1337,11 +1419,16 @@ button:disabled {
 
 /* Quick Alternatives 1-Click Pills */
 .quick-alternatives-container {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(99, 102, 241, 0.05) 100%);
-    border: 1px solid rgba(59, 130, 246, 0.2);
+    background: rgba(59, 130, 246, 0.06);
+    border: 1px solid rgba(59, 130, 246, 0.18);
     border-radius: 12px;
     padding: 8px 10px;
-    margin-top: 8px;
+    margin-top: 6px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .quick-alternatives-header {
@@ -1349,6 +1436,8 @@ button:disabled {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 6px;
+    width: 100%;
+    min-width: 0;
 }
 
 .quick-alternatives-title {
@@ -1373,6 +1462,7 @@ button:disabled {
     display: inline-flex;
     align-items: center;
     gap: 2px;
+    white-space: nowrap;
     transition: var(--transition);
 }
 
@@ -1385,9 +1475,13 @@ button:disabled {
     display: flex;
     gap: 6px;
     overflow-x: auto;
-    padding-bottom: 2px;
+    padding: 2px 2px 4px 2px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .quick-alternatives-pills::-webkit-scrollbar {
@@ -1422,23 +1516,23 @@ button:disabled {
     transform: translateY(0);
 }
 
-.quick-alt-tag {
-    font-size: 0.65rem;
-    font-weight: 600;
-    background: rgba(59, 130, 246, 0.15);
-    color: #93c5fd;
-    padding: 1px 5px;
-    border-radius: 4px;
-    margin-left: 2px;
+.quick-alt-swap-icon {
+    font-size: 0.85rem !important;
+    color: var(--accent-color);
+    opacity: 0.85;
+}
+
+.quick-alt-label {
+    white-space: nowrap;
 }
 
 .quick-alt-search-icon {
     font-size: 0.85rem !important;
     color: var(--text-muted);
-    opacity: 0.7;
+    opacity: 0.65;
     padding: 2px 4px;
     border-radius: 4px;
-    margin-left: 4px;
+    margin-left: 2px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1453,9 +1547,9 @@ button:disabled {
 
 /* Light Theme Overrides (Explicit .theme-light & System Auto Mode) */
 .theme-light .quick-alternatives-container {
-    background: linear-gradient(135deg, #f0f7ff 0%, #e0e7ff 100%);
+    background: #f0f7ff;
     border: 1px solid #bfdbfe;
-    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.08);
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.06);
 }
 .theme-light .quick-alternatives-title {
     color: #1d4ed8;
@@ -1474,13 +1568,12 @@ button:disabled {
     border-color: #3b82f6;
     color: #1d4ed8;
 }
-.theme-light .quick-alt-tag {
-    background: #dbeafe;
-    color: #1d4ed8;
+.theme-light .quick-alt-swap-icon {
+    color: #2563eb;
 }
 .theme-light .quick-alt-search-icon {
     color: #64748b;
-    opacity: 0.8;
+    opacity: 0.75;
 }
 .theme-light .quick-alt-search-icon:hover {
     color: #2563eb;
@@ -1489,9 +1582,9 @@ button:disabled {
 
 @media (prefers-color-scheme: light) {
     :root:not(.theme-dark) .quick-alternatives-container {
-        background: linear-gradient(135deg, #f0f7ff 0%, #e0e7ff 100%);
+        background: #f0f7ff;
         border: 1px solid #bfdbfe;
-        box-shadow: 0 1px 3px rgba(59, 130, 246, 0.08);
+        box-shadow: 0 1px 3px rgba(59, 130, 246, 0.06);
     }
     :root:not(.theme-dark) .quick-alternatives-title {
         color: #1d4ed8;
@@ -1510,17 +1603,46 @@ button:disabled {
         border-color: #3b82f6;
         color: #1d4ed8;
     }
-    :root:not(.theme-dark) .quick-alt-tag {
-        background: #dbeafe;
-        color: #1d4ed8;
+    :root:not(.theme-dark) .quick-alt-swap-icon {
+        color: #2563eb;
     }
     :root:not(.theme-dark) .quick-alt-search-icon {
         color: #64748b;
-        opacity: 0.8;
+        opacity: 0.75;
     }
     :root:not(.theme-dark) .quick-alt-search-icon:hover {
         color: #2563eb;
         background: #dbeafe;
+    }
+}
+
+/* Mobile Screen Specific Optimizations */
+@media (max-width: 480px) {
+    .content-padded {
+        padding: 12px 10px;
+    }
+    .exercise-card {
+        padding: 12px 10px;
+        border-radius: 12px;
+    }
+    .exercise-title {
+        font-size: 1rem;
+    }
+    .exercise-action-btn {
+        padding: 2px 6px !important;
+        font-size: 0.7rem !important;
+    }
+    .quick-alternatives-container {
+        padding: 6px 8px;
+        border-radius: 10px;
+    }
+    .quick-alt-pill {
+        padding: 4px 8px;
+        font-size: 0.75rem;
+    }
+    .quick-alt-swap-icon,
+    .quick-alt-search-icon {
+        font-size: 0.8rem !important;
     }
 }
 
