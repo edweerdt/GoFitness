@@ -3677,13 +3677,13 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             let quickAltsHtml = '';
             if (quickAlts && quickAlts.length > 0) {
                 quickAltsHtml = `
-                    <div class="quick-alternatives-container mt-2">
+                    <div class="quick-alternatives-container">
                         <div class="quick-alternatives-header">
                             <span class="quick-alternatives-title">
                                 <span class="material-icons-round" style="font-size:0.85rem; color:var(--accent-color); vertical-align:-1px;">swap_horiz</span> Direct wisselen:
                             </span>
                             <button class="quick-alt-more-btn" onclick="app.openSubstitutionModalForActiveWorkout(${exIndex})" title="Alle opties en filters bekijken">
-                                Meer opties <span class="material-icons-round" style="font-size:0.8rem; vertical-align:-1px;">arrow_forward</span>
+                                Alle opties <span class="material-icons-round" style="font-size:0.8rem; vertical-align:-1px;">arrow_forward</span>
                             </button>
                         </div>
                         <div class="quick-alternatives-pills">
@@ -3692,9 +3692,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 const safeId = app.escapeHTML(alt.id || alt.name);
                                 return `
                                     <button class="quick-alt-pill" onclick="app.quickSwapActiveExercise(${exIndex}, '${safeId}')" title="Wissel direct naar ${safeName}">
-                                        <span class="material-icons-round" style="font-size:0.8rem; opacity:0.7;">cached</span>
-                                        <span>${safeName}</span>
-                                        ${alt.badge ? `<span class="quick-alt-tag">${app.escapeHTML(alt.badge)}</span>` : ''}
+                                        <span class="material-icons-round quick-alt-swap-icon">swap_horiz</span>
+                                        <span class="quick-alt-label">${safeName}</span>
                                         <span class="quick-alt-search-icon material-icons-round" onclick="event.stopPropagation(); app.triggerExerciseSearch('${safeName}', event, this)" title="Zoek video/uitleg van ${safeName}">search</span>
                                     </button>
                                 `;
@@ -3904,22 +3903,22 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             card.className = 'glass-panel exercise-card';
             card.innerHTML = `
                 <div class="exercise-header">
-                    <div>
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                            <div class="exercise-title" style="margin:0;">${app.formatClickableExerciseName(ex.name)}</div>
-                        </div>
-                        ${variationHtml}
-                        <div style="margin-bottom:4px;">${badgesHtml}</div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-top:2px;">
-                            <div class="exercise-meta" style="margin:0;">${app.escapeHTML(metaString)}</div>
-                            <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
-                                <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;" onclick="app.openSubstitutionModalForActiveWorkout(${exIndex})" title="Vervang deze oefening met een alternatief">
-                                    <span class="material-icons-round" style="font-size:0.85rem;">swap_horiz</span> Vervang
+                    <div class="exercise-header-main">
+                        <div class="exercise-title-row">
+                            <div class="exercise-title">${app.formatClickableExerciseName(ex.name)}</div>
+                            <div class="exercise-actions-group">
+                                <button class="btn-secondary exercise-action-btn" onclick="app.openSubstitutionModalForActiveWorkout(${exIndex})" title="Vervang deze oefening met een alternatief">
+                                    <span class="material-icons-round">swap_horiz</span> Wissel
                                 </button>
-                                <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;" onclick="app.showExerciseHistoryModal('${safeExName}')">
-                                    <span class="material-icons-round" style="font-size:0.85rem;">history</span> Alle Historie
+                                <button class="btn-secondary exercise-action-btn" onclick="app.showExerciseHistoryModal('${safeExName}')" title="Bekijk geschiedenis">
+                                    <span class="material-icons-round">history</span> Historie
                                 </button>
                             </div>
+                        </div>
+                        ${variationHtml}
+                        <div class="exercise-meta-row">
+                            ${badgesHtml ? `<div class="exercise-badges" style="display:inline-flex; gap:4px;">${badgesHtml}</div>` : ''}
+                            <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
                         </div>
                         ${notesHtml}
                         ${quickAltsHtml}
