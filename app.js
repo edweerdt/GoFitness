@@ -128,10 +128,10 @@ const PRESET_PLANS = [
                     { id: "a-bench-press-or-chest-press", name: "Bench Press of Chest Press Machine", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["chest", "triceps", "shoulders"] },
                     { id: "a-lat-pulldown-or-assisted-pullup", name: "Lat Pulldown of Assisted Pull-up", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "biceps"] },
                     { id: "a-seated-row", name: "Seated Row", sets: 2, repsMin: 10, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "rear_shoulders", "biceps"] },
-                    { id: "a-pushups", name: "Push-ups", sets: 2, repsMin: 8, repsMax: 15, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["chest", "triceps", "shoulders"] },
+                    { id: "a-pushups", name: "Push-up", sets: 2, repsMin: 8, repsMax: 15, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["chest", "triceps", "shoulders"] },
                     { id: "a-dumbbell-shoulder-press", name: "Dumbbell Shoulder Press", sets: 2, repsMin: 8, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["shoulders", "triceps"] },
                     { id: "a-plank", name: "Plank", sets: 3, durationSecondsMin: 20, durationSecondsMax: 40, restSeconds: 45, exerciseType: "duration", category: "isometric", muscleGroups: ["core"] },
-                    { id: "a-dumbbell-bicep-curls", name: "Dumbbell Bicep Curls", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["biceps"] }
+                    { id: "a-dumbbell-bicep-curls", name: "Dumbbell Bicep Curl", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["biceps"] }
                 ]
             },
             {
@@ -142,13 +142,13 @@ const PRESET_PLANS = [
                 estimatedDurationMinutes: 45,
                 exercises: [
                     { id: "b-db-rdl", name: "Dumbbell Romanian Deadlift (DB RDL)", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["legs", "glutes", "back"] },
-                    { id: "b-walking-lunges", name: "Walking Lunges of Split Squats", sets: 2, repsMin: 10, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["legs", "glutes"] },
+                    { id: "b-walking-lunges", name: "Walking Lunge of Bulgarian Split Squat", sets: 2, repsMin: 10, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["legs", "glutes"] },
                     { id: "b-incline-db-press", name: "Incline Dumbbell Press of Incline Machine Press", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["chest", "shoulders", "triceps"] },
                     { id: "b-lat-pulldown", name: "Lat Pulldown of Assisted Pull-up", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "biceps"] },
-                    { id: "b-db-lateral-raises", name: "Dumbbell Lateral Raises of Cable Lateral Raises", sets: 3, repsMin: 12, repsMax: 15, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["shoulders"] },
-                    { id: "b-face-pulls", name: "Face Pulls", sets: 3, repsMin: 12, repsMax: 15, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["rear_shoulders", "upper_back"] },
+                    { id: "b-db-lateral-raises", name: "Dumbbell Lateral Raise of Cable Lateral Raise", sets: 3, repsMin: 12, repsMax: 15, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["shoulders"] },
+                    { id: "b-face-pulls", name: "Face Pull", sets: 3, repsMin: 12, repsMax: 15, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["rear_shoulders", "upper_back"] },
                     { id: "b-dead-bug", name: "Dead Bug of Bird Dog", sets: 2, repsMin: 10, repsMax: 12, restSeconds: 45, exerciseType: "bodyweight_reps", category: "core", muscleGroups: ["core"] },
-                    { id: "b-tricep-dips", name: "Tricep Dips of Cable Tricep Pushdown", sets: 2, repsMin: 10, repsMax: 12, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["triceps"] }
+                    { id: "b-tricep-dips", name: "Chest / Tricep Dips of Triceps Rope Pushdown", sets: 2, repsMin: 10, repsMax: 12, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["triceps"] }
                 ]
             }
         ]
@@ -266,7 +266,7 @@ const PRESET_PLANS = [
                     { id: "u-a-row", name: "Barbell Bent Over Row", sets: 4, repsMin: 6, repsMax: 10, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "biceps"] },
                     { id: "u-a-ohp", name: "Overhead Press (OHP)", sets: 3, repsMin: 8, repsMax: 10, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["shoulders", "triceps"] },
                     { id: "u-a-pulldown", name: "Lat Pulldown", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "biceps"] },
-                    { id: "u-a-curls", name: "Dumbbell Bicep Curls", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["biceps"] },
+                    { id: "u-a-curls", name: "Dumbbell Bicep Curl", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["biceps"] },
                     { id: "u-a-dips", name: "Chest / Tricep Dips", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["triceps", "chest"] }
                 ]
             },

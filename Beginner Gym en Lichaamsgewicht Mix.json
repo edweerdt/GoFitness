@@ -149,7 +149,7 @@
         {
           "exerciseId": "a-pushups",
           "order": 5,
-          "name": "Push-ups",
+          "name": "Push-up",
           "category": "bodyweight",
           "exerciseType": "bodyweight_strength",
           "muscleGroups": ["chest", "triceps", "shoulders"],
@@ -158,7 +158,7 @@
           "repMode": "near_failure",
           "restSeconds": 60,
           "trackMetrics": ["reps", "completed"],
-          "alternatives": ["Push-ups", "Knee Push-ups", "Incline Push-ups"],
+          "alternatives": ["Incline Push-up", "Knee Push-up", "Chest / Tricep Dips"],
           "notes": ["Stop net voor volledige mislukking", "Kwaliteit belangrijker dan aantal"],
           "progressionRuleOverride": {
             "method": "bodyweight_progression",
@@ -353,7 +353,7 @@
         {
           "exerciseId": "b-incline-pushups",
           "order": 6,
-          "name": "Incline Push-ups of Push-ups",
+          "name": "Incline Push-up of Push-up",
           "category": "bodyweight",
           "exerciseType": "bodyweight_strength",
           "muscleGroups": ["chest", "triceps", "shoulders"],
@@ -362,7 +362,7 @@
           "repMode": "near_failure",
           "restSeconds": 60,
           "trackMetrics": ["reps", "completed"],
-          "alternatives": ["Incline Push-ups", "Push-ups"],
+          "alternatives": ["Incline Push-up", "Push-up", "Knee Push-up"],
           "notes": ["Techniek blijft leidend"],
           "progressionRuleOverride": {
             "method": "bodyweight_progression",
