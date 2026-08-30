@@ -1534,36 +1534,30 @@ button:disabled {
 
 .quick-alternatives-pills {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
-    overflow-x: auto;
-    padding: 2px 2px 4px 2px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    padding: 2px 0 0 0;
     width: 100%;
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
 }
 
-.quick-alternatives-pills::-webkit-scrollbar {
-    display: none;
-}
-
 .quick-alt-pill {
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 20px;
+    border-radius: 16px;
     padding: 4px 10px;
     font-size: 0.78rem;
     font-weight: 500;
     color: var(--text-primary);
     cursor: pointer;
-    white-space: nowrap;
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    flex-shrink: 0;
     transition: var(--transition);
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .quick-alt-pill:hover {

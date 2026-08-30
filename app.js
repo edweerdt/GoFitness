@@ -7190,16 +7190,30 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const baseName = (ex.name || '').trim();
         const variations = this.getExerciseVariations ? this.getExerciseVariations(ex) : [];
 
-        // Tokens to strictly exclude (active name, base name, variations, and split choices)
-        const excludeTokens = new Set();
-        const normKey = s => typeof normalizeExerciseName === 'function' ? normalizeExerciseName(s) : String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        // Helper to normalize strings for comparison (lowercase, remove punctuation, strip trailing plural 's')
+        const normKey = s => {
+            const raw = typeof normalizeExerciseName === 'function' ? normalizeExerciseName(s) : String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            return raw.replace(/s$/, '');
+        };
+
+        const excludeKeys = new Set();
 
         const addExclude = s => {
             if (!s || typeof s !== 'string') return;
             const clean = s.trim().toLowerCase();
             if (clean) {
-                excludeTokens.add(clean);
-                excludeTokens.add(normKey(clean));
+                excludeKeys.add(clean);
+                excludeKeys.add(clean.replace(/s$/, ''));
+                excludeKeys.add(normKey(clean));
+            }
+            if (this.substitutionEngine) {
+                const dbEx = this.substitutionEngine.getExercise(s);
+                if (dbEx) {
+                    excludeKeys.add(dbEx.id.toLowerCase());
+                    excludeKeys.add(dbEx.name.toLowerCase());
+                    excludeKeys.add(normKey(dbEx.id));
+                    excludeKeys.add(normKey(dbEx.name));
+                }
             }
         };
 
@@ -7211,7 +7225,38 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         activeName.split(/\s+(?:of|or|\/)\s+/i).forEach(p => addExclude(p));
 
         const resultList = [];
-        const seenKeys = new Set();
+        const seenCanonicalKeys = new Set();
+
+        const isExcludedOrSeen = (id, name) => {
+            const idKey = (id || '').toLowerCase().trim();
+            const nameKey = (name || '').toLowerCase().trim();
+            const nKey = normKey(name);
+            const nIdKey = normKey(id);
+
+            if (excludeKeys.has(idKey) || excludeKeys.has(nameKey) || excludeKeys.has(nKey) || excludeKeys.has(nIdKey)) {
+                return true;
+            }
+            if (seenCanonicalKeys.has(idKey) || seenCanonicalKeys.has(nameKey) || seenCanonicalKeys.has(nKey) || seenCanonicalKeys.has(nIdKey)) {
+                return true;
+            }
+            return false;
+        };
+
+        const addAlternative = (id, name, badge) => {
+            if (!name || isExcludedOrSeen(id, name)) return;
+
+            const idKey = (id || '').toLowerCase().trim();
+            const nameKey = (name || '').toLowerCase().trim();
+            const nKey = normKey(name);
+            const nIdKey = normKey(id);
+
+            seenCanonicalKeys.add(idKey);
+            seenCanonicalKeys.add(nameKey);
+            seenCanonicalKeys.add(nKey);
+            seenCanonicalKeys.add(nIdKey);
+
+            resultList.push({ id: id || name, name, badge });
+        };
 
         // 1. Curated explicit alternatives from exercise schema/definition
         const rawExplicit = (ex.alternatives && ex.alternatives.length > 0) 
@@ -7221,39 +7266,21 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         for (const alt of rawExplicit) {
             if (!alt || typeof alt !== 'string') continue;
             const clean = alt.trim();
-            const lower = clean.toLowerCase();
-            const nKey = normKey(clean);
-
-            if (excludeTokens.has(lower) || excludeTokens.has(nKey) || seenKeys.has(nKey)) continue;
-
             const dbEx = this.substitutionEngine ? this.substitutionEngine.getExercise(clean) : null;
-            seenKeys.add(nKey);
-            resultList.push({
-                id: dbEx ? dbEx.id : clean,
-                name: dbEx ? dbEx.name : clean,
-                badge: dbEx ? (dbEx.type || dbEx.movement_pattern || '') : ''
-            });
+            const finalId = dbEx ? dbEx.id : clean;
+            const finalName = dbEx ? dbEx.name : clean;
+            const finalBadge = dbEx ? (dbEx.type || dbEx.movement_pattern || '') : '';
 
+            addAlternative(finalId, finalName, finalBadge);
             if (resultList.length >= 4) break;
         }
 
-        // 2. Supplement from SubstitutionEngine if fewer than 3 alternatives
+        // 2. Supplement from SubstitutionEngine if fewer than 4 alternatives
         if (resultList.length < 4 && this.substitutionEngine) {
-            const engineSubs = this.substitutionEngine.getSubstitutes(activeName, {}, 6);
+            const engineSubs = this.substitutionEngine.getSubstitutes(activeName, {}, 8);
             for (const sub of engineSubs) {
                 const subEx = sub.exercise;
-                const nKey = normKey(subEx.name);
-                const lower = subEx.name.toLowerCase().trim();
-
-                if (excludeTokens.has(lower) || excludeTokens.has(nKey) || seenKeys.has(nKey)) continue;
-
-                seenKeys.add(nKey);
-                resultList.push({
-                    id: subEx.id,
-                    name: subEx.name,
-                    badge: subEx.type || subEx.movement_pattern || ''
-                });
-
+                addAlternative(subEx.id, subEx.name, subEx.type || subEx.movement_pattern || '');
                 if (resultList.length >= 4) break;
             }
         }

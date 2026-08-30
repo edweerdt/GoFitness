@@ -304,6 +304,26 @@ describe('Exercise Database & SubstitutionEngine Tests', () => {
       expect(altNames).not.toContain('leg press of squat');
     });
 
+    test('getQuickAlternativesForExercise dedupliceert Push-ups en sluit Push-up uit', () => {
+      const ex = {
+        name: 'Push-ups',
+        alternatives: ['Push-ups', 'Push-up', 'Pushups', 'Knee Push-ups', 'Incline Push-ups']
+      };
+
+      const quickAlts = app.getQuickAlternativesForExercise(ex);
+      expect(quickAlts.length).toBeGreaterThan(0);
+
+      const altNames = quickAlts.map(a => a.name.toLowerCase());
+      expect(altNames).not.toContain('push-ups');
+      expect(altNames).not.toContain('push-up');
+      expect(altNames).not.toContain('pushups');
+      expect(altNames).not.toContain('pushup');
+
+      // Geen dubbele items in de lijst
+      const uniqueNames = new Set(altNames);
+      expect(uniqueNames.size).toBe(altNames.length);
+    });
+
     test('quickSwapActiveExercise wisselt direct van oefening en behoudt workout state', () => {
       app.startWorkout(store.plans[0].sessions[0], store.plans[0]);
       
