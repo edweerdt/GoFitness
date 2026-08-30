@@ -3734,7 +3734,30 @@ describe('add and remove sets during workout', () => {
             app.stopRestTimer();
         });
     });
+
+    describe('GOF-30: Session | rust timer styling & light theme', () => {
+        it('should have frost slate background, sky border, and glow for .rest-timer in style.css', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const css = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+
+            expect(css).toMatch(/\.rest-timer\s*\{[^}]*background:\s*linear-gradient/);
+            expect(css).toMatch(/\.rest-timer\s*\{[^}]*border:\s*1\.5px solid rgba\(56,\s*189,\s*248,\s*0\.45\);/);
+            expect(css).toMatch(/\.rest-timer\s*\{[^}]*box-shadow:\s*0 4px 20px rgba\(56,\s*189,\s*248,\s*0\.22\)/);
+        });
+
+        it('should support light theme styles for .theme-light and prefers-color-scheme light', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const css = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+
+            expect(css).toContain('.theme-light .rest-timer');
+            expect(css).toMatch(/\.theme-light \.rest-timer\s*\{[^}]*background:\s*linear-gradient\(135deg,\s*#f0f7ff 0%,\s*#e0f2fe 100%\);/);
+            expect(css).toContain(':root:not(.theme-dark) .rest-timer');
+        });
+    });
 });
+
 
 
 
