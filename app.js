@@ -2159,6 +2159,93 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 diffText = '1 sessie';
             }
 
+            // Bepaal all-time PR (Persoonlijk Record) voor deze oefening
+            let prWeight = 0;
+            let prReps = 0;
+            let prBest1RM = 0;
+            let prDuration = 0;
+            const targetCanonKey = this.getCanonicalExerciseKey(s.name);
+            const targetCanonName = this.getCanonicalExerciseName(s.name);
+
+            if (typeof store !== 'undefined' && Array.isArray(store.logs)) {
+                store.logs.forEach(log => {
+                    if (!log || !log.exercises) return;
+                    log.exercises.forEach(ex => {
+                        if (!ex || !ex.name) return;
+                        const exNames = String(ex.name || '').split(/\s+of\s+/i).map(str => str.trim()).filter(Boolean);
+                        exNames.forEach(displayName => {
+                            const canonKey = this.getCanonicalExerciseKey(displayName);
+                            const canonName = this.getCanonicalExerciseName(displayName);
+                            if (canonKey === targetCanonKey || canonName === targetCanonName || displayName === s.name) {
+                                (ex.details || []).forEach(d => {
+                                    if (!d) return;
+                                    if (s.isHold) {
+                                        const sec = parseFloat(d.durationSeconds) || parseInt(d.reps, 10) || 0;
+                                        if (sec > prDuration) prDuration = sec;
+                                    } else if (s.isBodyweightReps) {
+                                        const r = parseInt(d.reps, 10) || 0;
+                                        if (r > prReps) prReps = r;
+                                    } else {
+                                        const w = parseFloat(d.weight) || 0;
+                                        const r = parseInt(d.reps, 10) || 0;
+                                        if (w > 0 || r > 0) {
+                                            const est1RM = w > 0 ? (r === 1 ? w : w * (1 + r / 30)) : 0;
+                                            if (est1RM > prBest1RM || (est1RM === prBest1RM && w > prWeight) || (w === 0 && r > prReps && prWeight === 0)) {
+                                                prBest1RM = est1RM;
+                                                prWeight = w;
+                                                prReps = r;
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    });
+                });
+            }
+
+            // Fallback naar s.points indien nodig
+            if (!prWeight && !prReps && !prDuration && s.points.length > 0) {
+                s.points.forEach(p => {
+                    if (s.isHold) {
+                        if (p.weight > prDuration) prDuration = p.weight;
+                    } else if (s.isBodyweightReps) {
+                        if (p.weight > prReps) prReps = p.weight;
+                    } else {
+                        const est1RM = p.weight > 0 ? (p.reps === 1 ? p.weight : p.weight * (1 + p.reps / 30)) : 0;
+                        if (est1RM > prBest1RM || p.weight > prWeight) {
+                            prBest1RM = est1RM;
+                            prWeight = p.weight;
+                            prReps = p.reps;
+                        }
+                    }
+                });
+            }
+
+            let prValueHtml = '';
+            if (s.isHold && prDuration > 0) {
+                prValueHtml = `
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+                        <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">${prDuration} sec</span>
+                        <span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>
+                    </div>
+                `;
+            } else if (s.isBodyweightReps && prReps > 0) {
+                prValueHtml = `
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+                        <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">${prReps} reps</span>
+                        <span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>
+                    </div>
+                `;
+            } else if (prWeight > 0 || prReps > 0) {
+                prValueHtml = `
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+                        <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">${prWeight > 0 ? `${prWeight} kg` : '0 kg'} ${prReps > 0 ? `<span class="text-xs font-normal text-muted">× ${prReps}</span>` : ''}</span>
+                        <span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>
+                    </div>
+                `;
+            }
+
             let rmHtml = '';
             if (!s.isHold && s.unit === 'kg') {
                 let best1RM = 0;
@@ -2173,9 +2260,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
             html += `
                 <div class="glass-panel progress-card" style="padding: 16px;">
-                    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
-                        <div style="font-weight:600; font-size:0.9rem;">${this.escapeHTML(String(s.name))}</div>
-                        <div class="text-sm" style="color:${diffColor}; white-space:nowrap;">${diffText}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                        <div>
+                            <div style="font-weight:600; font-size:0.9rem;">${this.escapeHTML(String(s.name))}</div>
+                            ${prValueHtml}
+                        </div>
+                        <div class="text-sm" style="color:${diffColor}; white-space:nowrap; margin-top:2px;">${diffText}</div>
                     </div>
                     <div class="mt-2">${this.buildSparklineSVG(s.points, s.unit || 'kg')}</div>
                     <div class="text-sm text-muted" style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
@@ -6828,10 +6918,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         const fDateStr = fStat && fStat.date ? this.formatShortDate(fStat.date) : '';
 
                         const hasMyData = Boolean(myStat && (myKg > 0 || myReps > 0 || my1RM > 0));
-                        const isMyPR = Boolean(hasMyData && (myStat.isPR !== false));
-
                         const hasFriendData = Boolean(fStat && (fKg > 0 || fReps > 0 || f1RM > 0));
-                        const isFriendPR = Boolean(hasFriendData && (fStat.isPR !== false));
 
                         html += `
                             <div class="exercise-compare-card">
@@ -6846,10 +6933,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                             ${myDateStr ? `<span style="font-weight:600; opacity:0.8; white-space:nowrap;">${this.escapeHTML(myDateStr)}</span>` : ''}
                                         </div>
                                         ${hasMyData ? `
-                                            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:2px;">
-                                                <div style="font-size:1rem; font-weight:700;">${myKg > 0 ? `${myKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${myReps > 0 ? `× ${myReps}` : ''}</span></div>
-                                                ${isMyPR ? `<span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>` : ''}
-                                            </div>
+                                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${myKg > 0 ? `${myKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${myReps > 0 ? `× ${myReps}` : ''}</span></div>
                                             <div class="text-accent" style="font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${myKg > 0 ? `1RM: ${my1RM} kg` : `Max: ${myReps} reps`}</div>
                                         ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
                                     </div>
@@ -6859,10 +6943,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                             ${fDateStr ? `<span style="font-weight:600; opacity:0.8; white-space:nowrap;">${this.escapeHTML(fDateStr)}</span>` : ''}
                                         </div>
                                         ${hasFriendData ? `
-                                            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:2px;">
-                                                <div style="font-size:1rem; font-weight:700;">${fKg > 0 ? `${fKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${fReps > 0 ? `× ${fReps}` : ''}</span></div>
-                                                ${isFriendPR ? `<span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>` : ''}
-                                            </div>
+                                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${fKg > 0 ? `${fKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${fReps > 0 ? `× ${fReps}` : ''}</span></div>
                                             <div style="color:var(--status-orange); font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${fKg > 0 ? `1RM: ${f1RM} kg` : `Max: ${fReps} reps`}</div>
                                         ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
                                     </div>

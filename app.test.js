@@ -1250,6 +1250,24 @@ describe('exercise progress', () => {
         expect(document.getElementById('exercise-progress-list').innerHTML).toContain('Geschat 1RM: 117 kg');
     });
 
+    it('should show the PR crown badge and achieved values under the exercise name in progress card', () => {
+        store.logs = [
+            { date: '2026-07-01T10:00:00.000Z', exercises: [{ name: 'Squat', details: [{ setNumber: 1, weight: '90', reps: '8' }] }] },
+            { date: '2026-07-08T10:00:00.000Z', exercises: [{ name: 'Squat', details: [{ setNumber: 1, weight: '100', reps: '5' }] }] }
+        ];
+        app.renderExerciseProgress();
+
+        const container = document.getElementById('exercise-progress-list');
+        const card = container.querySelector('.progress-card');
+        expect(card).toBeDefined();
+        const prBadge = card.querySelector('.pr-crown-badge');
+        expect(prBadge).toBeDefined();
+        expect(prBadge.textContent).toContain('PR');
+        expect(prBadge.textContent).toContain('👑');
+        expect(card.textContent).toContain('100 kg');
+        expect(card.textContent).toContain('× 5');
+    });
+
     it('should display hold exercises in seconds and omit estimated 1RM', () => {
         store.logs = [
             { date: '2026-07-01T10:00:00.000Z', exercises: [{ name: 'Plank Hold', details: [{ setNumber: 1, weight: '0', reps: '50', durationSeconds: 50 }] }] },
@@ -3298,23 +3316,11 @@ describe('add and remove sets during workout', () => {
             expect(titles[2]).toBe('Barbell Bench Press');
         });
 
-        it('should show golden crown PR badge for users with data and not for Geen data', () => {
+        it('should not render pr-crown-badge in friends comparison cards as all values are already maxes', () => {
             app.renderFriends();
             const container = document.getElementById('friends-container');
-            const cards = container.querySelectorAll('.exercise-compare-card');
-            
-            // First card is Incline Bench Press (both have data)
-            const inclineCard = cards[0];
-            const prBadgesIncline = inclineCard.querySelectorAll('.pr-crown-badge');
-            expect(prBadgesIncline.length).toBe(2); // both JIJ and Friend 1 get PR crown
-            expect(prBadgesIncline[0].textContent).toContain('PR');
-            expect(prBadgesIncline[0].textContent).toContain('👑');
-
-            // Barbell Bench Press: JIJ has data, Friend 1 has "Geen data"
-            const barbellCard = Array.from(cards).find(c => c.textContent.includes('Barbell Bench Press'));
-            expect(barbellCard).toBeDefined();
-            const prBadgesBarbell = barbellCard.querySelectorAll('.pr-crown-badge');
-            expect(prBadgesBarbell.length).toBe(1); // only JIJ gets PR crown
+            const prBadges = container.querySelectorAll('.pr-crown-badge');
+            expect(prBadges.length).toBe(0);
         });
 
         it('calculateExerciseMaxesByMuscleGroup should attach isPR: true to max records', () => {
