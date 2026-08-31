@@ -6842,27 +6842,27 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                                     <div style="background:rgba(59, 130, 246, 0.06); border-left:3px solid var(--accent-color); padding:8px 10px; border-radius:6px;">
                                         <div class="text-sm text-muted" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:4px; font-size:0.65rem; font-weight:600;">
-                                            <div style="display:flex; align-items:center; gap:4px;">
-                                                <span>JIJ</span>
-                                                ${isMyPR ? `<span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>` : ''}
-                                            </div>
+                                            <span>JIJ</span>
                                             ${myDateStr ? `<span style="font-weight:600; opacity:0.8; white-space:nowrap;">${this.escapeHTML(myDateStr)}</span>` : ''}
                                         </div>
                                         ${hasMyData ? `
-                                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${myKg > 0 ? `${myKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${myReps > 0 ? `× ${myReps}` : ''}</span></div>
+                                            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:2px;">
+                                                <div style="font-size:1rem; font-weight:700;">${myKg > 0 ? `${myKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${myReps > 0 ? `× ${myReps}` : ''}</span></div>
+                                                ${isMyPR ? `<span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>` : ''}
+                                            </div>
                                             <div class="text-accent" style="font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${myKg > 0 ? `1RM: ${my1RM} kg` : `Max: ${myReps} reps`}</div>
                                         ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
                                     </div>
                                     <div style="background:rgba(245, 158, 11, 0.06); border-left:3px solid var(--status-orange); padding:8px 10px; border-radius:6px;">
                                         <div class="text-sm text-muted" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:4px; font-size:0.65rem; font-weight:600;">
-                                            <div style="display:flex; align-items:center; gap:4px;">
-                                                <span style="text-transform:uppercase;">${this.escapeHTML(friendName)}</span>
-                                                ${isFriendPR ? `<span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>` : ''}
-                                            </div>
+                                            <span style="text-transform:uppercase;">${this.escapeHTML(friendName)}</span>
                                             ${fDateStr ? `<span style="font-weight:600; opacity:0.8; white-space:nowrap;">${this.escapeHTML(fDateStr)}</span>` : ''}
                                         </div>
                                         ${hasFriendData ? `
-                                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${fKg > 0 ? `${fKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${fReps > 0 ? `× ${fReps}` : ''}</span></div>
+                                            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-top:2px;">
+                                                <div style="font-size:1rem; font-weight:700;">${fKg > 0 ? `${fKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${fReps > 0 ? `× ${fReps}` : ''}</span></div>
+                                                ${isFriendPR ? `<span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>` : ''}
+                                            </div>
                                             <div style="color:var(--status-orange); font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${fKg > 0 ? `1RM: ${f1RM} kg` : `Max: ${fReps} reps`}</div>
                                         ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
                                     </div>
