@@ -2225,22 +2225,24 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             let prValueHtml = '';
             if (s.isHold && prDuration > 0) {
                 prValueHtml = `
-                    <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
                         <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">${prDuration} sec</span>
                         <span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>
                     </div>
                 `;
             } else if (s.isBodyweightReps && prReps > 0) {
                 prValueHtml = `
-                    <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
                         <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">${prReps} reps</span>
                         <span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>
                     </div>
                 `;
             } else if (prWeight > 0 || prReps > 0) {
                 prValueHtml = `
-                    <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
-                        <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">${prWeight > 0 ? `${prWeight} kg` : '0 kg'} ${prReps > 0 ? `<span class="text-xs font-normal text-muted">× ${prReps}</span>` : ''}</span>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                        <div style="font-size:0.95rem; font-weight:700; color:var(--text-primary);">
+                            ${prWeight > 0 ? `${prWeight} kg` : '0 kg'} ${prReps > 0 ? `<span class="text-xs font-normal text-muted">× ${prReps}</span>` : ''}
+                        </div>
                         <span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>
                     </div>
                 `;
@@ -2260,15 +2262,13 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
             html += `
                 <div class="glass-panel progress-card" style="padding: 16px;">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                        <div>
-                            <div style="font-weight:600; font-size:0.9rem;">${this.escapeHTML(String(s.name))}</div>
-                            ${prValueHtml}
-                        </div>
-                        <div class="text-sm" style="color:${diffColor}; white-space:nowrap; margin-top:2px;">${diffText}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                        <div style="font-weight:600; font-size:0.95rem; color:var(--text-primary);">${this.escapeHTML(String(s.name))}</div>
+                        <div class="text-sm" style="color:${diffColor}; font-weight:600; white-space:nowrap;">${diffText}</div>
                     </div>
-                    <div class="mt-2">${this.buildSparklineSVG(s.points, s.unit || 'kg')}</div>
-                    <div class="text-sm text-muted" style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+                    ${prValueHtml}
+                    <div class="mt-3 mb-2">${this.buildSparklineSVG(s.points, s.unit || 'kg')}</div>
+                    <div class="text-sm text-muted" style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; font-size:0.75rem;">
                         <span>${s.points.length} sessie${s.points.length > 1 ? 's' : ''}</span>
                         ${rmHtml}
                         <span>Laatst: ${last}${unitStr}</span>
