@@ -83,7 +83,7 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
 .mt-2 { margin-top: 8px; }
 .mt-4 { margin-top: 16px; }
 .mt-6 { margin-top: 24px; }
-.pb-32 { padding-bottom: 120px; }
+.pb-32 { padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
 .flex-col { display: flex; flex-direction: column; }
 .gap-3 { gap: 12px; }
 .flex-1 { flex: 1; }
@@ -1715,6 +1715,10 @@ button:disabled {
 @media (max-width: 480px) {
     .content-padded {
         padding: 12px 10px;
+    }
+    .content-padded.pb-32,
+    .pb-32 {
+        padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
     }
     .exercise-card {
         padding: 12px 10px;
