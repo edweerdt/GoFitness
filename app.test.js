@@ -3243,6 +3243,87 @@ describe('add and remove sets during workout', () => {
             // Barbell Bench Press (only my user) & Dumbbell Flyes (only friend) -> non-matched, sorted alphabetically
             expect(titles[0]).toBe('Incline Bench Press');
         });
+
+        it('should sort exercises with newest date first per muscle group', () => {
+            global.FriendsManager.friends = [
+                {
+                    uid: 'friend1',
+                    displayName: 'Friend 1',
+                    stats: {
+                        muscleGroups: {
+                            chest: {
+                                exercises: [
+                                    { exercise: 'Dumbbell Flyes', maxKg: 20, maxReps: 12, estimated1RM: 28, date: '2026-08-25' }
+                                ]
+                            }
+                        }
+                    }
+                }
+            ];
+            store.logs = [
+                {
+                    id: 'log_old',
+                    date: '2026-08-01',
+                    exercises: [
+                        {
+                            name: 'Barbell Bench Press',
+                            details: [{ weight: 100, reps: 5, completed: true }]
+                        }
+                    ]
+                },
+                {
+                    id: 'log_new',
+                    date: '2026-08-20',
+                    exercises: [
+                        {
+                            name: 'Incline Bench Press',
+                            details: [{ weight: 70, reps: 8, completed: true }]
+                        }
+                    ]
+                }
+            ];
+
+            app.renderFriends();
+            const container = document.getElementById('friends-container');
+            const chestSection = container.querySelector('.muscle-group-section');
+            const exerciseCards = chestSection.querySelectorAll('.exercise-compare-card');
+            const titles = Array.from(exerciseCards).map(card => {
+                const titleEl = card.children[0] && card.children[0].children[0];
+                return titleEl ? titleEl.textContent.trim() : '';
+            });
+
+            // Dumbbell Flyes (2026-08-25) > Incline Bench Press (2026-08-20) > Barbell Bench Press (2026-08-01)
+            expect(titles[0]).toBe('Dumbbell Flyes');
+            expect(titles[1]).toBe('Incline Bench Press');
+            expect(titles[2]).toBe('Barbell Bench Press');
+        });
+
+        it('should show golden crown PR badge for users with data and not for Geen data', () => {
+            app.renderFriends();
+            const container = document.getElementById('friends-container');
+            const cards = container.querySelectorAll('.exercise-compare-card');
+            
+            // First card is Incline Bench Press (both have data)
+            const inclineCard = cards[0];
+            const prBadgesIncline = inclineCard.querySelectorAll('.pr-crown-badge');
+            expect(prBadgesIncline.length).toBe(2); // both JIJ and Friend 1 get PR crown
+            expect(prBadgesIncline[0].textContent).toContain('PR');
+            expect(prBadgesIncline[0].textContent).toContain('👑');
+
+            // Barbell Bench Press: JIJ has data, Friend 1 has "Geen data"
+            const barbellCard = Array.from(cards).find(c => c.textContent.includes('Barbell Bench Press'));
+            expect(barbellCard).toBeDefined();
+            const prBadgesBarbell = barbellCard.querySelectorAll('.pr-crown-badge');
+            expect(prBadgesBarbell.length).toBe(1); // only JIJ gets PR crown
+        });
+
+        it('calculateExerciseMaxesByMuscleGroup should attach isPR: true to max records', () => {
+            const maxes = app.calculateExerciseMaxesByMuscleGroup();
+            expect(maxes.chest).toBeDefined();
+            maxes.chest.forEach(entry => {
+                expect(entry.isPR).toBe(true);
+            });
+        });
     });
 
     describe('GOF-9: Extra set handling', () => {
