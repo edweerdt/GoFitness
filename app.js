@@ -6438,7 +6438,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                     maxKg: weight,
                                     maxReps: reps,
                                     estimated1RM: rounded1RM,
-                                    date: log.date
+                                    date: log.date,
+                                    isPR: true
                                 };
                             }
                         });
@@ -6659,6 +6660,45 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     { id: 'core', name: 'Core', icon: 'grid_view' }
                 ];
 
+                // Helper to parse dates into timestamp ms
+                const parseTime = (dateStr) => {
+                    if (!dateStr) return 0;
+                    return (this.parseLogDate ? this.parseLogDate(dateStr) : new Date(dateStr).getTime()) || 0;
+                };
+
+                // Calculate most recent activity timestamp for each muscle group across both users
+                const getGroupLatestTime = (mgId) => {
+                    const myExs = myMaxesByGroup[mgId] || [];
+                    const fData = friendMaxes[mgId];
+                    let fExs = [];
+                    if (fData) {
+                        if (Array.isArray(fData.exercises)) fExs = fData.exercises;
+                        else if (fData.exercise) fExs = [fData];
+                    }
+                    let maxTime = 0;
+                    myExs.forEach(e => {
+                        if (e && e.date) {
+                            const t = parseTime(e.date);
+                            if (t > maxTime) maxTime = t;
+                        }
+                    });
+                    fExs.forEach(e => {
+                        if (e && e.date) {
+                            const t = parseTime(e.date);
+                            if (t > maxTime) maxTime = t;
+                        }
+                    });
+                    return maxTime;
+                };
+
+                // Sorteer spiergroepen op meest recente activiteit bovenaan
+                const sortedMuscleGroupDefs = [...muscleGroupDefs].sort((a, b) => {
+                    const timeA = getGroupLatestTime(a.id);
+                    const timeB = getGroupLatestTime(b.id);
+                    if (timeB !== timeA) return timeB - timeA;
+                    return 0; // retain standard order when equal
+                });
+
                 html += `
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                         <h3 style="margin:0; text-transform:none; font-size:1.1rem; color:var(--text-primary);">Vergelijking met ${this.escapeHTML(friendName)}</h3>
@@ -6666,7 +6706,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     </div>
                 `;
 
-                muscleGroupDefs.forEach(mgDef => {
+                sortedMuscleGroupDefs.forEach(mgDef => {
                     const myExercises = myMaxesByGroup[mgDef.id] || [];
                     // Friend data: supports both old (single object) and new (exercises array) format
                     const friendMgData = friendMaxes[mgDef.id];
@@ -6699,22 +6739,38 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
                     const findStat = (list, canonName) => list.find(e => getCanonName(e.exercise) === canonName);
 
-                    // Sorteer oefeningen: eerst matchende oefeningen (data bij beiden), daarna niet-matchend
+                    // Sorteer oefeningen: nieuwste datum eerst, bij gelijke datum matchende oefeningen eerst, daarna alfabetisch
                     const sortedExerciseNames = Array.from(allExerciseNames).sort((a, b) => {
                         const aMy = findStat(myExercises, a);
                         const aFr = findStat(friendExercises, a);
+                        const aTimeMy = aMy && aMy.date ? parseTime(aMy.date) : 0;
+                        const aTimeFr = aFr && aFr.date ? parseTime(aFr.date) : 0;
+                        const aLatestTime = Math.max(aTimeMy, aTimeFr);
+
+                        const bMy = findStat(myExercises, b);
+                        const bFr = findStat(friendExercises, b);
+                        const bTimeMy = bMy && bMy.date ? parseTime(bMy.date) : 0;
+                        const bTimeFr = bFr && bFr.date ? parseTime(bFr.date) : 0;
+                        const bLatestTime = Math.max(bTimeMy, bTimeFr);
+
+                        // 1. Nieuwste datum eerst
+                        if (bLatestTime !== aLatestTime) {
+                            return bLatestTime - aLatestTime;
+                        }
+
+                        // 2. Matchende oefeningen (data bij beiden) eerst
                         const aHasMy = aMy && (aMy.maxKg > 0 || aMy.maxReps > 0 || aMy.estimated1RM > 0);
                         const aHasFr = aFr && (aFr.maxKg > 0 || aFr.maxReps > 0 || aFr.estimated1RM > 0);
                         const aMatch = aHasMy && aHasFr;
 
-                        const bMy = findStat(myExercises, b);
-                        const bFr = findStat(friendExercises, b);
                         const bHasMy = bMy && (bMy.maxKg > 0 || bMy.maxReps > 0 || bMy.estimated1RM > 0);
                         const bHasFr = bFr && (bFr.maxKg > 0 || bFr.maxReps > 0 || bFr.estimated1RM > 0);
                         const bMatch = bHasMy && bHasFr;
 
                         if (aMatch && !bMatch) return -1;
                         if (!aMatch && bMatch) return 1;
+
+                        // 3. Alfabetisch
                         return a.localeCompare(b);
                     });
 
@@ -6771,6 +6827,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         const myDateStr = myStat && myStat.date ? this.formatShortDate(myStat.date) : '';
                         const fDateStr = fStat && fStat.date ? this.formatShortDate(fStat.date) : '';
 
+                        const hasMyData = Boolean(myStat && (myKg > 0 || myReps > 0 || my1RM > 0));
+                        const isMyPR = Boolean(hasMyData && (myStat.isPR !== false));
+
+                        const hasFriendData = Boolean(fStat && (fKg > 0 || fReps > 0 || f1RM > 0));
+                        const isFriendPR = Boolean(hasFriendData && (fStat.isPR !== false));
+
                         html += `
                             <div class="exercise-compare-card">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -6780,20 +6842,26 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                                     <div style="background:rgba(59, 130, 246, 0.06); border-left:3px solid var(--accent-color); padding:8px 10px; border-radius:6px;">
                                         <div class="text-sm text-muted" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:4px; font-size:0.65rem; font-weight:600;">
-                                            <span>JIJ</span>
+                                            <div style="display:flex; align-items:center; gap:4px;">
+                                                <span>JIJ</span>
+                                                ${isMyPR ? `<span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>` : ''}
+                                            </div>
                                             ${myDateStr ? `<span style="font-weight:600; opacity:0.8; white-space:nowrap;">${this.escapeHTML(myDateStr)}</span>` : ''}
                                         </div>
-                                        ${myStat && (myKg > 0 || myReps > 0) ? `
+                                        ${hasMyData ? `
                                             <div style="font-size:1rem; font-weight:700; margin-top:2px;">${myKg > 0 ? `${myKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${myReps > 0 ? `× ${myReps}` : ''}</span></div>
                                             <div class="text-accent" style="font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${myKg > 0 ? `1RM: ${my1RM} kg` : `Max: ${myReps} reps`}</div>
                                         ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
                                     </div>
                                     <div style="background:rgba(245, 158, 11, 0.06); border-left:3px solid var(--status-orange); padding:8px 10px; border-radius:6px;">
                                         <div class="text-sm text-muted" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:4px; font-size:0.65rem; font-weight:600;">
-                                            <span style="text-transform:uppercase;">${this.escapeHTML(friendName)}</span>
+                                            <div style="display:flex; align-items:center; gap:4px;">
+                                                <span style="text-transform:uppercase;">${this.escapeHTML(friendName)}</span>
+                                                ${isFriendPR ? `<span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>` : ''}
+                                            </div>
                                             ${fDateStr ? `<span style="font-weight:600; opacity:0.8; white-space:nowrap;">${this.escapeHTML(fDateStr)}</span>` : ''}
                                         </div>
-                                        ${fStat && (fKg > 0 || fReps > 0) ? `
+                                        ${hasFriendData ? `
                                             <div style="font-size:1rem; font-weight:700; margin-top:2px;">${fKg > 0 ? `${fKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${fReps > 0 ? `× ${fReps}` : ''}</span></div>
                                             <div style="color:var(--status-orange); font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${fKg > 0 ? `1RM: ${f1RM} kg` : `Max: ${fReps} reps`}</div>
                                         ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
