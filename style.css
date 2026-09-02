@@ -457,6 +457,12 @@ button:disabled {
     font-size: 0.85rem !important;
 }
 
+.exercise-action-btn.active {
+    background: rgba(59, 130, 246, 0.25);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
 .theme-light .exercise-action-btn,
 @media (prefers-color-scheme: light) {
     :root:not(.theme-dark) .exercise-action-btn {
@@ -467,6 +473,11 @@ button:disabled {
     }
     :root:not(.theme-dark) .exercise-action-btn:hover {
         background: #eff6ff;
+        border-color: #3b82f6;
+        color: #1d4ed8;
+    }
+    :root:not(.theme-dark) .exercise-action-btn.active {
+        background: #dbeafe;
         border-color: #3b82f6;
         color: #1d4ed8;
     }

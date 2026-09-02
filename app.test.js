@@ -4027,6 +4027,59 @@ describe('add and remove sets during workout', () => {
             expect(css).toContain(':root:not(.theme-dark) .rest-timer');
         });
     });
+
+    describe('GOF-33: Session | Oefeningen weergave & Wissel actielade', () => {
+        beforeEach(() => {
+            store.plans = [{
+                id: 'p1',
+                name: 'Test Plan',
+                sessions: [{
+                    id: 's1',
+                    name: 'Full Body',
+                    exercises: [
+                        { id: 'bench_press', name: 'Bench Press of Chest Press Machine', sets: 3, reps: '8-12', restSeconds: 90, category: 'compound', exerciseType: 'strength' }
+                    ]
+                }]
+            }];
+            document.body.innerHTML = '<div id="workout-exercise-list"></div>';
+        });
+
+        it('should render clean exercise titles without magnifying glass icon clutter', () => {
+            const html = app.formatClickableExerciseName('Bench Press of Chest Press Machine');
+            expect(html).toContain('exercise-search-target');
+            expect(html).toContain('Bench Press');
+            expect(html).toContain('Chest Press Machine');
+            expect(html).not.toContain('<span class="material-icons-round text-muted" style="font-size:0.85rem; vertical-align:middle; opacity:0.6;">search</span>');
+        });
+
+        it('should render quick alternatives in a collapsible drawer that toggles with Wissel button', () => {
+            app.startWorkout(store.plans[0].sessions[0], store.plans[0]);
+            const drawer = document.getElementById('quick-alts-drawer-0');
+            const wisselBtn = document.getElementById('wissel-btn-0');
+            expect(drawer).not.toBeNull();
+            expect(wisselBtn).not.toBeNull();
+            expect(drawer.classList.contains('hidden')).toBe(true);
+            expect(wisselBtn.classList.contains('active')).toBe(false);
+
+            app.toggleSubstitutionDrawer(0);
+            expect(drawer.classList.contains('hidden')).toBe(false);
+            expect(wisselBtn.classList.contains('active')).toBe(true);
+
+            app.toggleSubstitutionDrawer(0);
+            expect(drawer.classList.contains('hidden')).toBe(true);
+            expect(wisselBtn.classList.contains('active')).toBe(false);
+        });
+
+        it('should close drawer and update exercise upon quick swap', () => {
+            app.startWorkout(store.plans[0].sessions[0], store.plans[0]);
+            app.toggleSubstitutionDrawer(0);
+            expect(app.openSubDrawers.has(0)).toBe(true);
+
+            app.quickSwapActiveExercise(0, 'Flat Dumbbell Press');
+            expect(app.activeWorkout.exercises[0].name).toBe('Flat Dumbbell Press');
+            expect(app.openSubDrawers.has(0)).toBe(false);
+        });
+    });
 });
 
 
