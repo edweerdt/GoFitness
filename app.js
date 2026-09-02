@@ -1089,7 +1089,7 @@ const app = {
             // Naam als data-attribuut meegeven i.p.v. in een inline JS-string:
             // een naam met een quote kan dan nooit uit de string breken (XSS)
             const safeName = this.escapeHTML(trimmed);
-            return `<span class="exercise-search-target" data-exercise-name="${safeName}" onclick="app.triggerExerciseSearch(this.dataset.exerciseName, event, this)" title="Zoek uitvoering van ${safeName}">${safeName} <span class="material-icons-round text-muted" style="font-size:0.85rem; vertical-align:middle; opacity:0.6;">search</span></span>`;
+            return `<span class="exercise-search-target" data-exercise-name="${safeName}" onclick="app.triggerExerciseSearch(this.dataset.exerciseName, event, this)" title="Zoek uitvoering van ${safeName}">${safeName}</span>`;
         }).join('');
     },
 
@@ -3431,6 +3431,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 actualReps: Array(e.sets).fill('')
             }))
         };
+        this.openSubDrawers = new Set();
         store.saveActiveWorkoutState(this.activeWorkout);
         this.openWorkoutView();
     },
@@ -4054,12 +4055,13 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 notesHtml += `<div class="text-sm text-muted mt-2">${app.escapeHTML(ex.notes)}</div>`;
             }
 
-            // Quick Alternatives: 1-Click Interactive Badges
+            // Quick Alternatives: 1-Click Interactive Badges (Collapsible Actielade)
             const quickAlts = app.getQuickAlternativesForExercise(ex);
             let quickAltsHtml = '';
+            const isSubDrawerOpen = Boolean(this.openSubDrawers && this.openSubDrawers.has(exIndex));
             if (quickAlts && quickAlts.length > 0) {
                 quickAltsHtml = `
-                    <div class="quick-alternatives-container">
+                    <div id="quick-alts-drawer-${exIndex}" class="quick-alternatives-container${isSubDrawerOpen ? '' : ' hidden'}">
                         <div class="quick-alternatives-header">
                             <span class="quick-alternatives-title">
                                 <span class="material-icons-round" style="font-size:0.85rem; color:var(--accent-color); vertical-align:-1px;">swap_horiz</span> Direct wisselen:
@@ -4076,7 +4078,6 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                     <button class="quick-alt-pill" onclick="app.quickSwapActiveExercise(${exIndex}, '${safeId}')" title="Wissel direct naar ${safeName}">
                                         <span class="material-icons-round quick-alt-swap-icon">swap_horiz</span>
                                         <span class="quick-alt-label">${safeName}</span>
-                                        <span class="quick-alt-search-icon material-icons-round" onclick="event.stopPropagation(); app.triggerExerciseSearch('${safeName}', event, this)" title="Zoek video/uitleg van ${safeName}">search</span>
                                     </button>
                                 `;
                             }).join('')}
@@ -4281,6 +4282,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             const chosenName = ex.chosenVariation || '';
             const safeExName = app.escapeHTML(chosenName || ex.name);
 
+            const hasQuickAlts = quickAlts && quickAlts.length > 0;
+            const wisselAction = hasQuickAlts 
+                ? `app.toggleSubstitutionDrawer(${exIndex})` 
+                : `app.openSubstitutionModalForActiveWorkout(${exIndex})`;
+            const wisselActiveCls = isSubDrawerOpen ? ' active' : '';
+
             const card = document.createElement('div');
             card.className = 'glass-panel exercise-card';
             card.innerHTML = `
@@ -4289,7 +4296,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         <div class="exercise-title-row">
                             <div class="exercise-title">${app.formatClickableExerciseName(ex.name)}</div>
                             <div class="exercise-actions-group">
-                                <button class="btn-secondary exercise-action-btn" onclick="app.openSubstitutionModalForActiveWorkout(${exIndex})" title="Vervang deze oefening met een alternatief">
+                                <button id="wissel-btn-${exIndex}" class="btn-secondary exercise-action-btn${wisselActiveCls}" onclick="${wisselAction}" title="Vervang deze oefening met een alternatief">
                                     <span class="material-icons-round">swap_horiz</span> Wissel
                                 </button>
                                 <button class="btn-secondary exercise-action-btn" onclick="app.showExerciseHistoryModal('${safeExName}')" title="Bekijk geschiedenis">
@@ -4325,6 +4332,29 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             </button>
         `;
         list.appendChild(addBtnContainer);
+    },
+
+    toggleSubstitutionDrawer(exIndex) {
+        if (!this.openSubDrawers) this.openSubDrawers = new Set();
+        if (this.openSubDrawers.has(exIndex)) {
+            this.openSubDrawers.delete(exIndex);
+        } else {
+            this.openSubDrawers.add(exIndex);
+        }
+        const drawer = document.getElementById(`quick-alts-drawer-${exIndex}`);
+        const btn = document.getElementById(`wissel-btn-${exIndex}`);
+        if (drawer) {
+            const isOpen = this.openSubDrawers.has(exIndex);
+            if (isOpen) {
+                drawer.classList.remove('hidden');
+                if (btn) btn.classList.add('active');
+            } else {
+                drawer.classList.add('hidden');
+                if (btn) btn.classList.remove('active');
+            }
+        } else {
+            this.openSubstitutionModalForActiveWorkout(exIndex);
+        }
     },
 
     addSetToExercise(exIndex) {
@@ -7731,6 +7761,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
     quickSwapActiveExercise(exIndex, newExerciseIdOrName) {
         if (!this.activeWorkout || !this.activeWorkout.exercises || !this.activeWorkout.exercises[exIndex]) return;
+        if (this.openSubDrawers) this.openSubDrawers.delete(exIndex);
         this.initSubstitutionEngine();
 
         const ex = this.activeWorkout.exercises[exIndex];
