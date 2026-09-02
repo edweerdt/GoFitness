@@ -4079,6 +4079,33 @@ describe('add and remove sets during workout', () => {
             expect(app.activeWorkout.exercises[0].name).toBe('Flat Dumbbell Press');
             expect(app.openSubDrawers.has(0)).toBe(false);
         });
+
+        it('should resolve and render muscle group badge at the front of badges row', () => {
+            const ex = { name: 'Bench Press', category: 'compound', exerciseType: 'strength' };
+            const label = app.getExerciseMuscleLabel(ex);
+            expect(label).toBe('Borst');
+
+            app.startWorkout(store.plans[0].sessions[0], store.plans[0]);
+            const card = document.querySelector('.exercise-card');
+            const badgesContainer = card.querySelector('.exercise-badges');
+            expect(badgesContainer).not.toBeNull();
+            const firstBadge = badgesContainer.querySelector('.status-badge');
+            expect(firstBadge.classList.contains('muscle-badge')).toBe(true);
+            expect(firstBadge.textContent.trim()).toBe('Borst');
+        });
+
+        it('should place quick alternatives drawer below variations and above metadata/notes', () => {
+            app.startWorkout(store.plans[0].sessions[0], store.plans[0]);
+            const headerMain = document.querySelector('.exercise-header-main');
+            const children = Array.from(headerMain.children);
+            const varIdx = children.findIndex(el => el.classList.contains('variation-selector'));
+            const drawerIdx = children.findIndex(el => el.classList.contains('quick-alternatives-container'));
+            const metaIdx = children.findIndex(el => el.classList.contains('exercise-meta-row'));
+
+            expect(varIdx).toBeGreaterThan(-1);
+            expect(drawerIdx).toBeGreaterThan(varIdx);
+            expect(metaIdx).toBeGreaterThan(drawerIdx);
+        });
     });
 });
 

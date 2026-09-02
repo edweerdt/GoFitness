@@ -4040,8 +4040,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             
             if (ex.restSeconds) metaString += ` • ${ex.restSeconds}s rust`;
 
-            // Build badges
+            // Build badges (spiergroep vooraan, daarna category, exerciseType)
             let badgesHtml = '';
+            const muscleLabel = app.getExerciseMuscleLabel(ex);
+            if (muscleLabel) {
+                badgesHtml += `<span class="status-badge muscle-badge" style="padding:2px 6px; font-size:0.7rem; margin-right:4px;">${app.escapeHTML(muscleLabel)}</span>`;
+            }
             if (ex.category) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted); margin-right:4px;">${app.escapeHTML(String(ex.category))}</span>`;
             if (ex.exerciseType) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${app.escapeHTML(String(ex.exerciseType))}</span>`;
 
@@ -4305,12 +4309,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                             </div>
                         </div>
                         ${variationHtml}
+                        ${quickAltsHtml}
                         <div class="exercise-meta-row">
                             ${badgesHtml ? `<div class="exercise-badges" style="display:inline-flex; gap:4px;">${badgesHtml}</div>` : ''}
                             <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
                         </div>
                         ${notesHtml}
-                        ${quickAltsHtml}
                         ${delayBarHtml}
                     </div>
                 </div>
@@ -4332,6 +4336,75 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             </button>
         `;
         list.appendChild(addBtnContainer);
+    },
+
+    getExerciseMuscleLabel(ex) {
+        if (!ex) return '';
+        let muscles = [];
+        if (Array.isArray(ex.muscleGroups) && ex.muscleGroups.length > 0) {
+            muscles = ex.muscleGroups;
+        } else if (typeof ex.muscleGroups === 'string' && ex.muscleGroups.trim()) {
+            muscles = [ex.muscleGroups.trim()];
+        } else {
+            const searchName = (ex.chosenVariation || ex.name || '').toLowerCase().trim();
+            const lib = (typeof store !== 'undefined' && store.getExerciseLibrary) ? store.getExerciseLibrary() : [];
+            const match = lib.find(item => item.name && (
+                item.name.toLowerCase() === searchName ||
+                searchName.includes(item.name.toLowerCase()) ||
+                item.name.toLowerCase().includes(searchName)
+            ));
+            if (match && match.muscleGroups && match.muscleGroups.length > 0) {
+                muscles = match.muscleGroups;
+            } else if (this.substitutionEngine) {
+                const dbEx = this.substitutionEngine.getExercise(ex.chosenVariation || ex.name);
+                if (dbEx && dbEx.primary_muscles && dbEx.primary_muscles.length > 0) {
+                    muscles = dbEx.primary_muscles;
+                }
+            }
+        }
+        if (!muscles || muscles.length === 0) return '';
+        const muscleMap = {
+            'chest': 'Borst',
+            'borst': 'Borst',
+            'back': 'Rug',
+            'rug': 'Rug',
+            'lats': 'Rug',
+            'traps': 'Traps',
+            'legs': 'Benen',
+            'benen': 'Benen',
+            'quads': 'Benen',
+            'quadriceps': 'Benen',
+            'hamstrings': 'Hamstrings',
+            'calves': 'Kuiten',
+            'kuiten': 'Kuiten',
+            'glutes': 'Billen',
+            'billen': 'Billen',
+            'shoulders': 'Schouders',
+            'schouders': 'Schouders',
+            'delts': 'Schouders',
+            'rear delts': 'Achterkant schouders',
+            'side delts': 'Zijkant schouders',
+            'front delts': 'Voorkant schouders',
+            'biceps': 'Biceps',
+            'triceps': 'Triceps',
+            'forearms': 'Onderarmen',
+            'onderarmen': 'Onderarmen',
+            'arms': 'Armen',
+            'armen': 'Armen',
+            'core': 'Core',
+            'abs': 'Buik',
+            'buik': 'Buik',
+            'obliques': 'Buik',
+            'cardio': 'Cardio'
+        };
+        const raw = String(muscles[0]).toLowerCase().trim();
+        if (muscleMap[raw]) return muscleMap[raw];
+        for (const [key, val] of Object.entries(muscleMap)) {
+            if (raw === key || raw.startsWith(key + ' ') || raw.startsWith(key + '(')) {
+                return val;
+            }
+        }
+        return raw.charAt(0).toUpperCase() + raw.slice(1);
     },
 
     toggleSubstitutionDrawer(exIndex) {

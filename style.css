@@ -483,6 +483,22 @@ button:disabled {
     }
 }
 
+.status-badge.muscle-badge {
+    background: rgba(59, 130, 246, 0.18) !important;
+    color: var(--accent-color) !important;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    font-weight: 600;
+}
+
+.theme-light .status-badge.muscle-badge,
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark) .status-badge.muscle-badge {
+        background: #eff6ff !important;
+        color: #1d4ed8 !important;
+        border: 1px solid #bfdbfe;
+    }
+}
+
 .exercise-meta-row {
     display: flex;
     align-items: center;
