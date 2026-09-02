@@ -871,6 +871,29 @@ describe('workout flow', () => {
         const recHoursEl = document.getElementById('recovery-hours');
         expect(recHoursEl.textContent).toBe('• 12u geleden');
     });
+
+    it('should format and render the day and date properly in home-date', () => {
+        document.body.innerHTML = `
+            <div id="recovery-status" class="status-badge"><span class="material-icons-round"></span></div>
+            <div id="recovery-text"></div>
+            <div id="recovery-hours"></div>
+            <div id="recommended-card-title"></div>
+            <div id="recommended-session-name"></div>
+            <div id="recommended-reason"></div>
+            <div id="session-picker-wrapper" class="hidden"><select id="home-session-select"></select></div>
+            <button id="btn-start-session"></button>
+            <h1 id="home-date"></h1>
+            <div id="stat-completed"></div>
+            <div id="stat-streak"></div>
+            <div class="stats-mini"></div>
+        `;
+
+        app.renderHome();
+
+        const homeDateEl = document.getElementById('home-date');
+        const expectedDate = new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' });
+        expect(homeDateEl.textContent).toBe(expectedDate);
+    });
 });
 
 describe('editing session duration', () => {

@@ -141,7 +141,7 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
 
 /* Headers */
 .home-header {
-    padding: 40px 20px 16px;
+    padding: 32px 20px 16px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -153,6 +153,24 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
     justify-content: space-between;
     align-items: center;
     width: 100%;
+    gap: 12px;
+}
+
+.home-header-row .theme-toggle-btn {
+    flex-shrink: 0;
+}
+
+#home-date {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-transform: capitalize;
+    margin: 0;
+    flex: 1;
+    min-width: 0;
 }
 
 .top-nav {
@@ -1740,6 +1758,12 @@ button:disabled {
 
 /* Mobile Screen Specific Optimizations */
 @media (max-width: 480px) {
+    .home-header {
+        padding: 24px 12px 12px;
+    }
+    #home-date {
+        font-size: 1.125rem;
+    }
     .content-padded {
         padding: 12px 10px;
     }
