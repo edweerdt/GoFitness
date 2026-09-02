@@ -1703,6 +1703,190 @@ describe('renderWorkoutExercises', () => {
         expect(span.getAttribute('onclick')).toContain('this.dataset.exerciseName');
         expect(span.getAttribute('onclick')).not.toContain('window.__pwned');
     });
+
+    it('should render warm-up card cleanly with title, duration, badges, and natural sentences (GOF-32)', () => {
+        app.activeWorkout = {
+            session: {
+                id: 's1',
+                name: 'Full Body A',
+                warmup: {
+                    durationMinutes: 8,
+                    steps: [
+                        {
+                            stepId: 'warmup-a-1',
+                            type: 'cardio',
+                            name: 'Fietsen of stevig wandelen',
+                            durationMinutes: 5,
+                            notes: 'Rustig tempo'
+                        },
+                        {
+                            stepId: 'warmup-a-2',
+                            type: 'activation',
+                            name: 'Lichte opwarmsets van de eerste 2 oefeningen',
+                            durationMinutes: 3,
+                            notes: '1 lichte set per oefening'
+                        }
+                    ]
+                }
+            },
+            startTime: new Date(),
+            exercises: [{
+                id: 'e1', name: 'Squat', sets: 1,
+                setsCompleted: [false], weights: [''], actualReps: ['']
+            }]
+        };
+
+        app.renderWorkoutExercises();
+
+        const html = document.getElementById('workout-exercise-list').innerHTML;
+        // Warm-up header & total duration
+        expect(html).toContain('Warm-up');
+        expect(html).toContain('8 min');
+        // Type badges
+        expect(html).toContain('Cardio');
+        expect(html).toContain('Activatie');
+        // Natural Dutch sentences without technical schema keys
+        expect(html).toContain('<strong>Fietsen of stevig wandelen</strong> gedurende 5 minuten (Rustig tempo).');
+        expect(html).toContain('<strong>Lichte opwarmsets van de eerste 2 oefeningen</strong> gedurende 3 minuten (1 lichte set per oefening).');
+        // No technical keys in the rendered markup
+        expect(html).not.toContain('stepId');
+        expect(html).not.toContain('warmup-a-1');
+        expect(html).not.toContain('durationMinutes:');
+    });
+});
+
+describe('Warmup formatting helpers (GOF-32)', () => {
+    it('should format warmup types cleanly with Dutch labels', () => {
+        expect(app.formatWarmupType('cardio')).toBe('Cardio');
+        expect(app.formatWarmupType('activation')).toBe('Activatie');
+        expect(app.formatWarmupType('mobility')).toBe('Mobiliteit');
+        expect(app.formatWarmupType('dynamic_stretch')).toBe('Dynamisch rekken');
+        expect(app.formatWarmupType('stretch')).toBe('Stretchen');
+        expect(app.formatWarmupType('core')).toBe('Core');
+        expect(app.formatWarmupType('custom_type')).toBe('Custom type');
+        expect(app.formatWarmupType('')).toBe('');
+        expect(app.formatWarmupType(null)).toBe('');
+    });
+
+    it('should format duration text accurately', () => {
+        expect(app.formatDurationText(1, null, null)).toBe('1 minuut');
+        expect(app.formatDurationText(5, null, null)).toBe('5 minuten');
+        expect(app.formatDurationText(null, 1, null)).toBe('1 seconde');
+        expect(app.formatDurationText(null, 45, null)).toBe('45 seconden');
+        expect(app.formatDurationText(null, 120, null)).toBe('2 minuten');
+        expect(app.formatDurationText(null, null, 10)).toBe('10 minuten');
+        expect(app.formatDurationText(null, null, '5-10 min')).toBe('5-10 min');
+        expect(app.formatDurationText(null, null, null)).toBe('');
+    });
+
+    it('should build natural sentences from step properties', () => {
+        // String step
+        expect(app.formatWarmupStepSentence('5 min wandelen')).toBe('5 min wandelen');
+
+        // Name + duration + notes
+        expect(app.formatWarmupStepSentence({
+            name: 'Fietsen of wandelen',
+            durationMinutes: 5,
+            notes: 'Rustig tempo'
+        })).toBe('<strong>Fietsen of wandelen</strong> gedurende 5 minuten (Rustig tempo).');
+
+        // Preposition in notes
+        expect(app.formatWarmupStepSentence({
+            name: 'Roeien',
+            durationMinutes: 5,
+            notes: 'op een laag tempo'
+        })).toBe('<strong>Roeien</strong> gedurende 5 minuten op een laag tempo.');
+
+        // Name + duration (no notes)
+        expect(app.formatWarmupStepSentence({
+            name: 'Dynamisch rekken',
+            durationMinutes: 3
+        })).toBe('<strong>Dynamisch rekken</strong> gedurende 3 minuten.');
+
+        // Name + notes (no duration)
+        expect(app.formatWarmupStepSentence({
+            name: 'Opwarmsets',
+            notes: '1 lichte set per oefening'
+        })).toBe('<strong>Opwarmsets</strong> (1 lichte set per oefening).');
+
+        // Sets / reps
+        expect(app.formatWarmupStepSentence({
+            name: 'Arm circles',
+            sets: 2,
+            reps: 10,
+            notes: 'Rustig draaien'
+        })).toBe('<strong>Arm circles</strong> (2 sets van 10 reps): Rustig draaien.');
+
+        // Only name
+        expect(app.formatWarmupStepSentence({
+            name: 'Warming-up oefening'
+        })).toBe('<strong>Warming-up oefening</strong>.');
+
+        // Notes array
+        expect(app.formatWarmupStepSentence({
+            name: 'Jumping Jacks',
+            durationSeconds: 60,
+            notes: ['Licht springen', 'Goed ademhalen']
+        })).toBe('<strong>Jumping Jacks</strong> gedurende 1 minuut (Licht springen, Goed ademhalen).');
+
+        // Empty step
+        expect(app.formatWarmupStepSentence(null)).toBe('');
+    });
+
+    it('should format complete warmup HTML with header and total time', () => {
+        const warmup = {
+            durationMinutes: 8,
+            steps: [
+                { type: 'cardio', name: 'Fietsen', durationMinutes: 5, notes: 'Rustig tempo' },
+                { type: 'activation', name: 'Armzwaaien', durationMinutes: 3 }
+            ]
+        };
+        const html = app.formatWarmupHTML(warmup);
+        expect(html).toContain('Warm-up');
+        expect(html).toContain('8 min');
+        expect(html).toContain('Cardio');
+        expect(html).toContain('Activatie');
+        expect(html).toContain('<strong>Fietsen</strong> gedurende 5 minuten (Rustig tempo).');
+        expect(html).toContain('<strong>Armzwaaien</strong> gedurende 3 minuten.');
+    });
+
+    it('should handle string warmup and sum step durations if top-level duration is omitted', () => {
+        // String warmup
+        const strHtml = app.formatWarmupHTML('10 min lichte cardio en dynamische rekoefeningen');
+        expect(strHtml).toContain('Warm-up');
+        expect(strHtml).toContain('10 min lichte cardio en dynamische rekoefeningen');
+
+        // Sum durations
+        const stepWarmup = {
+            steps: [
+                { type: 'cardio', name: 'Lopen', durationMinutes: 4 },
+                { type: 'mobility', name: 'Rekken', durationMinutes: 3 }
+            ]
+        };
+        const stepHtml = app.formatWarmupHTML(stepWarmup);
+        expect(stepHtml).toContain('7 min');
+    });
+
+    it('should sanitize HTML/XSS in warmup inputs', () => {
+        const malicious = {
+            durationMinutes: '<script>alert(1)</script>',
+            notes: '<img src=x onerror=alert(2)>',
+            steps: [
+                {
+                    type: '<b onmouseover=alert(3)>cardio</b>',
+                    name: '<script>evil()</script>',
+                    notes: '<iframe src=evil.com></iframe>',
+                    durationMinutes: 5
+                }
+            ]
+        };
+        const html = app.formatWarmupHTML(malicious);
+        expect(html).not.toContain('<script>');
+        expect(html).not.toContain('<img');
+        expect(html).not.toContain('<iframe');
+        expect(html).toContain('&lt;script&gt;');
+        expect(html).toContain('&lt;img');
+    });
 });
 
 describe('rest timer', () => {

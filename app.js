@@ -1116,10 +1116,291 @@ const app = {
         }
     },
 
+    formatWarmupType(type) {
+        if (!type) return '';
+        const cleanType = String(type).trim().toLowerCase();
+        const typeMap = {
+            'cardio': 'Cardio',
+            'activation': 'Activatie',
+            'mobility': 'Mobiliteit',
+            'dynamic_stretch': 'Dynamisch rekken',
+            'dynamic': 'Dynamisch',
+            'stretch': 'Stretchen',
+            'stretching': 'Stretchen',
+            'static_stretch': 'Statisch rekken',
+            'core': 'Core',
+            'strength': 'Kracht',
+            'potentiation': 'Potentiatie',
+            'warmup': 'Opwarming',
+            'opwarming': 'Opwarming'
+        };
+        if (typeMap[cleanType]) return typeMap[cleanType];
+        return cleanType.replace(/[_-]/g, ' ').replace(/^\w/, c => c.toUpperCase());
+    },
+
+    getWarmupTypeBadgeStyle(type) {
+        const cleanType = String(type || '').trim().toLowerCase();
+        switch (cleanType) {
+            case 'cardio':
+                return 'background:rgba(59, 130, 246, 0.15); color:var(--accent-color);';
+            case 'activation':
+            case 'activatie':
+            case 'potentiation':
+                return 'background:rgba(16, 185, 129, 0.15); color:var(--status-green);';
+            case 'mobility':
+            case 'mobiliteit':
+            case 'dynamic_stretch':
+            case 'dynamic':
+            case 'stretch':
+            case 'stretching':
+            case 'static_stretch':
+                return 'background:rgba(245, 158, 11, 0.15); color:var(--status-orange);';
+            default:
+                return 'background:rgba(255, 255, 255, 0.08); color:var(--text-muted);';
+        }
+    },
+
+    formatDurationText(mins, secs, rawDuration) {
+        if (mins !== undefined && mins !== null && mins !== '') {
+            const m = Number(mins);
+            if (!isNaN(m)) {
+                return m === 1 ? '1 minuut' : `${m} minuten`;
+            }
+            return `${mins} min`;
+        }
+        if (secs !== undefined && secs !== null && secs !== '') {
+            const s = Number(secs);
+            if (!isNaN(s)) {
+                if (s >= 60 && s % 60 === 0) {
+                    const m = s / 60;
+                    return m === 1 ? '1 minuut' : `${m} minuten`;
+                }
+                return s === 1 ? '1 seconde' : `${s} seconden`;
+            }
+            return `${secs} sec`;
+        }
+        if (rawDuration !== undefined && rawDuration !== null && rawDuration !== '') {
+            if (typeof rawDuration === 'number') {
+                return rawDuration === 1 ? '1 minuut' : `${rawDuration} minuten`;
+            }
+            return String(rawDuration);
+        }
+        return '';
+    },
+
+    formatWarmupStepSentence(step) {
+        if (typeof step === 'string') {
+            return this.escapeHTML(step);
+        }
+        if (!step || typeof step !== 'object') {
+            return '';
+        }
+
+        const name = step.name || step.title || step.exercise || '';
+        const durationText = this.formatDurationText(step.durationMinutes, step.durationSeconds, step.duration);
+        
+        let notesText = '';
+        if (step.notes) {
+            if (Array.isArray(step.notes)) {
+                notesText = step.notes.filter(Boolean).join(', ');
+            } else if (typeof step.notes === 'string') {
+                notesText = step.notes.trim();
+            }
+        } else if (step.description && typeof step.description === 'string' && step.description !== name) {
+            notesText = step.description.trim();
+        }
+
+        let setsRepsText = '';
+        if (step.sets && step.reps) {
+            setsRepsText = `${step.sets} sets van ${step.reps} reps`;
+        } else if (step.sets) {
+            setsRepsText = `${step.sets} sets`;
+        } else if (step.reps) {
+            setsRepsText = `${step.reps} reps`;
+        }
+
+        const safeName = name ? `<strong>${this.escapeHTML(name)}</strong>` : '';
+        let cleanNotes = notesText;
+        if (cleanNotes.startsWith('(') && cleanNotes.endsWith(')')) {
+            cleanNotes = cleanNotes.slice(1, -1).trim();
+        }
+        const safeNotes = this.escapeHTML(cleanNotes);
+        const safeSetsReps = this.escapeHTML(setsRepsText);
+
+        // Helper to format notes naturally in sentence
+        const formatNotesPart = (text) => {
+            if (!text) return '';
+            const lower = text.toLowerCase();
+            if (lower.startsWith('op ') || lower.startsWith('in ') || lower.startsWith('met ') || lower.startsWith('aan ') || lower.startsWith('voor ') || lower.startsWith('van ')) {
+                return ` ${text.charAt(0).toLowerCase() + text.slice(1)}`;
+            }
+            return ` (${text})`;
+        };
+
+        // Case: No name, but notes or description
+        if (!name) {
+            if (durationText && safeNotes) {
+                return `${this.escapeHTML(durationText)} – ${safeNotes}`;
+            }
+            return safeNotes || (durationText ? this.escapeHTML(durationText) : '');
+        }
+
+        // Case: Name + duration + notes
+        if (durationText && safeNotes) {
+            return `${safeName} gedurende ${this.escapeHTML(durationText)}${formatNotesPart(safeNotes)}.`;
+        }
+
+        // Case: Name + sets/reps + notes
+        if (safeSetsReps && safeNotes) {
+            return `${safeName} (${safeSetsReps}): ${safeNotes}.`;
+        }
+
+        // Case: Name + duration (no notes)
+        if (durationText) {
+            return `${safeName} gedurende ${this.escapeHTML(durationText)}.`;
+        }
+
+        // Case: Name + sets/reps (no notes, no duration)
+        if (safeSetsReps) {
+            return `${safeName} (${safeSetsReps}).`;
+        }
+
+        // Case: Name + notes (no duration)
+        if (safeNotes) {
+            return `${safeName}${formatNotesPart(safeNotes)}.`;
+        }
+
+        // Case: Only name
+        return `${safeName}.`;
+    },
+
+    formatWarmupHTML(warmup) {
+        if (!warmup) return '';
+
+        if (typeof warmup === 'string') {
+            const trimmed = warmup.trim();
+            if (!trimmed) return '';
+            return `
+                <div class="glass-panel" style="padding: 14px 16px; margin-bottom: 12px; border-left: 3px solid var(--accent-color);">
+                    <div style="display:flex; align-items:center; gap:6px; font-weight:600; font-size:0.85rem; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom: 6px;">
+                        <span class="material-icons-round" style="color:var(--accent-color); font-size:1.15rem; vertical-align:middle;">whatshot</span>
+                        <span>Warm-up</span>
+                    </div>
+                    <div class="text-sm text-muted" style="line-height:1.45;">${this.escapeHTML(trimmed)}</div>
+                </div>
+            `;
+        }
+
+        let totalDuration = '';
+        if (warmup.durationMinutes) {
+            totalDuration = `${warmup.durationMinutes} min`;
+        } else if (warmup.duration) {
+            totalDuration = typeof warmup.duration === 'number' ? `${warmup.duration} min` : String(warmup.duration);
+        } else if (warmup.durationSeconds) {
+            totalDuration = warmup.durationSeconds >= 60 ? `${Math.round(warmup.durationSeconds / 60)} min` : `${warmup.durationSeconds} sec`;
+        }
+
+        let steps = [];
+        if (Array.isArray(warmup)) {
+            steps = warmup;
+        } else if (Array.isArray(warmup.steps)) {
+            steps = warmup.steps;
+        }
+
+        // Sum durations from steps if totalDuration is not explicitly set
+        if (!totalDuration && steps.length > 0) {
+            let totalMins = 0;
+            let hasMins = false;
+            steps.forEach(s => {
+                if (s && typeof s === 'object') {
+                    if (s.durationMinutes) {
+                        totalMins += Number(s.durationMinutes) || 0;
+                        hasMins = true;
+                    } else if (s.durationSeconds) {
+                        totalMins += (Number(s.durationSeconds) || 0) / 60;
+                        hasMins = true;
+                    }
+                }
+            });
+            if (hasMins && totalMins > 0) {
+                totalDuration = `${Math.round(totalMins)} min`;
+            }
+        }
+
+        const totalTimeBadge = totalDuration ? `
+            <span style="font-size:0.75rem; font-weight:600; color:var(--accent-color); background:rgba(59, 130, 246, 0.12); padding:2px 8px; border-radius:12px; flex-shrink:0;">
+                ${this.escapeHTML(totalDuration)}
+            </span>
+        ` : '';
+
+        let topNotesHtml = '';
+        if (warmup.notes && typeof warmup.notes === 'string') {
+            topNotesHtml = `<div class="text-sm text-muted" style="margin-bottom: 8px;">${this.escapeHTML(warmup.notes)}</div>`;
+        } else if (warmup.description && typeof warmup.description === 'string') {
+            topNotesHtml = `<div class="text-sm text-muted" style="margin-bottom: 8px;">${this.escapeHTML(warmup.description)}</div>`;
+        }
+
+        let stepsHtml = '';
+        if (steps.length > 0) {
+            stepsHtml = steps.map((step, idx) => {
+                if (typeof step === 'string') {
+                    return `
+                        <div style="padding: 6px 0; ${idx > 0 || topNotesHtml ? 'border-top: 1px solid rgba(255,255,255,0.05);' : ''} font-size:0.875rem; line-height:1.45; color:var(--text-primary);">
+                            ${this.escapeHTML(step)}
+                        </div>
+                    `;
+                }
+                const typeLabel = this.formatWarmupType(step.type);
+                const typeBadgeStyle = this.getWarmupTypeBadgeStyle(step.type);
+                const typeBadge = typeLabel ? `
+                    <span class="status-badge" style="padding:2px 8px; font-size:0.7rem; font-weight:600; border-radius:4px; flex-shrink:0; text-transform:none; ${typeBadgeStyle}">
+                        ${this.escapeHTML(typeLabel)}
+                    </span>
+                ` : '';
+
+                const sentence = this.formatWarmupStepSentence(step);
+
+                return `
+                    <div style="display:flex; align-items:baseline; gap:8px; padding: 6px 0; ${idx > 0 || topNotesHtml ? 'border-top: 1px solid rgba(255,255,255,0.05);' : ''} font-size:0.875rem; line-height:1.45; color:var(--text-primary);">
+                        ${typeBadge}
+                        <div style="flex:1;">
+                            ${sentence}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else if (!topNotesHtml) {
+            if (typeof warmup === 'object' && Object.keys(warmup).length === 0) {
+                return '';
+            }
+            stepsHtml = `<div class="text-sm text-muted">${this.escapeHTML(JSON.stringify(warmup))}</div>`;
+        }
+
+        return `
+            <div class="glass-panel" style="padding: 14px 16px; margin-bottom: 12px; border-left: 3px solid var(--accent-color);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+                    <div style="display:flex; align-items:center; gap:6px; font-weight:600; font-size:0.85rem; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.5px;">
+                        <span class="material-icons-round" style="color:var(--accent-color); font-size:1.15rem; vertical-align:middle;">whatshot</span>
+                        <span>Warm-up</span>
+                    </div>
+                    ${totalTimeBadge}
+                </div>
+                ${topNotesHtml}
+                <div class="flex-col">
+                    ${stepsHtml}
+                </div>
+            </div>
+        `;
+    },
+
     // --- RENDERING ---
 
     formatRichField(value, label = null) {
         if (value === null || value === undefined) return '';
+
+        if (label && String(label).trim().toLowerCase().replace(/[-_]/g, '') === 'warmup') {
+            return this.formatWarmupHTML(value);
+        }
 
         const safeLabel = this.escapeHTML(label);
         let labelHtml = safeLabel ? `<strong>${safeLabel}:</strong> ` : '';
@@ -3709,11 +3990,14 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         list.innerHTML = '';
         
         if (this.activeWorkout.session && this.activeWorkout.session.warmup) {
-            const warmupEl = document.createElement('div');
-            warmupEl.className = 'glass-panel';
-            warmupEl.style.padding = '12px 16px';
-            warmupEl.innerHTML = this.formatRichField(this.activeWorkout.session.warmup, 'WARM-UP');
-            list.appendChild(warmupEl);
+            const warmupHtml = this.formatWarmupHTML(this.activeWorkout.session.warmup);
+            if (warmupHtml) {
+                const temp = document.createElement('div');
+                temp.innerHTML = warmupHtml.trim();
+                if (temp.firstElementChild) {
+                    list.appendChild(temp.firstElementChild);
+                }
+            }
         }
 
         const sortedExercises = [...(this.activeWorkout.exercises || [])].sort((a, b) => (a.order || 99) - (b.order || 99));
