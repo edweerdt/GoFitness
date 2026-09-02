@@ -4067,12 +4067,15 @@ describe('add and remove sets during workout', () => {
             document.body.innerHTML = '<div id="workout-exercise-list"></div>';
         });
 
-        it('should render clean exercise titles without magnifying glass icon clutter', () => {
-            const html = app.formatClickableExerciseName('Bench Press of Chest Press Machine');
-            expect(html).toContain('exercise-search-target');
-            expect(html).toContain('Bench Press');
-            expect(html).toContain('Chest Press Machine');
-            expect(html).not.toContain('<span class="material-icons-round text-muted" style="font-size:0.85rem; vertical-align:middle; opacity:0.6;">search</span>');
+        it('should render exercise pills with standalone search icons and no duplicate title text', () => {
+            app.startWorkout(store.plans[0].sessions[0], store.plans[0]);
+            const card = document.querySelector('.exercise-card');
+            const pillsRow = card.querySelector('.exercise-pills-row');
+            expect(pillsRow).not.toBeNull();
+
+            const searchBtns = pillsRow.querySelectorAll('.icon-search-btn');
+            expect(searchBtns.length).toBeGreaterThan(0);
+            expect(card.querySelector('.exercise-title')).toBeNull(); // No redundant plain text title
         });
 
         it('should render quick alternatives in a collapsible drawer that toggles with Wissel button', () => {
@@ -4117,17 +4120,17 @@ describe('add and remove sets during workout', () => {
             expect(firstBadge.textContent.trim()).toBe('Borst');
         });
 
-        it('should place quick alternatives drawer below variations and above metadata/notes', () => {
+        it('should place variation pills at top, metadata and action buttons below, and quick alternatives drawer below metadata', () => {
             app.startWorkout(store.plans[0].sessions[0], store.plans[0]);
             const headerMain = document.querySelector('.exercise-header-main');
             const children = Array.from(headerMain.children);
-            const varIdx = children.findIndex(el => el.classList.contains('variation-selector'));
-            const drawerIdx = children.findIndex(el => el.classList.contains('quick-alternatives-container'));
+            const pillsIdx = children.findIndex(el => el.classList.contains('exercise-pills-row'));
             const metaIdx = children.findIndex(el => el.classList.contains('exercise-meta-row'));
+            const drawerIdx = children.findIndex(el => el.classList.contains('quick-alternatives-container'));
 
-            expect(varIdx).toBeGreaterThan(-1);
-            expect(drawerIdx).toBeGreaterThan(varIdx);
-            expect(metaIdx).toBeGreaterThan(drawerIdx);
+            expect(pillsIdx).toBeGreaterThan(-1);
+            expect(metaIdx).toBeGreaterThan(pillsIdx);
+            expect(drawerIdx).toBeGreaterThan(metaIdx);
         });
     });
 });

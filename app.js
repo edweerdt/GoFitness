@@ -4079,10 +4079,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 const safeName = app.escapeHTML(alt.name);
                                 const safeId = app.escapeHTML(alt.id || alt.name);
                                 return `
-                                    <button class="quick-alt-pill" onclick="app.quickSwapActiveExercise(${exIndex}, '${safeId}')" title="Wissel direct naar ${safeName}">
-                                        <span class="material-icons-round quick-alt-swap-icon">swap_horiz</span>
-                                        <span class="quick-alt-label">${safeName}</span>
-                                    </button>
+                                    <div style="display:inline-flex; align-items:center; gap:2px;">
+                                        <button class="quick-alt-pill" onclick="app.quickSwapActiveExercise(${exIndex}, '${safeId}')" title="Wissel direct naar ${safeName}">
+                                            <span class="material-icons-round quick-alt-swap-icon">swap_horiz</span>
+                                            <span class="quick-alt-label">${safeName}</span>
+                                        </button>
+                                        <button class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch('${safeName}', event, this)" title="Zoek video/uitleg van ${safeName}">
+                                            <span class="material-icons-round">search</span>
+                                        </button>
+                                    </div>
                                 `;
                             }).join('')}
                         </div>
@@ -4270,17 +4275,41 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 }
             }
             
-            // --- Variation Pill Selector ---
-            let variationHtml = '';
+            // --- Header Pills: Variation pills or Single Exercise pill with 16px search icon (No redundant title text!) ---
+            let headerPillsHtml = '';
             if (variations && variations.length > 1) {
-                const chosen = ex.chosenVariation || '';
-                variationHtml = `<div class="variation-selector">`;
+                const chosen = ex.chosenVariation || variations[0];
+                headerPillsHtml = `<div class="exercise-pills-row">`;
                 variations.forEach(v => {
                     const isActive = chosen === v;
                     const safeV = app.escapeHTML(v);
-                    variationHtml += `<button class="variation-pill ${isActive ? 'active' : ''}" data-variation="${safeV}" onclick="app.selectVariation(${exIndex}, this.dataset.variation)"><span class="material-icons-round" style="font-size:0.85rem;">${isActive ? 'check_circle' : 'radio_button_unchecked'}</span> ${safeV}</button>`;
+                    headerPillsHtml += `
+                        <div class="exercise-pill-item">
+                            <button class="variation-pill ${isActive ? 'active' : ''}" data-variation="${safeV}" onclick="app.selectVariation(${exIndex}, this.dataset.variation)" title="Selecteer ${safeV}">
+                                <span class="material-icons-round" style="font-size:0.85rem;">${isActive ? 'check_circle' : 'radio_button_unchecked'}</span>
+                                <span>${safeV}</span>
+                            </button>
+                            <button class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch('${safeV}', event, this)" title="Zoek video/uitleg voor ${safeV}">
+                                <span class="material-icons-round">search</span>
+                            </button>
+                        </div>
+                    `;
                 });
-                variationHtml += `</div>`;
+                headerPillsHtml += `</div>`;
+            } else {
+                const displayName = ex.chosenVariation || ex.name;
+                const safeName = app.escapeHTML(displayName);
+                headerPillsHtml = `
+                    <div class="exercise-pills-row">
+                        <div class="exercise-single-pill">
+                            <span class="material-icons-round" style="font-size:0.85rem;">fitness_center</span>
+                            <span>${safeName}</span>
+                        </div>
+                        <button class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch('${safeName}', event, this)" title="Zoek video/uitleg voor ${safeName}">
+                            <span class="material-icons-round">search</span>
+                        </button>
+                    </div>
+                `;
             }
 
             const chosenName = ex.chosenVariation || '';
@@ -4297,8 +4326,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             card.innerHTML = `
                 <div class="exercise-header">
                     <div class="exercise-header-main">
-                        <div class="exercise-title-row">
-                            <div class="exercise-title">${app.formatClickableExerciseName(ex.name)}</div>
+                        ${headerPillsHtml}
+                        <div class="exercise-meta-row">
+                            <div class="exercise-badges-group" style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                ${badgesHtml ? `<div class="exercise-badges" style="display:inline-flex; gap:4px;">${badgesHtml}</div>` : ''}
+                                <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
+                            </div>
                             <div class="exercise-actions-group">
                                 <button id="wissel-btn-${exIndex}" class="btn-secondary exercise-action-btn${wisselActiveCls}" onclick="${wisselAction}" title="Vervang deze oefening met een alternatief">
                                     <span class="material-icons-round">swap_horiz</span> Wissel
@@ -4308,12 +4341,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 </button>
                             </div>
                         </div>
-                        ${variationHtml}
                         ${quickAltsHtml}
-                        <div class="exercise-meta-row">
-                            ${badgesHtml ? `<div class="exercise-badges" style="display:inline-flex; gap:4px;">${badgesHtml}</div>` : ''}
-                            <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
-                        </div>
                         ${notesHtml}
                         ${delayBarHtml}
                     </div>
