@@ -2539,6 +2539,81 @@ describe('Hold Timer (Stopwatch)', () => {
 
             app.stopHoldTimer(false);
         });
+
+        it('should color the timer yellow when within 10 seconds of reaching max duration (GOF-36)', () => {
+            store.logs = [
+                {
+                    id: 'log_prev_36',
+                    date: '2026-09-01',
+                    exercises: [
+                        {
+                            name: 'Plank Hold',
+                            details: [
+                                { set: 1, reps: '30', completed: true }
+                            ]
+                        }
+                    ]
+                }
+            ];
+
+            const mockSession = {
+                id: 'sess_36',
+                name: 'Test Session GOF-36',
+                exercises: [
+                    { id: 'ex_36', name: 'Plank Hold', sets: 2, actualReps: ['', ''], setsCompleted: [false, false] }
+                ]
+            };
+            app.activeWorkout = {
+                session: mockSession,
+                exercises: mockSession.exercises
+            };
+
+            document.body.innerHTML = `
+                <div id="workout-exercise-list">
+                    <button id="hold-timer-btn-0" class="hold-timer-btn"></button>
+                </div>
+            `;
+
+            store.holdTimerDelaySeconds = 0;
+            app.startHoldTimer(0, 0);
+
+            // 1. More than 10s before target (15s elapsed, target 30s) -> Red (standard running)
+            app.holdTimerState.startTime = Date.now() - 15000;
+            app.renderWorkoutExercises();
+            let btn = document.getElementById('hold-timer-btn-0');
+            expect(btn.className).toBe('hold-timer-btn running');
+            expect(btn.className).not.toContain('yellow');
+            expect(btn.className).not.toContain('green');
+
+            // 2. Exactly within 10s before target (20s elapsed, target 30s) -> Yellow (nearing-previous)
+            app.holdTimerState.startTime = Date.now() - 20000;
+            app.renderWorkoutExercises();
+            btn = document.getElementById('hold-timer-btn-0');
+            expect(btn.className).toContain('running');
+            expect(btn.className).toContain('yellow');
+            expect(btn.className).toContain('nearing-previous');
+            expect(btn.className).not.toContain('green');
+            expect(btn.className).not.toContain('passed-previous');
+
+            // 3. Almost at target (29s elapsed, target 30s) -> Yellow (nearing-previous)
+            app.holdTimerState.startTime = Date.now() - 29000;
+            app.renderWorkoutExercises();
+            btn = document.getElementById('hold-timer-btn-0');
+            expect(btn.className).toContain('yellow');
+            expect(btn.className).toContain('nearing-previous');
+            expect(btn.className).not.toContain('green');
+
+            // 4. Exceeded target (32s elapsed, target 30s) -> Green (passed-previous)
+            app.holdTimerState.startTime = Date.now() - 32000;
+            app.renderWorkoutExercises();
+            btn = document.getElementById('hold-timer-btn-0');
+            expect(btn.className).toContain('green');
+            expect(btn.className).toContain('passed-previous');
+            expect(btn.className).not.toContain('yellow');
+            expect(btn.className).not.toContain('nearing-previous');
+
+            app.stopHoldTimer(false);
+        });
     });
 });
 
