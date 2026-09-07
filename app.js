@@ -4255,10 +4255,16 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         const timeStr = mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
                         const targetSec = app.getPreviousAchievedDuration(ex, activeSetIdx);
                         const isGreen = targetSec > 0 && elapsedSec > targetSec;
-                        const greenClasses = isGreen ? ' green passed-previous' : '';
+                        const isYellow = !isGreen && targetSec > 0 && (targetSec - elapsedSec <= 10);
+                        let timerClasses = '';
+                        if (isGreen) {
+                            timerClasses = ' green passed-previous';
+                        } else if (isYellow) {
+                            timerClasses = ' yellow nearing-previous';
+                        }
                         singleHoldTimerHtml = `
                             <div class="hold-timer-container">
-                                <button id="hold-timer-btn-${exIndex}" class="hold-timer-btn running${greenClasses}" onclick="app.stopHoldTimer(true)">
+                                <button id="hold-timer-btn-${exIndex}" class="hold-timer-btn running${timerClasses}" onclick="app.stopHoldTimer(true)">
                                     <span class="material-icons-round">stop</span> ${timeStr} Stop (Set ${activeSetIdx + 1})
                                 </button>
                             </div>
@@ -4728,6 +4734,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 const ex = (this.activeWorkout && this.activeWorkout.exercises) ? this.activeWorkout.exercises[exIndex] : null;
                 const targetSec = this.getPreviousAchievedDuration(ex, setIndex);
                 const isGreen = targetSec > 0 && elapsedSec > targetSec;
+                const isYellow = !isGreen && targetSec > 0 && (targetSec - elapsedSec <= 10);
 
                 if (isGreen && !this.holdTimerState.hasAlertedPass) {
                     this.holdTimerState.hasAlertedPass = true;
@@ -4735,7 +4742,13 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 }
 
                 if (btnEl) {
-                    btnEl.className = isGreen ? 'hold-timer-btn running green passed-previous' : 'hold-timer-btn running';
+                    let timerClass = 'hold-timer-btn running';
+                    if (isGreen) {
+                        timerClass = 'hold-timer-btn running green passed-previous';
+                    } else if (isYellow) {
+                        timerClass = 'hold-timer-btn running yellow nearing-previous';
+                    }
+                    btnEl.className = timerClass;
                     btnEl.innerHTML = `<span class="material-icons-round">stop</span> ${timeStr} Stop (Set ${setIndex + 1})`;
                 }
             }

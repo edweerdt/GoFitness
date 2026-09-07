@@ -1104,6 +1104,15 @@ button:disabled {
     animation: pulse-running 1.2s infinite alternate;
 }
 
+.hold-timer-btn.running.yellow,
+.hold-timer-btn.running.nearing-previous {
+    background: rgba(234, 179, 8, 0.25);
+    color: #eab308;
+    border-color: #eab308;
+    box-shadow: 0 0 14px rgba(234, 179, 8, 0.45);
+    animation: pulse-running-yellow 1.2s infinite alternate;
+}
+
 .hold-timer-btn.running.green,
 .hold-timer-btn.running.passed-previous {
     background: rgba(16, 185, 129, 0.25);
@@ -1121,6 +1130,11 @@ button:disabled {
 @keyframes pulse-running {
     from { box-shadow: 0 0 4px rgba(239, 68, 68, 0.3); }
     to { box-shadow: 0 0 14px rgba(239, 68, 68, 0.7); }
+}
+
+@keyframes pulse-running-yellow {
+    from { box-shadow: 0 0 4px rgba(234, 179, 8, 0.3); }
+    to { box-shadow: 0 0 16px rgba(234, 179, 8, 0.7); }
 }
 
 @keyframes pulse-running-green {
