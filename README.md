@@ -43,6 +43,20 @@ De sync werkt volledig client-side: je data staat in de verborgen app-map (`appD
 - De data staat als `gofitness-data.json` in de app-map van je Google Drive; die map is alleen toegankelijk voor deze app en telt als automatische backup.
 - Offline? De app werkt gewoon door en synchroniseert zodra je weer online bent.
 
+## 🔐 Firestore security rules (vrienden en gedeelde schema's)
+
+De vriendenfunctie en de deelcodes (`GF-XXXX-XXXX`) gebruiken Firestore. De bijbehorende
+security rules staan in `firestore.rules`, zodat ze reviewbaar en reproduceerbaar zijn.
+Vergelijk dit bestand met wat er in de Firebase Console staat en deploy pas na review:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+Kern van de rules: profielen zijn alleen door de eigenaar te schrijven, vriendverzoeken
+alleen door de afzender aan te maken en door de ontvanger te accepteren, en een gedeeld
+schema kan alleen door de publicerende gebruiker (`ownerUid`) overschreven worden.
+
 ## 🚀 Live Zetten (GitHub Pages)
 
 1. Ga in je repository naar **Settings > Pages**.

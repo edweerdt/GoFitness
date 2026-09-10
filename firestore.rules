@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// VOORSTEL: Firestore security rules voor GoFitness.
+//
+// Deze rules stonden niet in de repo; de autorisatie van users, friendRequests en
+// shared_plans was daardoor niet reviewbaar of reproduceerbaar. Dit bestand is
+// afgeleid van het gebruik in friends.js en app.js (publishPlanToCloud /
+// fetchPlanFromCloud). Vergelijk met de rules die nu in de Firebase Console
+// staan en deploy pas na review:
+//
+//   firebase deploy --only firestore:rules
+//
+// Bekende beperking: users/{uid} bevat ook `email`, en vrienden lezen het hele
+// document (friends.js listenToFriends). Een nette scheiding vraagt een apart
+// publiek profiel-document; dat is een vervolgstap.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Gebruikersprofielen: lezen door ingelogde gebruikers (nodig voor het
+    // opzoeken op friendCode en voor vriendenprofielen), schrijven alleen zelf.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if isSelf(uid) && request.resource.data.uid == uid;
+      allow update: if isSelf(uid) && request.resource.data.uid == resource.data.uid;
+      allow delete: if isSelf(uid);
+
+      // Vriendenlijst: eigenaar mag alles; de andere partij mag alleen zijn
+      // eigen document toevoegen of verwijderen (accept / removeFriend doen dat
+      // aan beide kanten).
+      match /friends/{friendUid} {
+        allow read: if isSelf(uid);
+        allow create, delete: if isSelf(uid) || isSelf(friendUid);
+        allow update: if isSelf(uid);
+      }
+    }
+
+    // Vriendverzoeken: aanmaken alleen als afzender, lezen door beide partijen,
+    // status wijzigen alleen door de ontvanger, verwijderen door beide.
+    match /friendRequests/{requestId} {
+      allow read: if signedIn()
+        && (resource.data.toUid == request.auth.uid || resource.data.fromUid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.toUid is string
+        && request.resource.data.toUid != request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.toUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow delete: if signedIn()
+        && (resource.data.toUid == request.auth.uid || resource.data.fromUid == request.auth.uid);
+    }
+
+    // Gedeelde schema's: iedereen met de code mag lezen (deeplinks werken ook
+    // zonder login). Schrijven alleen ingelogd, en een bestaande code mag alleen
+    // door de eigenaar overschreven worden. publishPlanToCloud stuurt ownerUid mee.
+    match /shared_plans/{code} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.plan is map
+        && request.resource.data.plan.size() > 0;
+      allow update: if signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

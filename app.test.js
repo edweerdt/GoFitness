@@ -1557,7 +1557,7 @@ describe('sharePlan & 1-Click Deep Links / QR Code', () => {
         const plan = store.plans[0];
         const code = await app.publishPlanToCloud(plan);
 
-        expect(code).toMatch(/^GF-[A-Z0-9]{4}$/);
+        expect(code).toMatch(/^GF-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
         expect(mockCollection).toHaveBeenCalledWith('shared_plans');
         expect(mockDoc).toHaveBeenCalledWith(code);
         expect(mockSet).toHaveBeenCalledTimes(1);
