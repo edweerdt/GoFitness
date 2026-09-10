@@ -215,6 +215,34 @@ describe('navigate stopt de rusttimer buiten de workout-view', () => {
     });
 });
 
+describe('regexes op oefeningnamen zijn lineair (CodeQL ReDoS)', () => {
+    const { DataStore } = require('./app');
+    const timed = fn => { const t0 = Date.now(); fn(); return Date.now() - t0; };
+
+    it('tokeniseert vijandige invoer snel en geeft dezelfde tokens voor normale namen', () => {
+        const evil = ['('.repeat(20000), ' '.repeat(20000) + 'of', 'a' + ' '.repeat(20000) + '/'];
+        evil.forEach(s => expect(timed(() => app.extractExerciseNameTokens(s))).toBeLessThan(200));
+        expect([...app.extractExerciseNameTokens('Row Machine (Roeimachine)')].sort())
+            .toEqual(['roeimachine', 'row machine', 'row machine (roeimachine)']);
+        expect([...app.extractExerciseNameTokens('Goblet Squat of Leg Press')].sort())
+            .toEqual(['goblet squat', 'goblet squat of leg press', 'leg press']);
+    });
+
+    it('splitst variaties snel en met dezelfde uitkomst', () => {
+        expect(timed(() => app.getExerciseVariations('x' + ' '.repeat(20000) + 'y'))).toBeLessThan(200);
+        expect(app.getExerciseVariations('Goblet Squat of Leg Press')).toEqual(['Goblet Squat', 'Leg Press']);
+        expect(app.getExerciseVariations({ name: 'Bench Press / Chest Press or Dips' })).toEqual(['Bench Press', 'Chest Press', 'Dips']);
+        expect(app.getExerciseVariations('Squat  of   Lunge')).toEqual(['Squat', 'Lunge']);
+        expect(app.getExerciseVariations('Deadlift')).toEqual([]);
+    });
+
+    it('normaliseert namen met haakjes ongewijzigd en snel', () => {
+        expect(store.resolveCanonicalExercise('Lat Pulldown (Cable)')).toEqual(store.resolveCanonicalExercise('Lat Pulldown'));
+        expect(timed(() => store.resolveCanonicalExercise('('.repeat(20000)))).toBeLessThan(200);
+        expect(DataStore).toBeDefined();
+    });
+});
+
 describe('achievements', () => {
     it('ontgrendelt dezelfde badges als voorheen voor een vaste set logs', () => {
         document.body.innerHTML = '<div id="achievements-grid"></div>';

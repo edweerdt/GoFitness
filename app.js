@@ -64,7 +64,8 @@ function normalizeExerciseName(str) {
          .replace(/\bpull-?ups?\b/g, 'pullup')
          .replace(/\bchin-?ups?\b/g, 'chinup');
     s = s.replace(/\bdb\b/g, 'dumbbell').replace(/\bbb\b/g, 'barbell').replace(/\bkb\b/g, 'kettlebell').replace(/\bohp\b/g, 'overhead press').replace(/\brdl\b/g, 'romanian deadlift');
-    s = s.replace(/\([^)]*\)/g, ' ');
+    // [^()] i.p.v. [^)]: anders is dit kwadratisch op lange reeksen '(' (CodeQL ReDoS)
+    s = s.replace(/\([^()]*\)/g, ' ');
     s = s.replace(/[^a-z0-9]/gi, ' ').replace(/\s+/g, ' ').trim();
     s = s.split(' ').map(w => (w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w)).join(' ');
     return s;
@@ -1169,7 +1170,8 @@ const app = {
         if (!nameStr || typeof nameStr !== 'string') return this.escapeHTML(String(nameStr || ''));
 
         // Splitst op ' of ', ' / ', ' OR ', ',' om individuele oefeningen afzonderlijk klikbaar te maken
-        const parts = nameStr.split(/(\s+of\s+|\s*\/\s*|\s+or\s+|\s*,\s*)/i);
+        // Whitespace eerst samenvouwen; separator-regex zonder onbegrensde \s+ (CodeQL ReDoS)
+        const parts = nameStr.replace(/\s+/g, ' ').split(/( of | ?\/ ?| or | ?, ?)/i);
         return parts.map(part => {
             const trimmed = part.trim();
             const lower = trimmed.toLowerCase();
@@ -2387,7 +2389,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 if (maxVal <= 0) return;
 
                 // Split combined names ("X of Y") so historical logs attribute data to each variation name
-                const exNames = String(ex.name || '').split(/\s+of\s+/i).map(s => s.trim()).filter(Boolean);
+                const exNames = String(ex.name || '').replace(/\s+/g, ' ').split(/ of /i).map(s => s.trim()).filter(Boolean);
 
                 exNames.forEach(displayName => {
                     const key = this.getCanonicalExerciseKey(displayName);
@@ -2567,7 +2569,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     if (!log || !log.exercises) return;
                     log.exercises.forEach(ex => {
                         if (!ex || !ex.name) return;
-                        const exNames = String(ex.name || '').split(/\s+of\s+/i).map(str => str.trim()).filter(Boolean);
+                        const exNames = String(ex.name || '').replace(/\s+/g, ' ').split(/ of /i).map(str => str.trim()).filter(Boolean);
                         exNames.forEach(displayName => {
                             const canonKey = this.getCanonicalExerciseKey(displayName);
                             const canonName = this.getCanonicalExerciseName(displayName);
@@ -3617,21 +3619,24 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             tokens.add(cleanTypos);
 
             // Extract content inside parentheses e.g. "Row Machine (Roeimachine)" -> "roeimachine" & "row machine"
-            const parenRegex = /\(([^)]+)\)/g;
+            // Tekenklasse sluit '(' uit zodat de regex lineair blijft (CodeQL ReDoS)
+            const parenRegex = /\(([^()]+)\)/g;
             let match;
             while ((match = parenRegex.exec(raw)) !== null) {
                 if (match[1] && match[1].trim()) {
                     tokens.add(match[1].trim());
                 }
             }
-            const withoutParen = raw.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+            const withoutParen = raw.replace(/\([^()]*\)/g, ' ').replace(/\s+/g, ' ').trim();
             if (withoutParen) tokens.add(withoutParen);
 
             // Split by separators: " of ", "/", " or ", ",", "&", "+", " - "
-            const splitRegex = /(\s+of\s+|\s*\/\s*|\s+or\s+|\s*,\s*|\s*&\s*|\s*\+\s*|\s+-\s+)/i;
+            // Whitespace eerst lineair samenvouwen; de separator-regex heeft daardoor
+            // geen onbegrensde \s+/\s* voor een letterlijke tekst meer (CodeQL ReDoS)
+            const splitRegex = /( of | ?\/ ?| or | ?, ?| ?& ?| ?\+ ?| - )/i;
             const currentList = Array.from(tokens);
             currentList.forEach(s => {
-                const parts = s.split(splitRegex);
+                const parts = s.replace(/\s+/g, ' ').split(splitRegex);
                 parts.forEach(p => {
                     const t = p.trim();
                     if (t && !['of', '/', 'or', ',', '&', '+', '-'].includes(t)) {
@@ -7109,7 +7114,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         : (this.guessMuscleGroupsFromName ? this.guessMuscleGroupsFromName(ex.name) : []));
 
                 // Split old "X of Y" names into individual exercise names
-                const exNames = String(ex.name || '').split(/\s+of\s+/i).map(s => s.trim()).filter(Boolean);
+                const exNames = String(ex.name || '').replace(/\s+/g, ' ').split(/ of /i).map(s => s.trim()).filter(Boolean);
 
                 exNames.forEach(displayName => {
                     mGroups.forEach(rawMg => {
@@ -7166,9 +7171,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     // --- Variation helpers ---
     getExerciseVariations(exOrName) {
         if (!exOrName) return [];
+        // Whitespace eerst samenvouwen zodat de separator-regex lineair is (CodeQL ReDoS)
+        const VARIATION_SEP = / (?:of|or|\/) /i;
         if (typeof exOrName === 'string') {
-            if (/\s+(?:of|or|\/)\s+/i.test(exOrName)) {
-                return exOrName.split(/\s+(?:of|or|\/)\s+/i).map(s => s.trim()).filter(Boolean);
+            const norm = exOrName.replace(/\s+/g, ' ');
+            if (VARIATION_SEP.test(norm)) {
+                return norm.split(VARIATION_SEP).map(s => s.trim()).filter(Boolean);
             }
             return [];
         }
@@ -7177,9 +7185,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             return exOrName.availableVariations;
         }
         // 2. Choice exercises defined with " of " or " or " in name (e.g. "Goblet Squat of Leg Press")
-        const nameStr = String(exOrName.name || '');
-        if (/\s+(?:of|or|\/)\s+/i.test(nameStr)) {
-            const parts = nameStr.split(/\s+(?:of|or|\/)\s+/i).map(s => s.trim()).filter(Boolean);
+        const nameStr = String(exOrName.name || '').replace(/\s+/g, ' ');
+        if (VARIATION_SEP.test(nameStr)) {
+            const parts = nameStr.split(VARIATION_SEP).map(s => s.trim()).filter(Boolean);
             if (parts.length > 1) return parts;
         }
         return [];
@@ -7991,8 +7999,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         addExclude(baseName);
         variations.forEach(v => addExclude(v));
 
-        baseName.split(/\s+(?:of|or|\/)\s+/i).forEach(p => addExclude(p));
-        activeName.split(/\s+(?:of|or|\/)\s+/i).forEach(p => addExclude(p));
+        baseName.replace(/\s+/g, ' ').split(/ (?:of|or|\/) /i).forEach(p => addExclude(p));
+        activeName.replace(/\s+/g, ' ').split(/ (?:of|or|\/) /i).forEach(p => addExclude(p));
 
         const resultList = [];
         const seenCanonicalKeys = new Set();
