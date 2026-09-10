@@ -4207,6 +4207,129 @@ describe('add and remove sets during workout', () => {
             expect(metaIdx).toBeGreaterThan(pillsIdx);
             expect(drawerIdx).toBeGreaterThan(metaIdx);
         });
+
+        describe('GOF-35: Session Timer in Workout Header', () => {
+            beforeEach(() => {
+                jest.useFakeTimers();
+                document.body.innerHTML = `
+                    <div class="workout-sticky-header">
+                        <header class="workout-header">
+                            <button class="icon-btn" onclick="app.showCancelWorkoutModal()" title="Training annuleren" aria-label="Training annuleren"><span class="material-icons-round" aria-hidden="true">close</span></button>
+                            <div class="workout-title-container">
+                                <h2 id="workout-title">Training</h2>
+                                <span id="workout-session-timer" class="workout-session-timer" title="Totale sessieduur" aria-label="Totale sessieduur">00:00</span>
+                            </div>
+                            <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen" aria-label="Thema aanpassen">
+                                <span class="material-icons-round">brightness_auto</span>
+                            </button>
+                        </header>
+                    </div>
+                    <div id="workout-exercise-list"></div>
+                `;
+                app.activeWorkout = null;
+                if (app.sessionTimerInterval) app.stopSessionTimer();
+                if (store.plans && store.plans.length > 0 && store.plans[0].sessions && store.plans[0].sessions.length > 0) {
+                    app.startWorkout(store.plans[0].sessions[0], store.plans[0]);
+                }
+            });
+
+            afterEach(() => {
+                if (app.sessionTimerInterval) app.stopSessionTimer();
+                jest.useRealTimers();
+            });
+
+            it('should have .workout-title-container containing #workout-title and #workout-session-timer in index.html', () => {
+                const fs = require('fs');
+                const path = require('path');
+                const htmlContent = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+
+                expect(htmlContent).toContain('<div class="workout-title-container">');
+                expect(htmlContent).toContain('<h2 id="workout-title">Training</h2>');
+                expect(htmlContent).toContain('<span id="workout-session-timer" class="workout-session-timer"');
+
+                const titleIdx = htmlContent.indexOf('id="workout-title"');
+                const timerIdx = htmlContent.indexOf('id="workout-session-timer"');
+                expect(titleIdx).toBeGreaterThan(-1);
+                expect(timerIdx).toBeGreaterThan(titleIdx);
+            });
+
+            it('should define styles for .workout-title-container and .workout-session-timer in style.css', () => {
+                const fs = require('fs');
+                const path = require('path');
+                const cssContent = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+
+                expect(cssContent).toContain('.workout-title-container');
+                expect(cssContent).toContain('.workout-session-timer');
+                expect(cssContent).toMatch(/\.workout-session-timer\s*\{[^}]*font-variant-numeric:\s*tabular-nums;/);
+            });
+
+            it('should format session duration correctly with formatSessionDuration', () => {
+                expect(app.formatSessionDuration(0)).toBe('00:00');
+                expect(app.formatSessionDuration(5)).toBe('00:05');
+                expect(app.formatSessionDuration(59)).toBe('00:59');
+                expect(app.formatSessionDuration(60)).toBe('01:00');
+                expect(app.formatSessionDuration(75)).toBe('01:15');
+                expect(app.formatSessionDuration(3599)).toBe('59:59');
+                expect(app.formatSessionDuration(3600)).toBe('1:00:00');
+                expect(app.formatSessionDuration(3665)).toBe('1:01:05');
+                expect(app.formatSessionDuration(7325)).toBe('2:02:05');
+                expect(app.formatSessionDuration(-10)).toBe('00:00');
+                expect(app.formatSessionDuration(null)).toBe('00:00');
+                expect(app.formatSessionDuration(undefined)).toBe('00:00');
+            });
+
+            it('should initialize and update the session timer element when starting a workout', () => {
+                const timerEl = document.getElementById('workout-session-timer');
+                expect(timerEl).not.toBeNull();
+                expect(timerEl.textContent).toBe('00:00');
+
+                // Advance time by 5 seconds
+                jest.advanceTimersByTime(5000);
+                expect(timerEl.textContent).toBe('00:05');
+
+                // Advance time by 60 seconds
+                jest.advanceTimersByTime(60000);
+                expect(timerEl.textContent).toBe('01:05');
+            });
+
+            it('should update timer accurately when resuming a workout from an earlier startTime', () => {
+                const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+                app.activeWorkout.startTime = fiveMinutesAgo;
+                app.updateSessionTimer();
+
+                const timerEl = document.getElementById('workout-session-timer');
+                expect(timerEl.textContent).toBe('05:00');
+
+                // Advance by 12 seconds
+                jest.advanceTimersByTime(12000);
+                expect(timerEl.textContent).toBe('05:12');
+            });
+
+            it('should stop the timer interval on finishWorkout() and cancelWorkout()', () => {
+                expect(app.sessionTimerInterval).not.toBeNull();
+
+                app.cancelWorkout();
+                expect(app.sessionTimerInterval).toBeNull();
+
+                // Restart workout
+                app.startWorkout(store.plans[0].sessions[0], store.plans[0]);
+                expect(app.sessionTimerInterval).not.toBeNull();
+
+                app.finishWorkout();
+                expect(app.sessionTimerInterval).toBeNull();
+            });
+
+            it('should stop the timer interval when navigating away from the workout view', () => {
+                expect(app.sessionTimerInterval).not.toBeNull();
+
+                app.navigate('home');
+                expect(app.sessionTimerInterval).toBeNull();
+
+                // Resuming via openWorkoutView restores the timer
+                app.openWorkoutView();
+                expect(app.sessionTimerInterval).not.toBeNull();
+            });
+        });
     });
 });
 

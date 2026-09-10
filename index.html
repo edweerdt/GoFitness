@@ -83,7 +83,10 @@
                 <div class="workout-sticky-header">
                     <header class="workout-header">
                         <button class="icon-btn" onclick="app.showCancelWorkoutModal()" title="Training annuleren" aria-label="Training annuleren"><span class="material-icons-round" aria-hidden="true">close</span></button>
-                        <h2 id="workout-title">Training</h2>
+                        <div class="workout-title-container">
+                            <h2 id="workout-title">Training</h2>
+                            <span id="workout-session-timer" class="workout-session-timer" title="Totale sessieduur" aria-label="Totale sessieduur">00:00</span>
+                        </div>
                         <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen" aria-label="Thema aanpassen">
                             <span class="material-icons-round">brightness_auto</span>
                         </button>
