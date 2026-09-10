@@ -2,13 +2,20 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- Zoomen niet blokkeren (WCAG 1.4.4); viewport-fit voor de iPhone-notch -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Go Fitness</title>
-    <link rel="stylesheet" href="style.css?v=24">
+    <link rel="stylesheet" href="style.css?v=25">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
-    <meta name="theme-color" content="#121212">
+    <meta name="theme-color" content="#0f1115">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f4f6">
+    <!-- iOS: standalone starten met een passende statusbalk -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Go Fitness">
     <!-- Self-hosted fonts (Inter + Material Icons Round) voor betrouwbaar offline gebruik -->
     <link rel="stylesheet" href="fonts/fonts.css">
     <!-- Firebase SDK (Compat voor Vanilla JS) -->
@@ -26,7 +33,7 @@
                 <header class="home-header">
                     <div class="home-header-row">
                         <h1 id="home-date">Vandaag</h1>
-                        <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen">
+                        <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen" aria-label="Thema aanpassen">
                             <span class="material-icons-round">brightness_auto</span>
                         </button>
                     </div>
@@ -38,9 +45,9 @@
                 </header>
                 <div class="content-padded pb-32">
                     <div class="recommended-card glass-panel">
-                        <h3 id="recommended-card-title">Aanbevolen Sessie</h3>
-                        <h2 id="recommended-session-name">Geen schema actief</h2>
-                        <p id="recommended-reason" class="text-muted">Importeer eerst een trainingsschema.</p>
+                        <h3 id="recommended-card-title">⚡ Direct Starten</h3>
+                        <h2 id="recommended-session-name">Beginner Gym + Lichaamsgewicht Mix</h2>
+                        <p id="recommended-reason" class="text-muted">Start direct met ons beginnersschema of kies een schema uit de preset bibliotheek op het tabblad Schema's.</p>
                         <div id="session-picker-wrapper" class="hidden mt-3">
                             <label for="home-session-select" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Kies een andere sessie uit je schema:</label>
                             <select id="home-session-select" class="input-field" style="font-family:inherit; font-size:0.9rem; padding:8px 12px;"></select>
@@ -58,7 +65,7 @@
                                 <span class="stat-label">Weken Streak</span>
                             </div>
                         </div>
-                        <div class="stat-box glass-panel" style="cursor: pointer;" onclick="app.navigate('progress'); setTimeout(() => document.getElementById('history-list').scrollIntoView({behavior: 'smooth'}), 100);">
+                        <div class="stat-box glass-panel" style="cursor: pointer;" role="button" tabindex="0" aria-label="Bekijk je gelogde sessies" onclick="app.navigate('progress'); setTimeout(() => document.getElementById('history-list').scrollIntoView({behavior: 'smooth'}), 100);" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                             <div class="stat-icon-wrapper text-accent">
                                 <span class="material-icons-round">done_all</span>
                             </div>
@@ -75,13 +82,13 @@
             <section id="view-workout" class="view">
                 <div class="workout-sticky-header">
                     <header class="workout-header">
-                        <button class="icon-btn" onclick="app.showCancelWorkoutModal()" title="Training annuleren"><span class="material-icons-round">close</span></button>
+                        <button class="icon-btn" onclick="app.showCancelWorkoutModal()" title="Training annuleren" aria-label="Training annuleren"><span class="material-icons-round" aria-hidden="true">close</span></button>
                         <h2 id="workout-title">Training</h2>
-                        <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen">
+                        <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen" aria-label="Thema aanpassen">
                             <span class="material-icons-round">brightness_auto</span>
                         </button>
                     </header>
-                    <div id="rest-timer" class="rest-timer glass-panel hidden" onclick="app.stopRestTimer()" title="Tik om over te slaan">
+                    <div id="rest-timer" class="rest-timer glass-panel hidden" role="button" tabindex="0" aria-label="Rusttimer, tik om over te slaan" onclick="app.stopRestTimer()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" title="Tik om over te slaan">
                         <span class="material-icons-round">timer</span>
                         <span id="rest-timer-label">Rust: 0:00</span>
                         <span class="text-sm text-muted">tik om over te slaan</span>
@@ -103,7 +110,7 @@
                 <div class="content-padded pb-32">
                     <div class="actions-row">
                         <button class="btn-secondary flex-1" onclick="app.showImportModal()"><span class="material-icons-round">upload_file</span> Importeer</button>
-                        <button class="btn-secondary flex-1" onclick="app.startQrScanner()" title="Scan QR-code van een ander toestel"><span class="material-icons-round">qr_code_scanner</span> Scan QR</button>
+                        <button class="btn-secondary flex-1" data-feature="qr-scan" onclick="app.startQrScanner()" title="Scan QR-code van een ander toestel"><span class="material-icons-round">qr_code_scanner</span> Scan QR</button>
                         <button class="btn-secondary flex-1" onclick="app.exportData()"><span class="material-icons-round">download</span> Backup</button>
                         <button class="btn-secondary flex-1" onclick="document.getElementById('restore-file').click()"><span class="material-icons-round">restore</span> Herstel</button>
                     </div>
@@ -221,25 +228,25 @@
         </main>
 
         <!-- Bottom Navigation -->
-        <nav id="bottom-nav" class="glass-panel">
+        <nav id="bottom-nav" class="glass-panel" aria-label="Hoofdnavigatie">
             <button class="nav-item active" data-target="home">
-                <span class="material-icons-round">home</span>
+                <span class="material-icons-round" aria-hidden="true">home</span>
                 <span>Home</span>
             </button>
             <button class="nav-item" data-target="plans">
-                <span class="material-icons-round">view_list</span>
+                <span class="material-icons-round" aria-hidden="true">view_list</span>
                 <span>Schema's</span>
             </button>
             <button class="nav-item" data-target="progress">
-                <span class="material-icons-round">bar_chart</span>
+                <span class="material-icons-round" aria-hidden="true">bar_chart</span>
                 <span>Statistieken</span>
             </button>
             <button class="nav-item" data-target="friends">
-                <span class="material-icons-round">group</span>
+                <span class="material-icons-round" aria-hidden="true">group</span>
                 <span>Vrienden</span>
             </button>
             <button class="nav-item" data-target="achievements">
-                <span class="material-icons-round">emoji_events</span>
+                <span class="material-icons-round" aria-hidden="true">emoji_events</span>
                 <span>Achievements</span>
             </button>
         </nav>
@@ -258,7 +265,7 @@
                 <div id="import-error" class="status-badge mt-2 hidden" style="background: rgba(255, 82, 82, 0.1); color: #ff5252; border: 1px solid rgba(255,82,82,0.2);"></div>
                 <div id="import-preview" class="glass-panel mt-2 hidden"></div>
                 <div class="modal-actions mt-4">
-                    <button class="btn-secondary flex-1" onclick="app.hideModal()">Annuleren</button>
+                    <button class="btn-secondary flex-1" onclick="app.hideModal()" data-modal-close>Annuleren</button>
                     <button id="btn-confirm-import" class="btn-primary flex-1" onclick="app.processImport()">Importeer</button>
                 </div>
             </div>
@@ -272,7 +279,7 @@
                 <h3>Sessie Afronden?</h3>
                 <p class="text-sm text-muted mt-2">Weet je zeker dat je klaar bent met je training? Je prestaties worden opgeslagen in je logboek.</p>
                 <div class="modal-actions mt-6">
-                    <button class="btn-secondary flex-1" onclick="app.hideFinishModal()">Annuleren</button>
+                    <button class="btn-secondary flex-1" onclick="app.hideFinishModal()" data-modal-close>Annuleren</button>
                     <button class="btn-primary flex-1" onclick="app.finishWorkout()">Afronden</button>
                 </div>
             </div>
@@ -286,7 +293,7 @@
                 <h3>Training Annuleren?</h3>
                 <p class="text-sm text-muted mt-2">Weet je zeker dat je deze training wilt annuleren? Niet-opgeslagen sets gaan verloren en de sessie wordt niet opgeslagen.</p>
                 <div class="modal-actions mt-6">
-                    <button class="btn-secondary flex-1" onclick="app.hideCancelWorkoutModal()">Verder Trainen</button>
+                    <button class="btn-secondary flex-1" onclick="app.hideCancelWorkoutModal()" data-modal-close>Verder Trainen</button>
                     <button class="btn-primary flex-1" style="background: #ff5252; color: white;" onclick="app.cancelWorkout()">Ja, Annuleren</button>
                 </div>
             </div>
@@ -301,7 +308,7 @@
                 <h3>Sessie Verwijderen?</h3>
                 <p class="text-sm text-muted mt-2">Weet je zeker dat je deze opgeslagen sessie uit je logboek wilt verwijderen? Dit beïnvloedt je statistieken en kan niet ongedaan worden gemaakt.</p>
                 <div class="modal-actions mt-6">
-                    <button class="btn-secondary flex-1" onclick="app.hideDeleteModal('log')">Annuleren</button>
+                    <button class="btn-secondary flex-1" onclick="app.hideDeleteModal('log')" data-modal-close>Annuleren</button>
                     <button class="btn-primary flex-1" style="background: #ff5252; color: white;" onclick="app.confirmDelete('log')">Verwijderen</button>
                 </div>
             </div>
@@ -316,7 +323,7 @@
                 <h3>Schema Verwijderen?</h3>
                 <p class="text-sm text-muted mt-2">Weet je zeker dat je dit schema wilt verwijderen? Je gelogde sessies blijven wel bewaard in je logboek.</p>
                 <div class="modal-actions mt-6">
-                    <button class="btn-secondary flex-1" onclick="app.hideDeleteModal('plan')">Annuleren</button>
+                    <button class="btn-secondary flex-1" onclick="app.hideDeleteModal('plan')" data-modal-close>Annuleren</button>
                     <button class="btn-primary flex-1" style="background: #ff5252; color: white;" onclick="app.confirmDelete('plan')">Verwijderen</button>
                 </div>
             </div>
@@ -331,7 +338,7 @@
                 <h3>Oefening Verwijderen?</h3>
                 <p class="text-sm text-muted mt-2">Weet je zeker dat je deze oefening uit je bibliotheek wilt verwijderen?</p>
                 <div class="modal-actions mt-6">
-                    <button class="btn-secondary flex-1" onclick="app.hideDeleteModal('exercise')">Annuleren</button>
+                    <button class="btn-secondary flex-1" onclick="app.hideDeleteModal('exercise')" data-modal-close>Annuleren</button>
                     <button class="btn-primary flex-1" style="background: #ff5252; color: white;" onclick="app.confirmDelete('exercise')">Verwijderen</button>
                 </div>
             </div>
@@ -342,7 +349,7 @@
             <div class="modal-content glass-panel" style="max-width: 480px; width: 100%;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                     <h3 id="modal-add-exercise-title" style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Oefening Toevoegen</h3>
-                    <button class="icon-btn" onclick="app.hideAddExerciseModal()"><span class="material-icons-round">close</span></button>
+                    <button class="icon-btn" onclick="app.hideAddExerciseModal()" aria-label="Sluiten" data-modal-close><span class="material-icons-round" aria-hidden="true">close</span></button>
                 </div>
                 <input type="hidden" id="ex-edit-id">
                 <div class="flex-col gap-3">
@@ -392,7 +399,7 @@
                     </div>
                 </div>
                 <div class="modal-actions mt-6">
-                    <button class="btn-secondary flex-1" onclick="app.hideAddExerciseModal()">Annuleren</button>
+                    <button class="btn-secondary flex-1" onclick="app.hideAddExerciseModal()" data-modal-close>Annuleren</button>
                     <button class="btn-primary flex-1" onclick="app.saveCustomExercise()">Opslaan</button>
                 </div>
             </div>
@@ -403,7 +410,7 @@
             <div class="modal-content glass-panel" style="max-width: 480px; width: 100%; max-height: 85vh; display: flex; flex-direction: column;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Oefening Toevoegen aan Sessie</h3>
-                    <button class="icon-btn" onclick="app.hideSelectExerciseForWorkoutModal()"><span class="material-icons-round">close</span></button>
+                    <button class="icon-btn" onclick="app.hideSelectExerciseForWorkoutModal()" aria-label="Sluiten" data-modal-close><span class="material-icons-round" aria-hidden="true">close</span></button>
                 </div>
                 
                 <div style="margin-bottom: 12px; display:flex; gap:8px;">
@@ -442,7 +449,7 @@
                 <p class="text-sm text-muted mt-2" id="restore-summary"></p>
                 <p class="text-sm text-muted mt-2">Let op: je huidige schema's en logboek worden vervangen door de backup. Dit kan niet ongedaan worden gemaakt.</p>
                 <div class="modal-actions mt-6">
-                    <button class="btn-secondary flex-1" onclick="app.hideRestoreModal()">Annuleren</button>
+                    <button class="btn-secondary flex-1" onclick="app.hideRestoreModal()" data-modal-close>Annuleren</button>
                     <button class="btn-primary flex-1" onclick="app.confirmRestore()">Herstellen</button>
                 </div>
             </div>
@@ -453,7 +460,7 @@
             <div class="modal-content glass-panel">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                     <h3>Sessie Bewerken</h3>
-                    <button class="icon-btn" onclick="app.hideEditLogModal()"><span class="material-icons-round">close</span></button>
+                    <button class="icon-btn" onclick="app.hideEditLogModal()" aria-label="Sluiten" data-modal-close><span class="material-icons-round" aria-hidden="true">close</span></button>
                 </div>
                 <div id="edit-log-container" class="flex-col gap-3" style="max-height: 60vh; overflow-y: auto; padding-right: 4px;">
                     <!-- Injected by JS -->
@@ -469,7 +476,7 @@
             <div class="modal-content glass-panel" style="max-width: 480px; width: 100%; max-height: 80vh; display: flex; flex-direction: column;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 id="exercise-history-modal-title" style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Oefening Geschiedenis</h3>
-                    <button class="icon-btn" onclick="app.hideExerciseHistoryModal()"><span class="material-icons-round">close</span></button>
+                    <button class="icon-btn" onclick="app.hideExerciseHistoryModal()" aria-label="Sluiten" data-modal-close><span class="material-icons-round" aria-hidden="true">close</span></button>
                 </div>
                 <div id="exercise-history-modal-content" class="flex-col gap-2" style="flex:1; overflow-y:auto; padding-right:4px;">
                     <!-- Injected by JS -->
@@ -482,7 +489,7 @@
             <div class="modal-content glass-panel" style="max-width: 520px; width: 100%;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Statistieken Delen</h3>
-                    <button class="icon-btn" onclick="app.hideShareStatsModal()"><span class="material-icons-round">close</span></button>
+                    <button class="icon-btn" onclick="app.hideShareStatsModal()" aria-label="Sluiten" data-modal-close><span class="material-icons-round" aria-hidden="true">close</span></button>
                 </div>
                 <p class="text-sm text-muted" style="margin-bottom:12px;">Selecteer welke onderdelen je wilt opnemen in de afbeelding:</p>
                 <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
@@ -504,7 +511,7 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button class="btn-secondary flex-1" onclick="app.hideShareStatsModal()">Annuleren</button>
+                    <button class="btn-secondary flex-1" onclick="app.hideShareStatsModal()" data-modal-close>Annuleren</button>
                     <button class="btn-secondary flex-1" onclick="app.downloadStatsImage()" id="btn-download-share-img">
                         <span class="material-icons-round">download</span>Download
                     </button>
@@ -520,7 +527,7 @@
             <div class="modal-content glass-panel" style="max-width: 440px; width: 100%; text-align: center;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;" id="share-plan-modal-title">Schema Delen</h3>
-                    <button class="icon-btn" onclick="app.hideSharePlanModal()"><span class="material-icons-round">close</span></button>
+                    <button class="icon-btn" onclick="app.hideSharePlanModal()" aria-label="Sluiten" data-modal-close><span class="material-icons-round" aria-hidden="true">close</span></button>
                 </div>
                 <p id="share-plan-modal-subtitle" class="text-sm text-muted" style="margin-bottom:16px;">Scan met een andere telefoon of deel de directe link:</p>
                 
@@ -550,7 +557,7 @@
             <div class="modal-content glass-panel" style="max-width: 460px; width: 100%; text-align: center;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Scan Schema QR-Code</h3>
-                    <button class="icon-btn" onclick="app.stopQrScanner()"><span class="material-icons-round">close</span></button>
+                    <button class="icon-btn" onclick="app.stopQrScanner()" aria-label="Sluiten" data-modal-close><span class="material-icons-round" aria-hidden="true">close</span></button>
                 </div>
                 <p class="text-sm text-muted" style="margin-bottom:12px;">Richt je camera op de QR-code van een ander toestel:</p>
                 
@@ -567,7 +574,7 @@
                 </div>
 
                 <div class="mt-4" style="display:flex; gap:8px;">
-                    <button class="btn-secondary flex-1" onclick="app.stopQrScanner()">Annuleren</button>
+                    <button class="btn-secondary flex-1" onclick="app.stopQrScanner()" data-modal-close>Annuleren</button>
                     <button class="btn-secondary flex-1" onclick="document.getElementById('qr-file-input').click()">
                         <span class="material-icons-round" style="font-size:1rem;">image</span> Kies Afbeelding
                     </button>
@@ -581,14 +588,14 @@
             <div class="modal-content glass-panel" style="max-width: 480px; width: 100%;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Schema Ontvangen</h3>
-                    <button class="icon-btn" onclick="app.hidePlanImportPromptModal()"><span class="material-icons-round">close</span></button>
+                    <button class="icon-btn" onclick="app.hidePlanImportPromptModal()" aria-label="Sluiten" data-modal-close><span class="material-icons-round" aria-hidden="true">close</span></button>
                 </div>
                 <p class="text-sm text-muted" style="margin-bottom:12px;">Wil je onderstaand schema importeren in je GoFitness bibliotheek?</p>
                 
                 <div id="link-import-preview" class="glass-panel" style="background:rgba(0,0,0,0.25); border-radius:12px; padding:14px; margin-bottom:16px;"></div>
 
                 <div class="modal-actions">
-                    <button class="btn-secondary flex-1" onclick="app.hidePlanImportPromptModal()">Annuleren</button>
+                    <button class="btn-secondary flex-1" onclick="app.hidePlanImportPromptModal()" data-modal-close>Annuleren</button>
                     <button class="btn-primary flex-1" onclick="app.confirmPlanImportFromLink()">
                         <span class="material-icons-round">download</span>Importeren
                     </button>
@@ -604,7 +611,7 @@
                         <div class="text-xs text-muted" style="text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">🔄 Oefening Vervangen</div>
                         <h3 style="margin:2px 0 0 0; text-transform:none; color:var(--text-primary); font-size:1.15rem;" id="sub-modal-target-name">Barbell Back Squat</h3>
                     </div>
-                    <button class="icon-btn" onclick="app.hideSubstitutionModal()"><span class="material-icons-round">close</span></button>
+                    <button class="icon-btn" onclick="app.hideSubstitutionModal()" aria-label="Sluiten" data-modal-close><span class="material-icons-round" aria-hidden="true">close</span></button>
                 </div>
 
                 <div id="sub-modal-target-meta" style="margin-bottom:12px; display:flex; gap:6px; flex-wrap:wrap;"></div>
@@ -625,7 +632,7 @@
                 <!-- Zoekbalk -->
                 <div style="position:relative; margin-bottom:12px;">
                     <span class="material-icons-round text-muted" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:1.1rem;">search</span>
-                    <input type="text" id="sub-modal-search" class="search-input w-full" placeholder="Zoek in alle 107 oefeningen..." style="padding-left:36px;" oninput="app.renderSubstitutionModalResults()">
+                    <input type="text" id="sub-modal-search" class="search-input w-full" placeholder="Zoek een oefening..." style="padding-left:36px;" oninput="app.renderSubstitutionModalResults()">
                 </div>
 
                 <!-- Resultatenlijst -->
@@ -637,13 +644,13 @@
                     <label id="sub-modal-save-plan-label" style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:var(--text-muted); cursor:pointer;">
                         <input type="checkbox" id="sub-modal-save-to-plan"> Ook permanent opslaan in schema
                     </label>
-                    <button class="btn-secondary" style="padding:4px 12px; font-size:0.85rem;" onclick="app.hideSubstitutionModal()">Sluiten</button>
+                    <button class="btn-secondary" style="padding:4px 12px; font-size:0.85rem;" onclick="app.hideSubstitutionModal()" data-modal-close>Sluiten</button>
                 </div>
             </div>
         </div>
 
         <!-- Toast Container -->
-        <div id="toast-container" class="toast-container"></div>
+        <div id="toast-container" class="toast-container" role="status" aria-live="polite"></div>
     </div>
     
     <script src="qr.js"></script>
@@ -659,18 +666,12 @@
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(reg => {
-                    console.log('SW geregistreerd!');
                     reg.update();
+                    // Nieuwe versie? Dan een melding tonen i.p.v. de app midden in een
+                    // training onaangekondigd herladen (zie app.handleServiceWorkerRegistration)
+                    app.handleServiceWorkerRegistration(reg);
                 })
                 .catch(err => console.log('SW registratie faalde', err));
-
-            let refreshing = false;
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (!refreshing) {
-                    refreshing = true;
-                    window.location.reload();
-                }
-            });
         }
         try {
             CloudSync.init({ store: store, app: app });
