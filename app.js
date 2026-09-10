@@ -827,6 +827,7 @@ const app = {
             if (document.visibilityState === 'hidden') this.flushActiveWorkoutSave();
             if (document.visibilityState === 'visible' && this.activeWorkout && this.currentView === 'workout') {
                 this.requestWakeLock();
+                this.updateSessionTimer();
             }
         });
         if (typeof window !== 'undefined') {
@@ -932,8 +933,11 @@ const app = {
         }
 
         this.currentView = viewId;
-        // De rusttimer is puur UI van de workout-view; buiten die view niet laten doortikken
-        if (viewId !== 'workout' && this.restTimer) this.stopRestTimer();
+        // De rusttimer en sessietimer zijn puur UI van de workout-view; buiten die view niet laten doortikken
+        if (viewId !== 'workout') {
+            if (this.restTimer) this.stopRestTimer();
+            if (this.sessionTimerInterval) this.stopSessionTimer();
+        }
 
         if(viewId === 'home') this.renderHome();
         if(viewId === 'plans') this.renderPlans();
@@ -3693,6 +3697,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         }
 
         this.requestWakeLock();
+        this.startSessionTimer();
         this.navigate('workout');
     },
 
@@ -4830,6 +4835,54 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         }
     },
 
+    // --- SESSIETIMER ---
+
+    sessionTimerInterval: null,
+
+    formatSessionDuration(totalSeconds) {
+        const sec = Math.max(0, Math.floor(totalSeconds || 0));
+        const hours = Math.floor(sec / 3600);
+        const mins = Math.floor((sec % 3600) / 60);
+        const remainingSecs = sec % 60;
+        if (hours > 0) {
+            return `${hours}:${String(mins).padStart(2, '0')}:${String(remainingSecs).padStart(2, '0')}`;
+        }
+        return `${String(mins).padStart(2, '0')}:${String(remainingSecs).padStart(2, '0')}`;
+    },
+
+    startSessionTimer() {
+        this.stopSessionTimer();
+        this.updateSessionTimer();
+        this.sessionTimerInterval = setInterval(() => {
+            this.updateSessionTimer();
+        }, 1000);
+    },
+
+    stopSessionTimer() {
+        if (this.sessionTimerInterval) {
+            clearInterval(this.sessionTimerInterval);
+            this.sessionTimerInterval = null;
+        }
+    },
+
+    updateSessionTimer() {
+        const timerEl = document.getElementById('workout-session-timer');
+        if (!timerEl) return;
+        if (!this.activeWorkout || !this.activeWorkout.startTime) {
+            timerEl.textContent = '00:00';
+            return;
+        }
+        const start = this.activeWorkout.startTime instanceof Date
+            ? this.activeWorkout.startTime
+            : new Date(this.activeWorkout.startTime);
+        if (isNaN(start.getTime())) {
+            timerEl.textContent = '00:00';
+            return;
+        }
+        const elapsedSec = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+        timerEl.textContent = this.formatSessionDuration(elapsedSec);
+    },
+
     // --- RUSTTIMER ---
 
     restTimer: null,
@@ -5233,6 +5286,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.hideCancelWorkoutModal();
         if (this.holdTimerState) this.stopHoldTimer(false);
         this.stopRestTimer();
+        this.stopSessionTimer();
         this.releaseWakeLock();
 
         this.activeWorkout = null;
@@ -5249,6 +5303,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.hideFinishModal();
         if (this.holdTimerState) this.stopHoldTimer(false);
         this.stopRestTimer();
+        this.stopSessionTimer();
         this.releaseWakeLock();
 
         if (document.activeElement && typeof document.activeElement.blur === 'function') {
