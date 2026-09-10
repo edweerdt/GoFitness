@@ -64,7 +64,8 @@ function normalizeExerciseName(str) {
          .replace(/\bpull-?ups?\b/g, 'pullup')
          .replace(/\bchin-?ups?\b/g, 'chinup');
     s = s.replace(/\bdb\b/g, 'dumbbell').replace(/\bbb\b/g, 'barbell').replace(/\bkb\b/g, 'kettlebell').replace(/\bohp\b/g, 'overhead press').replace(/\brdl\b/g, 'romanian deadlift');
-    s = s.replace(/\([^)]*\)/g, ' ');
+    // [^()] i.p.v. [^)]: anders is dit kwadratisch op lange reeksen '(' (CodeQL ReDoS)
+    s = s.replace(/\([^()]*\)/g, ' ');
     s = s.replace(/[^a-z0-9]/gi, ' ').replace(/\s+/g, ' ').trim();
     s = s.split(' ').map(w => (w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w)).join(' ');
     return s;
@@ -342,12 +343,38 @@ class DataStore {
     }
     invalidateCache() {
         this._cachedLibrary = null;
+        this._cachedLibraryState = null;
+        // Versieteller: lookup-caches in app (log-matches) worden hierop gecontroleerd
+        this._logsVersion = (this._logsVersion || 0) + 1;
         try {
             if (typeof app !== 'undefined' && app) {
-                app._canonicalKeyCache = {};
-                app._canonicalNameCache = {};
+                app._canonicalKeyCache = new Map();
+                app._canonicalNameCache = new Map();
             }
         } catch (e) {}
+    }
+    // Vingerafdruk van de bronnen van de bibliotheek. save()/load() legen de cache
+    // al; dit vangt daarnaast directe vervanging van store.plans of
+    // store.customExercises (zoals tests doen) zonder save().
+    _libraryState() {
+        let exCount = 0;
+        if (Array.isArray(this.plans)) {
+            for (const p of this.plans) {
+                if (!p || !Array.isArray(p.sessions)) continue;
+                for (const s of p.sessions) exCount += (s && Array.isArray(s.exercises)) ? s.exercises.length : 0;
+            }
+        }
+        return {
+            plans: this.plans,
+            plansLen: Array.isArray(this.plans) ? this.plans.length : -1,
+            custom: this.customExercises,
+            customLen: Array.isArray(this.customExercises) ? this.customExercises.length : -1,
+            exCount
+        };
+    }
+    _libraryStateEquals(a, b) {
+        return !!a && !!b && a.plans === b.plans && a.plansLen === b.plansLen
+            && a.custom === b.custom && a.customLen === b.customLen && a.exCount === b.exCount;
     }
     resolveCanonicalExercise(name) {
         if (!name) return null;
@@ -484,6 +511,7 @@ class DataStore {
     // "Vorige keer", PR-detectie en achievements lezen de logs op array-volgorde;
     // die moet dus chronologisch zijn, ook na een datumcorrectie, merge of restore
     sortLogs() {
+        this._logsVersion = (this._logsVersion || 0) + 1;
         if (!Array.isArray(this.logs)) return;
         const t = l => {
             const v = l && (l.date || l.endTime);
@@ -515,6 +543,18 @@ class DataStore {
         return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     }
     getExerciseLibrary() {
+        // De bibliotheek werd per render (soms per log-oefening) opnieuw opgebouwd,
+        // inclusief een regex-scan per plan-oefening. Nu gecachet tot de bron wijzigt.
+        const state = this._libraryState();
+        if (this._cachedLibrary && this._libraryStateEquals(this._cachedLibraryState, state)) {
+            return [...this._cachedLibrary];
+        }
+        const list = this._buildExerciseLibrary();
+        this._cachedLibrary = list;
+        this._cachedLibraryState = state;
+        return [...list];
+    }
+    _buildExerciseLibrary() {
         const list = [...DEFAULT_EXERCISES];
         const existingIds = new Set(list.map(ex => ex.id));
 
@@ -784,10 +824,14 @@ const app = {
 
         // Wake lock vervalt zodra de app naar de achtergrond gaat; vraag opnieuw aan
         document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') this.flushActiveWorkoutSave();
             if (document.visibilityState === 'visible' && this.activeWorkout && this.currentView === 'workout') {
                 this.requestWakeLock();
             }
         });
+        if (typeof window !== 'undefined') {
+            window.addEventListener('pagehide', () => this.flushActiveWorkoutSave());
+        }
 
         this.setupNavigation();
         this.renderHome();
@@ -882,7 +926,9 @@ const app = {
         }
 
         this.currentView = viewId;
-        
+        // De rusttimer is puur UI van de workout-view; buiten die view niet laten doortikken
+        if (viewId !== 'workout' && this.restTimer) this.stopRestTimer();
+
         if(viewId === 'home') this.renderHome();
         if(viewId === 'plans') this.renderPlans();
         if(viewId === 'progress') this.renderProgress();
@@ -1124,7 +1170,8 @@ const app = {
         if (!nameStr || typeof nameStr !== 'string') return this.escapeHTML(String(nameStr || ''));
 
         // Splitst op ' of ', ' / ', ' OR ', ',' om individuele oefeningen afzonderlijk klikbaar te maken
-        const parts = nameStr.split(/(\s+of\s+|\s*\/\s*|\s+or\s+|\s*,\s*)/i);
+        // Whitespace eerst samenvouwen; separator-regex zonder onbegrensde \s+ (CodeQL ReDoS)
+        const parts = nameStr.replace(/\s+/g, ' ').split(/( of | ?\/ ?| or | ?, ?)/i);
         return parts.map(part => {
             const trimmed = part.trim();
             const lower = trimmed.toLowerCase();
@@ -2230,17 +2277,36 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.renderExerciseProgress();
     },
 
+    // Caches voor canonieke sleutels/namen. store.invalidateCache (save/load) leegt
+    // ze; daarnaast worden ze gereset zodra store.customExercises direct vervangen is,
+    // want resolveCanonicalExercise kijkt daar ook in.
+    _canonicalCache(kind) {
+        const custom = (typeof store !== 'undefined') ? store.customExercises : null;
+        const customLen = Array.isArray(custom) ? custom.length : -1;
+        if (this._canonicalCacheCustomRef !== custom || this._canonicalCacheCustomLen !== customLen
+            || !(this._canonicalKeyCache instanceof Map) || !(this._canonicalNameCache instanceof Map)) {
+            this._canonicalKeyCache = new Map();
+            this._canonicalNameCache = new Map();
+            this._canonicalCacheCustomRef = custom;
+            this._canonicalCacheCustomLen = customLen;
+        }
+        return kind === 'name' ? this._canonicalNameCache : this._canonicalKeyCache;
+    },
+
     getCanonicalExerciseKey(name) {
         if (!name) return '';
         let raw = String(name).trim();
         if (!raw) return '';
 
+        const cache = this._canonicalCache('key');
+        if (cache.has(raw)) return cache.get(raw);
+
         const matched = (typeof store !== 'undefined' && store.resolveCanonicalExercise)
             ? store.resolveCanonicalExercise(raw)
             : null;
-        if (matched && matched.id) return matched.id;
-
-        return normalizeExerciseName(raw) || raw.toLowerCase().trim();
+        const result = (matched && matched.id) ? matched.id : (normalizeExerciseName(raw) || raw.toLowerCase().trim());
+        cache.set(raw, result);
+        return result;
     },
 
     getCanonicalExerciseName(name) {
@@ -2248,12 +2314,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         let raw = String(name).trim();
         if (!raw) return '';
 
+        const cache = this._canonicalCache('name');
+        if (cache.has(raw)) return cache.get(raw);
+
         const matched = (typeof store !== 'undefined' && store.resolveCanonicalExercise)
             ? store.resolveCanonicalExercise(raw)
             : null;
-        if (matched && matched.name) return matched.name;
-
-        return raw;
+        const result = (matched && matched.name) ? matched.name : raw;
+        cache.set(raw, result);
+        return result;
     },
 
     formatShortDate(dateStr) {
@@ -2320,7 +2389,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 if (maxVal <= 0) return;
 
                 // Split combined names ("X of Y") so historical logs attribute data to each variation name
-                const exNames = String(ex.name || '').split(/\s+of\s+/i).map(s => s.trim()).filter(Boolean);
+                const exNames = String(ex.name || '').replace(/\s+/g, ' ').split(/ of /i).map(s => s.trim()).filter(Boolean);
 
                 exNames.forEach(displayName => {
                     const key = this.getCanonicalExerciseKey(displayName);
@@ -2500,7 +2569,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     if (!log || !log.exercises) return;
                     log.exercises.forEach(ex => {
                         if (!ex || !ex.name) return;
-                        const exNames = String(ex.name || '').split(/\s+of\s+/i).map(str => str.trim()).filter(Boolean);
+                        const exNames = String(ex.name || '').replace(/\s+/g, ' ').split(/ of /i).map(str => str.trim()).filter(Boolean);
                         exNames.forEach(displayName => {
                             const canonKey = this.getCanonicalExerciseKey(displayName);
                             const canonName = this.getCanonicalExerciseName(displayName);
@@ -2766,11 +2835,13 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             { id: 'marathon', title: 'Marathon Strijder', desc: 'Workout > 90 minuten.', icon: 'timer', unlocked: false }
         ];
 
-        // Evaluate logic
-        if (totalWorkouts >= 1) allAchievements.find(a => a.id === 'first_step').unlocked = true;
-        if (totalWorkouts >= 3) allAchievements.find(a => a.id === 'taste_it').unlocked = true;
-        if (totalWorkouts >= 10) allAchievements.find(a => a.id === 'unstoppable').unlocked = true;
-        if (totalWorkouts >= 100) allAchievements.find(a => a.id === 'century').unlocked = true;
+        // Evaluate logic (lookup op id i.p.v. een array-scan per conditie per log)
+        const byId = new Map(allAchievements.map(a => [a.id, a]));
+        const unlock = id => { const a = byId.get(id); if (a) a.unlocked = true; };
+        if (totalWorkouts >= 1) unlock('first_step');
+        if (totalWorkouts >= 3) unlock('taste_it');
+        if (totalWorkouts >= 10) unlock('unstoppable');
+        if (totalWorkouts >= 100) unlock('century');
         
         let lastDate = null;
         let datesMap = {};
@@ -2783,18 +2854,18 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             const dayOfWeek = d.getDay();
             
             datesMap[dateString] = (datesMap[dateString] || 0) + 1;
-            if (datesMap[dateString] >= 2) allAchievements.find(a => a.id === 'oops').unlocked = true;
+            if (datesMap[dateString] >= 2) unlock('oops');
 
-            if (hour >= 0 && hour < 4) allAchievements.find(a => a.id === 'night').unlocked = true;
-            if (hour >= 4 && hour < 6) allAchievements.find(a => a.id === 'bird').unlocked = true;
-            if (dayOfWeek === 0 || dayOfWeek === 6) allAchievements.find(a => a.id === 'weekend').unlocked = true;
-            if (log.duration < 15) allAchievements.find(a => a.id === 'flash').unlocked = true;
-            if (log.duration > 90) allAchievements.find(a => a.id === 'marathon').unlocked = true;
+            if (hour >= 0 && hour < 4) unlock('night');
+            if (hour >= 4 && hour < 6) unlock('bird');
+            if (dayOfWeek === 0 || dayOfWeek === 6) unlock('weekend');
+            if (log.duration < 15) unlock('flash');
+            if (log.duration > 90) unlock('marathon');
 
             if (lastDate) {
                 const diffDays = (d - lastDate) / (1000 * 60 * 60 * 24);
-                if (diffDays > 5) allAchievements.find(a => a.id === 'exorcist').unlocked = true;
-                if (diffDays > 1.5 && diffDays <= 2.5) allAchievements.find(a => a.id === 'golden_path').unlocked = true;
+                if (diffDays > 5) unlock('exorcist');
+                if (diffDays > 1.5 && diffDays <= 2.5) unlock('golden_path');
             }
 
             // Weekstart (maandag) als sleutel, zodat de jaargrens geen rol speelt
@@ -2820,16 +2891,16 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     else bwCount++;
                 });
 
-                if ((groupCounts['chest'] || 0) >= 3) allAchievements.find(a => a.id === 'chest').unlocked = true;
-                if ((groupCounts['back'] || 0) >= 3) allAchievements.find(a => a.id === 'back').unlocked = true;
-                if ((groupCounts['shoulders'] || 0) >= 3) allAchievements.find(a => a.id === 'shoulders').unlocked = true;
-                if ((groupCounts['legs'] || 0) >= 3) allAchievements.find(a => a.id === 'legs').unlocked = true;
-                if ((groupCounts['glutes'] || 0) >= 2) allAchievements.find(a => a.id === 'glutes').unlocked = true;
-                if ((groupCounts['core'] || 0) >= 3) allAchievements.find(a => a.id === 'core').unlocked = true;
-                if ((groupCounts['arms'] || 0) >= 3) allAchievements.find(a => a.id === 'arms').unlocked = true;
+                if ((groupCounts['chest'] || 0) >= 3) unlock('chest');
+                if ((groupCounts['back'] || 0) >= 3) unlock('back');
+                if ((groupCounts['shoulders'] || 0) >= 3) unlock('shoulders');
+                if ((groupCounts['legs'] || 0) >= 3) unlock('legs');
+                if ((groupCounts['glutes'] || 0) >= 2) unlock('glutes');
+                if ((groupCounts['core'] || 0) >= 3) unlock('core');
+                if ((groupCounts['arms'] || 0) >= 3) unlock('arms');
 
-                if (bwCount > weightCount && bwCount >= 3) allAchievements.find(a => a.id === 'calisthenics').unlocked = true;
-                if (weightCount > bwCount && weightCount >= 3) allAchievements.find(a => a.id === 'iron').unlocked = true;
+                if (bwCount > weightCount && bwCount >= 3) unlock('calisthenics');
+                if (weightCount > bwCount && weightCount >= 3) unlock('iron');
             }
         });
 
@@ -2841,7 +2912,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             expectedNext.setDate(expectedNext.getDate() + 7);
             if (expectedNext.getTime() === weekStarts[i]) consecutiveWeeks++;
             else consecutiveWeeks = 1;
-            if (consecutiveWeeks >= 4) allAchievements.find(a => a.id === 'rhythm').unlocked = true;
+            if (consecutiveWeeks >= 4) unlock('rhythm');
         }
 
         // Render grid: behaalde badges eerst, daarna de nog te verdienen (vergrijsd)
@@ -3548,21 +3619,24 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             tokens.add(cleanTypos);
 
             // Extract content inside parentheses e.g. "Row Machine (Roeimachine)" -> "roeimachine" & "row machine"
-            const parenRegex = /\(([^)]+)\)/g;
+            // Tekenklasse sluit '(' uit zodat de regex lineair blijft (CodeQL ReDoS)
+            const parenRegex = /\(([^()]+)\)/g;
             let match;
             while ((match = parenRegex.exec(raw)) !== null) {
                 if (match[1] && match[1].trim()) {
                     tokens.add(match[1].trim());
                 }
             }
-            const withoutParen = raw.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+            const withoutParen = raw.replace(/\([^()]*\)/g, ' ').replace(/\s+/g, ' ').trim();
             if (withoutParen) tokens.add(withoutParen);
 
             // Split by separators: " of ", "/", " or ", ",", "&", "+", " - "
-            const splitRegex = /(\s+of\s+|\s*\/\s*|\s+or\s+|\s*,\s*|\s*&\s*|\s*\+\s*|\s+-\s+)/i;
+            // Whitespace eerst lineair samenvouwen; de separator-regex heeft daardoor
+            // geen onbegrensde \s+/\s* voor een letterlijke tekst meer (CodeQL ReDoS)
+            const splitRegex = /( of | ?\/ ?| or | ?, ?| ?& ?| ?\+ ?| - )/i;
             const currentList = Array.from(tokens);
             currentList.forEach(s => {
-                const parts = s.split(splitRegex);
+                const parts = s.replace(/\s+/g, ' ').split(splitRegex);
                 parts.forEach(p => {
                     const t = p.trim();
                     if (t && !['of', '/', 'or', ',', '&', '+', '-'].includes(t)) {
@@ -3614,29 +3688,79 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         return tokens;
     },
 
+    // --- LOOKUP-CACHES (performance) ---
+    // De "vorige keer"-placeholders, PR-detectie en hold-timer-doelen scanden elk
+    // alle logs met een regex-tokenisatie per log-oefening, bij elke render en zelfs
+    // 10x per seconde. De matching zelf is ongewijzigd; het resultaat per doeloefening
+    // wordt nu gecachet tot de logs veranderen, en tokens per log-oefening hergebruikt.
+    _logTokenCache: new WeakMap(),
+    _logMatchCache: null,
+    _logMatchCacheState: null,
+
+    getLogExerciseTokens(e) {
+        if (!e || typeof e !== 'object') return this.extractExerciseNameTokens(e && e.name, e);
+        const cached = this._logTokenCache.get(e);
+        if (cached && cached.name === e.name && cached.chosen === e.chosenVariation && cached.original === e.originalName) {
+            return cached.tokens;
+        }
+        const tokens = this.extractExerciseNameTokens(e.name, e);
+        this._logTokenCache.set(e, { name: e.name, chosen: e.chosenVariation, original: e.originalName, tokens });
+        return tokens;
+    },
+
+    // Alle log-oefeningen die bij een doeloefening horen, in chronologische volgorde.
+    // `all`: elke match; `firstPerLog`: per log alleen de eerste match (zoals find()).
+    findLogExerciseMatches(exerciseName, exObj = null) {
+        const logs = (typeof store !== 'undefined' && Array.isArray(store.logs)) ? store.logs : [];
+        const version = (typeof store !== 'undefined') ? (store._logsVersion || 0) : 0;
+        const state = this._logMatchCacheState;
+        if (!state || state.logs !== logs || state.length !== logs.length || state.version !== version) {
+            this._logMatchCache = new Map();
+            this._logMatchCacheState = { logs, length: logs.length, version };
+        }
+
+        const targetCanonical = this.getCanonicalExerciseKey(exerciseName || (exObj && exObj.name));
+        const targetTokens = this.extractExerciseNameTokens(exerciseName, exObj);
+        const key = targetCanonical + '|' + [...targetTokens].sort().join('\u0001');
+        const hit = this._logMatchCache.get(key);
+        if (hit) return hit;
+
+        const all = [];
+        const firstPerLog = [];
+        for (let i = 0; i < logs.length; i++) {
+            const log = logs[i];
+            if (!log || !Array.isArray(log.exercises)) continue;
+            let first = null;
+            for (const e of log.exercises) {
+                if (!e || !e.name) continue;
+                let matches = false;
+                if (targetCanonical && (e.canonicalId === targetCanonical || this.getCanonicalExerciseKey(e.name) === targetCanonical)) {
+                    matches = true;
+                } else {
+                    const logTokens = this.getLogExerciseTokens(e);
+                    for (const t of logTokens) {
+                        if (targetTokens.has(t)) { matches = true; break; }
+                    }
+                }
+                if (matches) {
+                    const m = { log, logIndex: i, ex: e };
+                    all.push(m);
+                    if (!first) { first = m; firstPerLog.push(m); }
+                }
+            }
+        }
+        const result = { all, firstPerLog };
+        this._logMatchCache.set(key, result);
+        return result;
+    },
+
     getPreviousExerciseDetails(exerciseName, exObj = null) {
         if (!exerciseName && !exObj) return null;
-        const targetCanonical = this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(exerciseName || (exObj && exObj.name)) : null;
-        const targetTokens = this.extractExerciseNameTokens(exerciseName, exObj);
-
         const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
 
-        for (let i = store.logs.length - 1; i >= 0; i--) {
-            const log = store.logs[i];
-            if (!log || !log.exercises) continue;
-            
-            const matchedEx = log.exercises.find(e => {
-                if (!e || !e.name) return false;
-                if (targetCanonical && this.getCanonicalExerciseKey && (e.canonicalId === targetCanonical || this.getCanonicalExerciseKey(e.name) === targetCanonical)) {
-                    return true;
-                }
-                const logTokens = this.extractExerciseNameTokens(e.name, e);
-                for (const t of logTokens) {
-                    if (targetTokens.has(t)) return true;
-                }
-                return false;
-            });
-
+        const { firstPerLog } = this.findLogExerciseMatches(exerciseName, exObj);
+        for (let i = firstPerLog.length - 1; i >= 0; i--) {
+            const matchedEx = firstPerLog[i].ex;
             if (matchedEx && matchedEx.details && matchedEx.details.length > 0) {
                 const hasData = matchedEx.details.some(d => isNonEmpty(d.weight) || isNonEmpty(d.reps) || isNonEmpty(d.level));
                 if (hasData) {
@@ -3649,27 +3773,11 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
     getPreviousSetDetails(exerciseName, setIndex, exObj = null) {
         if ((!exerciseName && !exObj) || typeof setIndex !== 'number' || setIndex < 0) return null;
-        const targetCanonical = this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(exerciseName || (exObj && exObj.name)) : null;
-        const targetTokens = this.extractExerciseNameTokens(exerciseName, exObj);
-
         const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
 
-        for (let i = store.logs.length - 1; i >= 0; i--) {
-            const log = store.logs[i];
-            if (!log || !log.exercises) continue;
-            
-            const matchedEx = log.exercises.find(e => {
-                if (!e || !e.name) return false;
-                if (targetCanonical && this.getCanonicalExerciseKey && (e.canonicalId === targetCanonical || this.getCanonicalExerciseKey(e.name) === targetCanonical)) {
-                    return true;
-                }
-                const logTokens = this.extractExerciseNameTokens(e.name, e);
-                for (const t of logTokens) {
-                    if (targetTokens.has(t)) return true;
-                }
-                return false;
-            });
-
+        const { firstPerLog } = this.findLogExerciseMatches(exerciseName, exObj);
+        for (let i = firstPerLog.length - 1; i >= 0; i--) {
+            const matchedEx = firstPerLog[i].ex;
             if (matchedEx && matchedEx.details && matchedEx.details.length > setIndex) {
                 const d = matchedEx.details[setIndex];
                 if (d && (isNonEmpty(d.weight) || isNonEmpty(d.reps) || isNonEmpty(d.level))) {
@@ -3701,32 +3809,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         }
 
         // 3. Try to check highest historical duration across all logs for this exercise
-        const targetCanonical = this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(ex.name) : null;
-        const targetTokens = this.extractExerciseNameTokens ? this.extractExerciseNameTokens(ex.name, ex) : null;
         let maxHistoricalDuration = 0;
-        if (typeof store !== 'undefined' && Array.isArray(store.logs)) {
-            for (const log of store.logs) {
-                if (!log || !log.exercises) continue;
-                for (const e of log.exercises) {
-                    if (!e || !e.name) continue;
-                    let matches = false;
-                    if (targetCanonical && this.getCanonicalExerciseKey && (e.canonicalId === targetCanonical || this.getCanonicalExerciseKey(e.name) === targetCanonical)) {
-                        matches = true;
-                    } else if (targetTokens) {
-                        const logTokens = this.extractExerciseNameTokens(e.name, e);
-                        for (const t of logTokens) {
-                            if (targetTokens.has(t)) { matches = true; break; }
-                        }
-                    }
-                    if (matches && Array.isArray(e.details)) {
-                        for (const d of e.details) {
-                            if (!d || !d.reps) continue;
-                            const r = parseInt(d.reps, 10);
-                            if (!isNaN(r) && r > maxHistoricalDuration) {
-                                maxHistoricalDuration = r;
-                            }
-                        }
-                    }
+        for (const m of this.findLogExerciseMatches(ex.name, ex).all) {
+            const e = m.ex;
+            if (!Array.isArray(e.details)) continue;
+            for (const d of e.details) {
+                if (!d || !d.reps) continue;
+                const r = parseInt(d.reps, 10);
+                if (!isNaN(r) && r > maxHistoricalDuration) {
+                    maxHistoricalDuration = r;
                 }
             }
         }
@@ -3945,37 +4036,19 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         let maxHistoricalReps = 0;
         let hasPreviousLogs = false;
 
-        const targetCanonical = this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(ex.name) : null;
-        const targetTokens = this.extractExerciseNameTokens(ex.name, ex);
-
-        if (typeof store !== 'undefined' && Array.isArray(store.logs)) {
-            for (const log of store.logs) {
-                if (!log || !log.exercises) continue;
-                for (const e of log.exercises) {
-                    if (!e || !e.name) continue;
-                    let matches = false;
-                    if (targetCanonical && this.getCanonicalExerciseKey && (e.canonicalId === targetCanonical || this.getCanonicalExerciseKey(e.name) === targetCanonical)) {
-                        matches = true;
-                    } else {
-                        const logTokens = this.extractExerciseNameTokens(e.name, e);
-                        for (const t of logTokens) {
-                            if (targetTokens.has(t)) { matches = true; break; }
-                        }
-                    }
-                    if (matches && Array.isArray(e.details)) {
-                        for (const d of e.details) {
-                            if (!d) continue;
-                            const w = parseFloat(d.weight) || 0;
-                            const r = parseInt(d.reps, 10) || 0;
-                            if (w > 0 || r > 0) {
-                                hasPreviousLogs = true;
-                                if (w > maxHistoricalWeight) maxHistoricalWeight = w;
-                                if (r > maxHistoricalReps) maxHistoricalReps = r;
-                                const est = this.estimate1RM(w, r) || 0;
-                                if (est > maxHistorical1RM) maxHistorical1RM = est;
-                            }
-                        }
-                    }
+        for (const m of this.findLogExerciseMatches(ex.name, ex).all) {
+            const e = m.ex;
+            if (!Array.isArray(e.details)) continue;
+            for (const d of e.details) {
+                if (!d) continue;
+                const w = parseFloat(d.weight) || 0;
+                const r = parseInt(d.reps, 10) || 0;
+                if (w > 0 || r > 0) {
+                    hasPreviousLogs = true;
+                    if (w > maxHistoricalWeight) maxHistoricalWeight = w;
+                    if (r > maxHistoricalReps) maxHistoricalReps = r;
+                    const est = this.estimate1RM(w, r) || 0;
+                    if (est > maxHistorical1RM) maxHistorical1RM = est;
                 }
             }
         }
@@ -4736,10 +4809,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         const delaySec = (typeof store !== 'undefined' && typeof store.holdTimerDelaySeconds === 'number') ? store.holdTimerDelaySeconds : 3;
         const now = Date.now();
+        // Het doel (vorige prestatie) verandert niet tijdens de set: één keer berekenen
+        // in plaats van 10x per seconde alle logs scannen
+        const targetEx = (this.activeWorkout && this.activeWorkout.exercises) ? this.activeWorkout.exercises[exIndex] : null;
+        const targetSec = this.getPreviousAchievedDuration(targetEx, setIndex);
 
         this.holdTimerState = {
             exIndex,
             setIndex,
+            targetSec,
             delaySeconds: delaySec,
             startTime: delaySec > 0 ? null : now,
             delayStartTime: now,
@@ -4783,8 +4861,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 const secs = elapsedSec % 60;
                 const timeStr = mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
 
-                const ex = (this.activeWorkout && this.activeWorkout.exercises) ? this.activeWorkout.exercises[exIndex] : null;
-                const targetSec = this.getPreviousAchievedDuration(ex, setIndex);
+                const targetSec = this.holdTimerState.targetSec || 0;
                 const isGreen = targetSec > 0 && elapsedSec > targetSec;
                 const isYellow = !isGreen && targetSec > 0 && (targetSec - elapsedSec <= 10);
 
@@ -4925,7 +5002,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const ex = this.activeWorkout.exercises[exIndex];
         if (!ex.weights) ex.weights = Array(ex.sets).fill('');
         ex.weights[setIndex] = val;
-        if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+        this.scheduleActiveWorkoutSave(finalize);
         if (finalize) this.checkAutoCompleteSet(exIndex, setIndex);
         this.updateCheckBtnDOM(exIndex, setIndex);
     },
@@ -4935,7 +5012,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const ex = this.activeWorkout.exercises[exIndex];
         if (!ex.actualReps) ex.actualReps = Array(ex.sets).fill('');
         ex.actualReps[setIndex] = val;
-        if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+        this.scheduleActiveWorkoutSave(finalize);
         if (finalize) this.checkAutoCompleteSet(exIndex, setIndex);
         this.updateCheckBtnDOM(exIndex, setIndex);
     },
@@ -4945,9 +5022,32 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const ex = this.activeWorkout.exercises[exIndex];
         if (!ex.levels) ex.levels = Array(ex.sets).fill('');
         ex.levels[setIndex] = val;
-        if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+        this.scheduleActiveWorkoutSave(finalize);
         if (finalize) this.checkAutoCompleteSet(exIndex, setIndex);
         this.updateCheckBtnDOM(exIndex, setIndex);
+    },
+
+    // Elke toetsaanslag schreef de volledige workout-state naar localStorage. Nu
+    // gebundeld per 300 ms; bij het afronden van een veld (change/Enter), bij het
+    // verlaten van de pagina en bij naar de achtergrond gaan wordt direct geschreven.
+    scheduleActiveWorkoutSave(immediate = false) {
+        if (typeof store === 'undefined') return;
+        if (this._activeWorkoutSaveTimer) {
+            clearTimeout(this._activeWorkoutSaveTimer);
+            this._activeWorkoutSaveTimer = null;
+        }
+        if (immediate) {
+            store.saveActiveWorkoutState(this.activeWorkout);
+            return;
+        }
+        this._activeWorkoutSaveTimer = setTimeout(() => {
+            this._activeWorkoutSaveTimer = null;
+            if (this.activeWorkout) store.saveActiveWorkoutState(this.activeWorkout);
+        }, 300);
+    },
+
+    flushActiveWorkoutSave() {
+        if (this._activeWorkoutSaveTimer && this.activeWorkout) this.scheduleActiveWorkoutSave(true);
     },
 
     handleInputEnter(event, exIndex, setIndex, inputType) {
@@ -6257,7 +6357,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
             try {
-                const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+                if (!this._barcodeDetector) this._barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code'] });
+                const detector = this._barcodeDetector;
                 detector.detect(video).then(barcodes => {
                     if (barcodes && barcodes.length > 0) {
                         const raw = barcodes[0].rawValue;
@@ -6991,13 +7092,21 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const groups = {}; // mg -> { exerciseName -> { exercise, maxKg, maxReps, estimated1RM } }
         if (!store || !store.logs) return groups;
 
+        // Bibliotheek één keer opbouwen i.p.v. per log-oefening
+        const libById = new Map();
+        if (store.getExerciseLibrary) {
+            for (const item of store.getExerciseLibrary()) {
+                if (item && item.id && !libById.has(item.id)) libById.set(item.id, item);
+            }
+        }
+
         store.logs.forEach(log => {
             if (!log.exercises) return;
             log.exercises.forEach(ex => {
                 if (!ex.details || ex.details.length === 0) return;
                 
                 const canonKey = this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(ex.name) : null;
-                const libEx = (canonKey && store && store.getExerciseLibrary) ? store.getExerciseLibrary().find(item => item.id === canonKey) : null;
+                const libEx = canonKey ? (libById.get(canonKey) || null) : null;
                 let mGroups = (ex.muscleGroups && Array.isArray(ex.muscleGroups) && ex.muscleGroups.length > 0)
                     ? ex.muscleGroups
                     : ((libEx && Array.isArray(libEx.muscleGroups) && libEx.muscleGroups.length > 0)
@@ -7005,7 +7114,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         : (this.guessMuscleGroupsFromName ? this.guessMuscleGroupsFromName(ex.name) : []));
 
                 // Split old "X of Y" names into individual exercise names
-                const exNames = String(ex.name || '').split(/\s+of\s+/i).map(s => s.trim()).filter(Boolean);
+                const exNames = String(ex.name || '').replace(/\s+/g, ' ').split(/ of /i).map(s => s.trim()).filter(Boolean);
 
                 exNames.forEach(displayName => {
                     mGroups.forEach(rawMg => {
@@ -7062,9 +7171,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     // --- Variation helpers ---
     getExerciseVariations(exOrName) {
         if (!exOrName) return [];
+        // Whitespace eerst samenvouwen zodat de separator-regex lineair is (CodeQL ReDoS)
+        const VARIATION_SEP = / (?:of|or|\/) /i;
         if (typeof exOrName === 'string') {
-            if (/\s+(?:of|or|\/)\s+/i.test(exOrName)) {
-                return exOrName.split(/\s+(?:of|or|\/)\s+/i).map(s => s.trim()).filter(Boolean);
+            const norm = exOrName.replace(/\s+/g, ' ');
+            if (VARIATION_SEP.test(norm)) {
+                return norm.split(VARIATION_SEP).map(s => s.trim()).filter(Boolean);
             }
             return [];
         }
@@ -7073,9 +7185,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             return exOrName.availableVariations;
         }
         // 2. Choice exercises defined with " of " or " or " in name (e.g. "Goblet Squat of Leg Press")
-        const nameStr = String(exOrName.name || '');
-        if (/\s+(?:of|or|\/)\s+/i.test(nameStr)) {
-            const parts = nameStr.split(/\s+(?:of|or|\/)\s+/i).map(s => s.trim()).filter(Boolean);
+        const nameStr = String(exOrName.name || '').replace(/\s+/g, ' ');
+        if (VARIATION_SEP.test(nameStr)) {
+            const parts = nameStr.split(VARIATION_SEP).map(s => s.trim()).filter(Boolean);
             if (parts.length > 1) return parts;
         }
         return [];
@@ -7887,8 +7999,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         addExclude(baseName);
         variations.forEach(v => addExclude(v));
 
-        baseName.split(/\s+(?:of|or|\/)\s+/i).forEach(p => addExclude(p));
-        activeName.split(/\s+(?:of|or|\/)\s+/i).forEach(p => addExclude(p));
+        baseName.replace(/\s+/g, ' ').split(/ (?:of|or|\/) /i).forEach(p => addExclude(p));
+        activeName.replace(/\s+/g, ' ').split(/ (?:of|or|\/) /i).forEach(p => addExclude(p));
 
         const resultList = [];
         const seenCanonicalKeys = new Set();
