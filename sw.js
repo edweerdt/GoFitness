@@ -1,5 +1,5 @@
 // Versienummer ophogen bij wijzigingen aan de assets, zodat oude caches opgeruimd worden
-const CACHE_NAME = 'go-fitness-cache-v22';
+const CACHE_NAME = 'go-fitness-cache-v23';
 const ASSETS = [
     './',
     './index.html',
@@ -21,7 +21,9 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-    self.skipWaiting();
+    // Geen skipWaiting meer bij installatie: de nieuwe versie wacht tot de gebruiker
+    // in de app op "Vernieuwen" tikt (bericht SKIP_WAITING), zodat een lopende
+    // training nooit onaangekondigd herlaadt.
     e.waitUntil(
         caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
     );
@@ -43,6 +45,10 @@ self.addEventListener('activate', (e) => {
     return self.clients.claim();
 });
 
+self.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('fetch', (e) => {
     // Alleen same-origin GET-requests afhandelen: externe calls (Google-login,
     // Drive API) mogen nooit gecachet of beantwoord worden door de service worker
@@ -59,9 +65,18 @@ self.addEventListener('fetch', (e) => {
                 });
             }
             return response;
-        }).catch(() => {
+        }).catch(async () => {
             // Als we offline zijn (fetch faalt), val dan pas terug op de cache
-            return caches.match(e.request);
+            const cached = await caches.match(e.request);
+            if (cached) return cached;
+            // Navigatie (bijv. een deeplink bij een koude offline start) valt terug op
+            // de app-shell; een ontbrekend asset geeft een nette netwerkfout i.p.v. een
+            // TypeError in respondWith
+            if (e.request.mode === 'navigate') {
+                const shell = await caches.match('./index.html') || await caches.match('./');
+                if (shell) return shell;
+            }
+            return Response.error();
         })
     );
 });

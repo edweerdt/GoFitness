@@ -790,6 +790,8 @@ const app = {
         });
 
         this.setupNavigation();
+        this.setupKeyboardShortcuts();
+        this.updateQrScanAvailability();
         this.renderHome();
         this.renderPlans();
         this.renderProgress();
@@ -869,8 +871,12 @@ const app = {
         // DOM-tolerant: ontbrekende elementen (bijv. in tests) mogen navigatie niet breken
         const viewEl = document.getElementById(`view-${viewId}`);
         if (viewEl) viewEl.classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n => n.removeAttribute('aria-current'));
         const navBtn = document.querySelector(`.nav-item[data-target="${viewId}"]`);
-        if(navBtn) navBtn.classList.add('active');
+        if(navBtn) {
+            navBtn.classList.add('active');
+            navBtn.setAttribute('aria-current', 'page');
+        }
 
         const bottomNav = document.getElementById('bottom-nav');
         if (bottomNav) {
@@ -888,6 +894,105 @@ const app = {
         if(viewId === 'progress') this.renderProgress();
         if(viewId === 'friends') this.renderFriends();
         if(viewId === 'achievements') this.renderAchievements();
+    },
+
+    // Escape sluit de bovenste open modal via zijn eigen annuleer-/sluitknop
+    // (data-modal-close), zodat de bijbehorende state netjes wordt opgeruimd
+    setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (this.closeTopmostModal()) e.preventDefault();
+        });
+    },
+
+    closeTopmostModal() {
+        const open = [...document.querySelectorAll('.modal-overlay:not(.hidden)')];
+        if (open.length === 0) return false;
+        const z = el => {
+            const v = parseInt((typeof getComputedStyle === 'function' ? getComputedStyle(el).zIndex : '') || el.style.zIndex, 10);
+            return isNaN(v) ? 0 : v;
+        };
+        // Hoogste z-index bovenop; bij gelijke z-index de laatste in de DOM
+        const top = open.reduce((best, el) => (z(el) >= z(best) ? el : best), open[0]);
+        const closeBtn = top.querySelector('[data-modal-close]');
+        if (closeBtn) closeBtn.click();
+        else top.classList.add('hidden');
+        return true;
+    },
+
+    // QR scannen leunt op BarcodeDetector (Chromium/Android); iOS Safari heeft die
+    // niet, dus daar verbergen we de knop in plaats van een dode functie te tonen
+    isQrScanSupported() {
+        return typeof window !== 'undefined' && 'BarcodeDetector' in window;
+    },
+
+    updateQrScanAvailability() {
+        const supported = this.isQrScanSupported();
+        document.querySelectorAll('[data-feature="qr-scan"]').forEach(btn => {
+            btn.classList.toggle('hidden', !supported);
+        });
+    },
+
+    // --- APP-UPDATES ---
+    // De service worker activeert een nieuwe versie pas na SKIP_WAITING; de gebruiker
+    // kiest zelf het moment, zodat een lopende training nooit stil herlaadt.
+    _updateAccepted: false,
+    _reloadPage() {
+        if (typeof window !== 'undefined' && window.location) window.location.reload();
+    },
+
+    handleServiceWorkerRegistration(reg) {
+        if (!reg || typeof navigator === 'undefined' || !navigator.serviceWorker) return;
+        const hasController = () => !!navigator.serviceWorker.controller;
+        if (reg.waiting && hasController()) this.showUpdateToast(reg);
+        if (typeof reg.addEventListener === 'function') {
+            reg.addEventListener('updatefound', () => {
+                const worker = reg.installing;
+                if (!worker || typeof worker.addEventListener !== 'function') return;
+                worker.addEventListener('statechange', () => {
+                    if (worker.state === 'installed' && hasController()) this.showUpdateToast(reg);
+                });
+            });
+        }
+        if (!this._controllerChangeBound && typeof navigator.serviceWorker.addEventListener === 'function') {
+            this._controllerChangeBound = true;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (this._updateAccepted) this._reloadPage();
+            });
+        }
+    },
+
+    showUpdateToast(reg) {
+        const container = document.getElementById('toast-container');
+        if (!container || document.getElementById('update-toast')) return;
+        const toast = document.createElement('div');
+        toast.id = 'update-toast';
+        toast.className = 'toast update';
+        toast.innerHTML = `
+            <span class="material-icons-round" style="color: var(--accent-color);" aria-hidden="true">system_update</span>
+            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">Nieuwe versie beschikbaar</div>
+            <button type="button" class="toast-action">Vernieuwen</button>
+            <button type="button" class="toast-dismiss" aria-label="Later"><span class="material-icons-round" aria-hidden="true">close</span></button>
+        `;
+        toast.querySelector('.toast-action').addEventListener('click', () => this.applyUpdate(reg));
+        toast.querySelector('.toast-dismiss').addEventListener('click', () => this.dismissUpdateToast());
+        container.appendChild(toast);
+    },
+
+    dismissUpdateToast() {
+        const toast = document.getElementById('update-toast');
+        if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+    },
+
+    applyUpdate(reg) {
+        this._updateAccepted = true;
+        this.dismissUpdateToast();
+        const waiting = reg && reg.waiting;
+        if (waiting && typeof waiting.postMessage === 'function') {
+            waiting.postMessage({ type: 'SKIP_WAITING' });
+        } else {
+            this._reloadPage();
+        }
     },
 
     setupNavigation() {
@@ -6198,6 +6303,10 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     // --- QR-CODE SCANNER MET CAMERA & BARCODE DETECTOR ---
 
     async startQrScanner() {
+        if (!this.isQrScanSupported()) {
+            this.showToast('QR scannen wordt op deze browser niet ondersteund. Open de deellink van het schema.', 'error');
+            return;
+        }
         const modal = document.getElementById('modal-qr-scanner');
         const video = document.getElementById('qr-scanner-video');
         const statusEl = document.getElementById('qr-scanner-status');
@@ -6279,7 +6388,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         }
 
         // Als BarcodeDetector niet aanwezig is in deze browser
-        if (statusEl) statusEl.textContent = 'Live scanner vereist Chromium/Android of kies een foto.';
+        if (statusEl) statusEl.textContent = 'QR scannen wordt op deze browser niet ondersteund. Open de deellink van het schema.';
     },
 
     async processQrScannedText(rawText) {

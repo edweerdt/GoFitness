@@ -247,6 +247,8 @@ button:disabled {
     background: transparent;
     color: var(--text-primary);
     padding: 8px;
+    min-width: 44px;
+    min-height: 44px; /* tap-target */
     border-radius: 50%;
     display: grid;
     place-items: center;
@@ -372,6 +374,7 @@ button:disabled {
 .nav-item {
     flex: 1;
     min-width: 62px;
+    min-height: 44px; /* tap-target (Apple HIG / WCAG 2.5.8) */
     background: transparent;
     color: var(--text-muted);
     display: flex;
@@ -1884,5 +1887,48 @@ button:disabled {
     }
 }
 
+/* --- Toegankelijkheid --- */
+/* Zichtbare focus voor toetsenbord- en switch-gebruikers; muis/touch krijgt geen ring */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
 
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
 
+/* Update-melding: blijft staan tot de gebruiker kiest */
+.toast.update {
+    border-left: 4px solid var(--accent-color);
+    flex-wrap: wrap;
+}
+.toast.update .toast-action {
+    background: var(--accent-color);
+    color: #fff;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    padding: 6px 12px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.toast.update .toast-dismiss {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    display: grid;
+    place-items: center;
+}
