@@ -25,6 +25,10 @@ function mergeSyncData(local, remote) {
         plans: uniqCapped([...(local.deleted && local.deleted.plans || []), ...(remote.deleted && remote.deleted.plans || [])]),
         logs: uniqCapped([...(local.deleted && local.deleted.logs || []), ...(remote.deleted && remote.deleted.logs || [])])
     };
+    // Tombstones van eigen oefeningen mogen niet bij elke merge verloren gaan;
+    // de sleutel blijft weg als geen van beide kanten hem kent (oude payloads)
+    const deletedCustom = uniqCapped([...(local.deleted && local.deleted.customExercises || []), ...(remote.deleted && remote.deleted.customExercises || [])]);
+    if (deletedCustom.length > 0) deleted.customExercises = deletedCustom;
 
     const ts = item => new Date(item.updatedAt || item.date || 0).getTime() || 0;
     const mergeById = (a, b, tombstones) => {
@@ -40,7 +44,10 @@ function mergeSyncData(local, remote) {
     const plans = mergeById(local.plans || [], remote.plans || [], deleted.plans);
     // Logs op datum sorteren: de app verwacht dat de laatste log de recentste is
     const logs = mergeById(local.logs || [], remote.logs || [], deleted.logs)
-        .sort((a, b) => ((a.date || '') < (b.date || '') ? -1 : 1));
+        .sort((a, b) => {
+            const da = String(a.date || ''), db = String(b.date || '');
+            return da < db ? -1 : (da > db ? 1 : 0);
+        });
 
     return { plans, logs, deleted };
 }
@@ -213,7 +220,10 @@ const CloudSync = {
         try {
             return await res.json();
         } catch (e) {
-            return null; // corrupt bestand -> behandelen als geen remote data
+            // Een onleesbaar cloud-bestand mag nooit stil met lokale data overschreven
+            // worden: dat kost de historie van andere apparaten. Bewust herstellen
+            // kan via een backup-restore (overwriteRemote).
+            throw new Error('corrupt');
         }
     },
 
@@ -286,6 +296,7 @@ const CloudSync = {
                     this.store.plans = merged.plans;
                     this.store.logs = merged.logs;
                     this.store.deleted = merged.deleted;
+                    if (typeof this.store.sortLogs === 'function') this.store.sortLogs();
                     if (this.store.activePlanId && !merged.plans.find(p => p.id === this.store.activePlanId)) {
                         this.store.activePlanId = merged.plans.length > 0 ? merged.plans[0].id : null;
                     }
@@ -304,7 +315,9 @@ const CloudSync = {
             this.setStatus('actief');
             this.rerender();
         } catch (e) {
-            this.lastError = e.message;
+            this.lastError = e.message === 'corrupt'
+                ? 'Het cloud-bestand is onleesbaar en is niet overschreven. Herstel een backup om de cloud opnieuw te vullen.'
+                : e.message;
             this.setStatus(e.message === 'auth' ? 'verlopen' : 'fout');
             throw e;
         } finally {

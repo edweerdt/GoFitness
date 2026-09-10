@@ -388,6 +388,7 @@ class DataStore {
         this.customExercises = this.safeParse('customExercises', []);
         // Tombstones: ids van verwijderde items, zodat cloud-sync ze niet terugbrengt
         this.deleted = this.safeParse('deleted', { plans: [], logs: [] });
+        this.sortLogs();
         this.sanitizeLogPlanIds();
         this.invalidateCache();
     }
@@ -470,6 +471,26 @@ class DataStore {
         if (!this.deleted[type].includes(id)) this.deleted[type].push(id);
         // Begrens de lijst zodat localStorage niet volloopt
         if (this.deleted[type].length > 500) this.deleted[type] = this.deleted[type].slice(-500);
+    }
+    // Tijdstempel voor cloud-sync: zonder updatedAt kan de merge niet zien welke
+    // versie van een plan de nieuwste is, en wint altijd de lokale kant
+    touchPlan(plan) {
+        if (plan && typeof plan === 'object') plan.updatedAt = new Date().toISOString();
+        return plan;
+    }
+    savePlans() {
+        return this.save();
+    }
+    // "Vorige keer", PR-detectie en achievements lezen de logs op array-volgorde;
+    // die moet dus chronologisch zijn, ook na een datumcorrectie, merge of restore
+    sortLogs() {
+        if (!Array.isArray(this.logs)) return;
+        const t = l => {
+            const v = l && (l.date || l.endTime);
+            const ms = v ? new Date(v).getTime() : NaN;
+            return isNaN(ms) ? 0 : ms;
+        };
+        this.logs.sort((a, b) => t(a) - t(b));
     }
     saveActiveWorkoutState(state) {
         this.activeWorkoutState = state;
@@ -613,8 +634,8 @@ class DataStore {
                     throw new Error(`Ongeldige oefening #${exIdx + 1} in sessie '${sessionName}': Oefeningnaam ('name') is verplicht.`);
                 }
                 const setsNum = Number(ex.sets);
-                if (ex.sets === undefined || ex.sets === null || isNaN(setsNum) || setsNum <= 0) {
-                    throw new Error(`Ongeldige oefening '${exName}' in sessie '${sessionName}': Aantal sets ('sets') moet een getal groter dan 0 zijn.`);
+                if (ex.sets === undefined || ex.sets === null || !Number.isInteger(setsNum) || setsNum <= 0) {
+                    throw new Error(`Ongeldige oefening '${exName}' in sessie '${sessionName}': Aantal sets ('sets') moet een getal groter dan 0 zijn (geheel getal).`);
                 }
             });
         });
@@ -667,11 +688,14 @@ class DataStore {
                         if (!e.id && !e.exerciseId) e.id = canonicalKey;
                     }
                 }
+                // Validatie accepteert "3" als string; Array("3") zou 1 set geven i.p.v. 3
+                if (e.sets !== undefined && e.sets !== null) e.sets = Number(e.sets);
                 if (!e.id && !e.exerciseId) e.id = 'ex_' + Math.random().toString(36).slice(2, 11);
                 else if (e.exerciseId && !e.id) e.id = e.exerciseId;
             });
         });
 
+        this.touchPlan(planData);
         if (existingIndex !== -1) {
             this.plans[existingIndex] = planData;
         } else {
@@ -683,6 +707,7 @@ class DataStore {
     }
     saveWorkoutLog(log) {
         this.logs.push({ ...log, id: this.generateId('log'), date: new Date().toISOString() });
+        this.sortLogs();
         this.save();
     }
     restoreBackup(backup) {
@@ -691,7 +716,11 @@ class DataStore {
         // Handgemaakte of oude backups normaliseren zodat het renderen niet breekt
         this.plans.forEach(p => {
             if (!Array.isArray(p.sessions)) p.sessions = [];
+            p.sessions.forEach(s => {
+                if (s && !Array.isArray(s.exercises)) s.exercises = [];
+            });
         });
+        this.sortLogs();
         // De backup bevat geen activePlanId; kies een geldig plan als het huidige niet (meer) bestaat
         if (!this.plans.find(p => p.id === this.activePlanId)) {
             this.activePlanId = this.plans.length > 0 ? this.plans[0].id : null;
@@ -737,10 +766,17 @@ const app = {
     activeWorkout: null,
 
     init() {
-        if(store.activeWorkoutState) {
-            this.activeWorkout = store.activeWorkoutState;
-            if(this.activeWorkout && this.activeWorkout.startTime) {
-                this.activeWorkout.startTime = new Date(this.activeWorkout.startTime);
+        if (store.activeWorkoutState) {
+            const state = store.activeWorkoutState;
+            // Een corrupte of verouderde workout-state mag de app niet onbruikbaar maken
+            if (state && typeof state === 'object' && state.session && Array.isArray(state.exercises)) {
+                this.activeWorkout = state;
+                if (this.activeWorkout.startTime) {
+                    this.activeWorkout.startTime = new Date(this.activeWorkout.startTime);
+                }
+            } else {
+                console.warn('Ongeldige actieve workout-state genegeerd en gewist.');
+                store.saveActiveWorkoutState(null);
             }
         }
 
@@ -1071,6 +1107,17 @@ const app = {
                 '"': '&quot;'
             }[tag] || tag)
         );
+    },
+
+    // Waarde veilig meegeven als JS-argument in een inline handler-attribuut,
+    // bijv. onclick="app.foo(${app.jsArg(x)})". escapeHTML alleen is daar niet
+    // genoeg: de HTML-parser decodeert &#39; terug naar ' voordat de JS-parser
+    // de string leest, dus een naam met een quote breekt uit de string (XSS).
+    // JSON.stringify maakt eerst een geldige JS-stringliteral, escapeHTML maakt
+    // die daarna veilig voor het attribuut.
+    jsArg(value) {
+        const str = (value === null || value === undefined) ? '' : String(value);
+        return this.escapeHTML(JSON.stringify(str));
     },
 
     formatClickableExerciseName(nameStr) {
@@ -1488,7 +1535,7 @@ const app = {
             if (reasonEl) reasonEl.textContent = reason;
         };
 
-        if (this.activeWorkout) {
+        if (this.activeWorkout && this.activeWorkout.session) {
             if (pickerWrapper) pickerWrapper.classList.add('hidden');
             const choosePresetsBtn = document.getElementById('btn-home-presets');
             if (choosePresetsBtn) choosePresetsBtn.classList.add('hidden');
@@ -1721,7 +1768,6 @@ const app = {
                             </div>
                             <div class="flex-col gap-2 ${isSessionsHidden ? 'hidden' : ''}" style="margin-top: 8px;">
                                 ${p.sessions.map(s => {
-                                    const sId = this.escapeHTML(s.id || s.sessionId);
                                     const exCount = (s.exercises || []).length;
                                     const exNames = (s.exercises || []).map(ex => this.formatClickableExerciseName(ex.name)).join(', ');
                                     return `
@@ -1731,7 +1777,7 @@ const app = {
                                                     <div style="font-weight:500; font-size:0.9rem; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${this.escapeHTML(s.name)}</div>
                                                     <div class="text-sm text-muted">${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}</div>
                                                 </div>
-                                                <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;" onclick="app.startWorkoutBySessionId('${this.escapeHTML(p.id)}', '${sId}')" title="Start sessie">
+                                                <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;" onclick="app.startWorkoutBySessionId(${this.jsArg(p.id)}, ${this.jsArg(s.id || s.sessionId)})" title="Start sessie">
                                                     <span class="material-icons-round" style="font-size:1rem;">play_arrow</span> Start
                                                 </button>
                                             </div>
@@ -1741,7 +1787,7 @@ const app = {
                                                     return `
                                                         <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.82rem; color:var(--text-primary); padding: 2px 0;">
                                                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:8px;">• ${safeExName}</span>
-                                                            <button class="btn-secondary" style="padding:1px 6px; font-size:0.7rem; display:inline-flex; align-items:center; gap:2px; flex-shrink:0;" onclick="app.openSubstitutionModalForPlan('${this.escapeHTML(p.id)}', '${sId}', ${exIdx})" title="Vervang in schema">
+                                                            <button class="btn-secondary" style="padding:1px 6px; font-size:0.7rem; display:inline-flex; align-items:center; gap:2px; flex-shrink:0;" onclick="app.openSubstitutionModalForPlan(${this.jsArg(p.id)}, ${this.jsArg(s.id || s.sessionId)}, ${exIdx})" title="Vervang in schema">
                                                                 <span class="material-icons-round" style="font-size:0.75rem;">swap_horiz</span> Wissel
                                                             </button>
                                                         </div>
@@ -1765,8 +1811,8 @@ const app = {
                             </div>
                             <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
                                 ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
-                                <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan('${this.escapeHTML(p.id)}')" title="Schema delen">ios_share</span>
-                                <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', '${this.escapeHTML(p.id)}')">delete_outline</span>
+                                <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan(${this.jsArg(p.id)})" title="Schema delen">ios_share</span>
+                                <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', ${this.jsArg(p.id)})">delete_outline</span>
                             </div>
                         </div>
                         ${desc}
@@ -1793,7 +1839,7 @@ const app = {
 
                     ${sessionsListHtml}
                     
-                    ${!isActive ? `<button class="btn-secondary mt-3 w-full" onclick="app.setActivePlan('${p.id}')">Maak Actief</button>` : ''}
+                    ${!isActive ? `<button class="btn-secondary mt-3 w-full" onclick="app.setActivePlan(${this.jsArg(p.id)})">Maak Actief</button>` : ''}
                 `;
                 list.appendChild(el);
             });
@@ -1862,11 +1908,11 @@ const app = {
                                 ${!isActive ? `
                                     <div style="margin-top: 4px;">
                                         ${isAdded ? `
-                                            <button class="btn-secondary w-full" style="padding:7px 14px; font-size:0.85rem;" onclick="app.setActivePlan('${this.escapeHTML(existing.id)}')">
+                                            <button class="btn-secondary w-full" style="padding:7px 14px; font-size:0.85rem;" onclick="app.setActivePlan(${this.jsArg(existing.id)})">
                                                 Maak Actief
                                             </button>
                                         ` : `
-                                            <button class="btn-primary w-full" style="padding:7px 14px; font-size:0.85rem; display:inline-flex; align-items:center; justify-content:center; gap:6px;" onclick="app.loadPresetPlan('${this.escapeHTML(p.id)}')">
+                                            <button class="btn-primary w-full" style="padding:7px 14px; font-size:0.85rem; display:inline-flex; align-items:center; justify-content:center; gap:6px;" onclick="app.loadPresetPlan(${this.jsArg(p.id)})">
                                                 <span class="material-icons-round" style="font-size:1.1rem;">add</span> Gebruik dit schema
                                             </button>
                                         `}
@@ -1946,6 +1992,7 @@ const app = {
             // Clone preset en geef uniek ID
             const newPlan = JSON.parse(JSON.stringify(preset));
             newPlan.id = store.generateId('plan');
+            store.touchPlan(newPlan);
             store.plans.push(newPlan);
             existingPlan = newPlan;
         }
@@ -2914,12 +2961,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 }
 
                 const editIcon = (log.exercises && log.exercises.length > 0)
-                    ? html`<span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal('${log.id}')">edit_note</span>`
+                    ? html`<span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal(${rawHtml(this.jsArg(log.id))})">edit_note</span>`
                     : '';
                 summaryParts.push(html`
                     <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
                         ${editIcon}
-                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', '${log.id}')">delete_outline</span>
+                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', ${rawHtml(this.jsArg(log.id))})">delete_outline</span>
                     </div>
                 `);
 
@@ -3088,8 +3135,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             
             let actions = `
                 <div style="display:flex; align-items:center; gap:6px;">
-                    <span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:var(--text-muted);" onclick="app.showAddExerciseModal('${safeId}')" title="Bewerken">edit</span>
-                    ${ex.isCustom ? `<span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('exercise', '${safeId}')" title="Verwijderen">delete_outline</span>` : ''}
+                    <span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:var(--text-muted);" onclick="app.showAddExerciseModal(${this.jsArg(ex.id)})" title="Bewerken">edit</span>
+                    ${ex.isCustom ? `<span class="material-icons-round" style="font-size:1.2rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('exercise', ${this.jsArg(ex.id)})" title="Verwijderen">delete_outline</span>` : ''}
                 </div>
             `;
 
@@ -3279,7 +3326,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             const borderStyle = isSelected ? 'border: 2px solid var(--accent-color);' : '';
 
             return `
-                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.05); padding:10px 12px; border-radius:10px; cursor:pointer; ${borderStyle}" onclick="app.selectExerciseForWorkout('${safeId}')">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.05); padding:10px 12px; border-radius:10px; cursor:pointer; ${borderStyle}" onclick="app.selectExerciseForWorkout(${this.jsArg(ex.id)})">
                     <div style="min-width:0; flex:1;">
                         <div style="font-weight:600; font-size:0.9rem;">${safeName}</div>
                         <div class="text-sm text-muted">${typeBadge} • ${musclesStr}</div>
@@ -3424,12 +3471,17 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             planName: plan ? plan.name : 'Overige Sessies',
             session: session,
             startTime: new Date(),
-            exercises: session.exercises.map(e => ({
-                ...e,
-                setsCompleted: Array(e.sets).fill(false),
-                weights: Array(e.sets).fill(''),
-                actualReps: Array(e.sets).fill('')
-            }))
+            exercises: (session.exercises || []).map(e => {
+                // Oude of handmatige data kan sets als string of decimaal bevatten
+                const setCount = Math.max(0, parseInt(e.sets, 10) || 0);
+                return {
+                    ...e,
+                    sets: setCount,
+                    setsCompleted: Array(setCount).fill(false),
+                    weights: Array(setCount).fill(''),
+                    actualReps: Array(setCount).fill('')
+                };
+            })
         };
         this.openSubDrawers = new Set();
         store.saveActiveWorkoutState(this.activeWorkout);
@@ -4080,11 +4132,11 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 const safeId = app.escapeHTML(alt.id || alt.name);
                                 return `
                                     <div style="display:inline-flex; align-items:center; gap:2px;">
-                                        <button class="quick-alt-pill" onclick="app.quickSwapActiveExercise(${exIndex}, '${safeId}')" title="Wissel direct naar ${safeName}">
+                                        <button class="quick-alt-pill" onclick="app.quickSwapActiveExercise(${exIndex}, ${app.jsArg(alt.id || alt.name)})" title="Wissel direct naar ${safeName}">
                                             <span class="material-icons-round quick-alt-swap-icon">swap_horiz</span>
                                             <span class="quick-alt-label">${safeName}</span>
                                         </button>
-                                        <button class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch('${safeName}', event, this)" title="Zoek video/uitleg van ${safeName}">
+                                        <button class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch(${app.jsArg(alt.name)}, event, this)" title="Zoek video/uitleg van ${safeName}">
                                             <span class="material-icons-round">search</span>
                                         </button>
                                     </div>
@@ -4295,7 +4347,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 <span class="material-icons-round" style="font-size:0.85rem;">${isActive ? 'check_circle' : 'radio_button_unchecked'}</span>
                                 <span>${safeV}</span>
                             </button>
-                            <button class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch('${safeV}', event, this)" title="Zoek video/uitleg voor ${safeV}">
+                            <button class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch(${app.jsArg(v)}, event, this)" title="Zoek video/uitleg voor ${safeV}">
                                 <span class="material-icons-round">search</span>
                             </button>
                         </div>
@@ -4311,7 +4363,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                             <span class="material-icons-round" style="font-size:0.85rem;">fitness_center</span>
                             <span>${safeName}</span>
                         </div>
-                        <button class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch('${safeName}', event, this)" title="Zoek video/uitleg voor ${safeName}">
+                        <button class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch(${app.jsArg(displayName)}, event, this)" title="Zoek video/uitleg voor ${safeName}">
                             <span class="material-icons-round">search</span>
                         </button>
                     </div>
@@ -4342,7 +4394,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 <button id="wissel-btn-${exIndex}" class="btn-secondary exercise-action-btn${wisselActiveCls}" onclick="${wisselAction}" title="Vervang deze oefening met een alternatief">
                                     <span class="material-icons-round">swap_horiz</span> Wissel
                                 </button>
-                                <button class="btn-secondary exercise-action-btn" onclick="app.showExerciseHistoryModal('${safeExName}')" title="Bekijk geschiedenis">
+                                <button class="btn-secondary exercise-action-btn" onclick="app.showExerciseHistoryModal(${app.jsArg(chosenName || ex.name)})" title="Bekijk geschiedenis">
                                     <span class="material-icons-round">history</span> Historie
                                 </button>
                             </div>
@@ -5113,8 +5165,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         store.saveWorkoutLog({
             planId: snapshotPlanId !== undefined ? snapshotPlanId : (fallbackPlan ? fallbackPlan.id : null),
             planName: snapshotPlanName !== undefined ? snapshotPlanName : (fallbackPlan ? fallbackPlan.name : 'Overige Sessies'),
-            sessionId: this.activeWorkout.session.id,
-            sessionName: this.activeWorkout.session.name,
+            sessionId: (this.activeWorkout && this.activeWorkout.session) ? this.activeWorkout.session.id : null,
+            sessionName: (this.activeWorkout && this.activeWorkout.session) ? this.activeWorkout.session.name : 'Sessie',
             startTime: startTime instanceof Date ? startTime.toISOString() : startTime,
             endTime: endTime.toISOString(),
             duration: duration,
@@ -5242,9 +5294,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     updateEditLogDate(val) {
         if (!this.logToEdit || !val) return;
         const d = new Date(val);
-        if (!isNaN(d.getTime())) {
-            this.logToEdit.date = d.toISOString();
-        }
+        if (isNaN(d.getTime())) return;
+        const oldMs = this.logToEdit.date ? new Date(this.logToEdit.date).getTime() : NaN;
+        const delta = isNaN(oldMs) ? 0 : d.getTime() - oldMs;
+        this.logToEdit.date = d.toISOString();
+        // Herstel-stoplicht en statistieken kijken naar startTime/endTime: schuif die mee
+        ['startTime', 'endTime'].forEach(key => {
+            const ms = this.logToEdit[key] ? new Date(this.logToEdit[key]).getTime() : NaN;
+            if (!isNaN(ms)) this.logToEdit[key] = new Date(ms + delta).toISOString();
+        });
     },
 
     updateEditLogDuration(val) {
@@ -5497,10 +5555,14 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.logToEdit.updatedAt = new Date().toISOString();
 
         const index = store.logs.findIndex(l => l.id === this.logToEdit.id);
-        if (index > -1) {
-            store.logs[index] = this.logToEdit;
-            store.save();
+        if (index === -1) {
+            this.hideEditLogModal();
+            this.showToast('Sessie niet gevonden; wijzigingen zijn niet opgeslagen.', 'error');
+            return;
         }
+        store.logs[index] = this.logToEdit;
+        store.sortLogs();
+        store.save();
         this.hideEditLogModal();
         this.renderProgress();
         this.renderHome();
@@ -5811,13 +5873,20 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         }
     },
 
+    // Deelcode van 8 tekens uit een alfabet van 32 (ruim 1e12 combinaties) uit een
+    // cryptografische bron. 4 tekens met Math.random waren in minuten te enumereren.
     generateShortShareCode() {
         const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-        let code = 'GF-';
-        for (let i = 0; i < 4; i++) {
-            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        const bytes = new Uint8Array(8);
+        const cryptoObj = (typeof globalThis !== 'undefined' && globalThis.crypto) ? globalThis.crypto : null;
+        if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
+            cryptoObj.getRandomValues(bytes);
+        } else {
+            for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
         }
-        return code;
+        let raw = '';
+        for (let i = 0; i < bytes.length; i++) raw += chars.charAt(bytes[i] % chars.length);
+        return `GF-${raw.slice(0, 4)}-${raw.slice(4, 8)}`;
     },
 
     async publishPlanToCloud(plan) {
@@ -5826,19 +5895,31 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (!db) return null;
 
         try {
-            const code = (plan.shareCode && typeof plan.shareCode === 'string' && plan.shareCode.startsWith('GF-')) 
-                ? plan.shareCode 
-                : this.generateShortShareCode();
+            const hasOwnCode = plan.shareCode && typeof plan.shareCode === 'string' && plan.shareCode.startsWith('GF-');
+            let code = hasOwnCode ? plan.shareCode : this.generateShortShareCode();
+            let docRef = db.collection('shared_plans').doc(code);
+            if (!hasOwnCode) {
+                // Nooit een bestaande deelcode van iemand anders overschrijven
+                for (let attempt = 0; attempt < 5; attempt++) {
+                    const snap = (typeof docRef.get === 'function') ? await docRef.get() : null;
+                    if (!snap || !snap.exists) break;
+                    code = this.generateShortShareCode();
+                    docRef = db.collection('shared_plans').doc(code);
+                }
+            }
             const cleaned = this.cleanPlanForSharing(plan);
-            const docRef = db.collection('shared_plans').doc(code);
+            const auth = (typeof getAuth === 'function') ? getAuth() : null;
+            const ownerUid = (auth && auth.currentUser && auth.currentUser.uid) ? auth.currentUser.uid : null;
             await docRef.set({
                 plan: cleaned,
                 name: plan.name || 'Schema',
-                createdAt: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) 
-                    ? firebase.firestore.FieldValue.serverTimestamp() 
+                ownerUid,
+                createdAt: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue)
+                    ? firebase.firestore.FieldValue.serverTimestamp()
                     : new Date().toISOString()
             });
             plan.shareCode = code;
+            store.touchPlan(plan);
             store.save();
             return code;
         } catch (e) {
@@ -5874,7 +5955,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (!plan) return '';
         const origin = (typeof window !== 'undefined' && window.location) ? (window.location.origin + window.location.pathname) : 'https://gofitness.app/';
 
-        // Probeer eerst een super compacte cloud share code te genereren (GF-XXXX)
+        // Probeer eerst een compacte cloud share code te genereren (GF-XXXX-XXXX)
         try {
             const shortCode = await this.publishPlanToCloud(plan);
             if (shortCode) {
@@ -7087,7 +7168,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 <div class="text-sm text-muted" style="font-size:0.75rem;">Jouw vrienden-code:</div>
                                 <div style="color:var(--accent-color); font-family:monospace; font-weight:700; font-size:0.95rem; margin-top:2px;">${this.escapeHTML(code)}</div>
                             </div>
-                            <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="navigator.clipboard.writeText('${this.escapeHTML(code)}'); app.showToast('Vrienden-code gekopieerd!', 'success');" title="Kopieer code">
+                            <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="navigator.clipboard.writeText(${this.jsArg(code)}); app.showToast('Vrienden-code gekopieerd!', 'success');" title="Kopieer code">
                                 <span class="material-icons-round" style="font-size:1rem;">content_copy</span> Kopieer
                             </button>
                         </div>
@@ -7113,8 +7194,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                             <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.15); padding:10px 12px; border-radius:10px;">
                                 <div style="font-weight:500;">${this.escapeHTML(req.fromName)}</div>
                                 <div style="display:flex; gap:6px;">
-                                    <button class="btn-primary" style="padding:4px 10px; font-size:0.8rem; background:var(--status-green);" onclick="FriendsManager.acceptFriendRequest('${this.escapeHTML(req.id)}')">Accepteren</button>
-                                    <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="FriendsManager.rejectFriendRequest('${this.escapeHTML(req.id)}')">Weigeren</button>
+                                    <button class="btn-primary" style="padding:4px 10px; font-size:0.8rem; background:var(--status-green);" onclick="FriendsManager.acceptFriendRequest(${this.jsArg(req.id)})">Accepteren</button>
+                                    <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="FriendsManager.rejectFriendRequest(${this.jsArg(req.id)})">Weigeren</button>
                                 </div>
                             </div>
                         `).join('')}
@@ -7133,7 +7214,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         const isSelected = f.uid === FriendsManager.selectedFriendUid && !this.showAddFriendInput;
                         const fName = f.displayName || 'Vriend';
                         return `
-                            <button class="btn-secondary ${isSelected ? 'active-friend-pill' : ''}" style="padding:8px 14px; border-radius:99px; white-space:nowrap; display:flex; align-items:center; gap:6px; ${isSelected ? 'background:var(--accent-color); color:white; font-weight:600;' : ''}" onclick="FriendsManager.selectedFriendUid = '${this.escapeHTML(f.uid)}'; app.showAddFriendInput = false; app.renderFriends();">
+                            <button class="btn-secondary ${isSelected ? 'active-friend-pill' : ''}" style="padding:8px 14px; border-radius:99px; white-space:nowrap; display:flex; align-items:center; gap:6px; ${isSelected ? 'background:var(--accent-color); color:white; font-weight:600;' : ''}" onclick="FriendsManager.selectedFriendUid = ${this.jsArg(f.uid)}; app.showAddFriendInput = false; app.renderFriends();">
                                 <span class="material-icons-round" style="font-size:1rem;">person</span> ${this.escapeHTML(fName)}
                             </button>
                         `;
@@ -7220,7 +7301,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 html += `
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                         <h3 style="margin:0; text-transform:none; font-size:1.1rem; color:var(--text-primary);">Vergelijking met ${this.escapeHTML(friendName)}</h3>
-                        <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; color:var(--status-red);" onclick="if(confirm('Weet je zeker dat je ${this.escapeHTML(friendName)} wilt verwijderen uit je vriendenlijst?')){ FriendsManager.removeFriend('${this.escapeHTML(selectedFriend.uid)}'); }">Verwijder vriend</button>
+                        <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; color:var(--status-red);" onclick="if(confirm('Weet je zeker dat je ' + ${this.jsArg(friendName)} + ' wilt verwijderen uit je vriendenlijst?')){ FriendsManager.removeFriend(${this.jsArg(selectedFriend.uid)}); }">Verwijder vriend</button>
                     </div>
                 `;
 
@@ -7651,7 +7732,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 ${ex.is_home_friendly ? '<span class="sub-tag" style="background:rgba(16,185,129,0.15); color:#34d399;">🏠 Thuis</span>' : ''}
                             </div>
                         </div>
-                        <button class="btn-primary" style="padding:5px 12px; font-size:0.8rem; flex-shrink:0;" onclick="app.applySubstitution('${safeId}')">
+                        <button class="btn-primary" style="padding:5px 12px; font-size:0.8rem; flex-shrink:0;" onclick="app.applySubstitution(${this.jsArg(ex.id)})">
                             Kies
                         </button>
                     </div>
@@ -7688,7 +7769,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         if (session && session.exercises && session.exercises[exIndex]) {
                             session.exercises[exIndex].name = newName;
                             session.exercises[exIndex].id = newEx.id;
-                            store.savePlans();
+                            store.touchPlan(plan); store.savePlans();
                         }
                     }
                 }
@@ -7705,7 +7786,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 if (session && session.exercises && session.exercises[exIndex]) {
                     session.exercises[exIndex].name = newName;
                     session.exercises[exIndex].id = newEx.id;
-                    store.savePlans();
+                    store.touchPlan(plan); store.savePlans();
                     this.renderPlans();
                     this.showToast(`🔄 ${oldName} permanent vervangen door ${newName} in ${session.name}`);
                 }
