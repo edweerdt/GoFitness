@@ -2731,25 +2731,25 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             let prValueHtml = '';
             if (s.isHold && prDuration > 0) {
                 prValueHtml = `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-                        <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">${prDuration} sec</span>
+                    <div class="pr-display-row" style="display:flex; align-items:center; gap:6px; margin-top:4px;">
                         <span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>
+                        <span class="pr-value" style="font-weight:700; font-size:calc(0.95rem - 4px); color:var(--text-primary);">${prDuration} sec</span>
                     </div>
                 `;
             } else if (s.isBodyweightReps && prReps > 0) {
                 prValueHtml = `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-                        <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">${prReps} reps</span>
+                    <div class="pr-display-row" style="display:flex; align-items:center; gap:6px; margin-top:4px;">
                         <span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>
+                        <span class="pr-value" style="font-weight:700; font-size:calc(0.95rem - 4px); color:var(--text-primary);">${prReps} reps</span>
                     </div>
                 `;
             } else if (prWeight > 0 || prReps > 0) {
                 prValueHtml = `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-                        <div style="font-size:0.95rem; font-weight:700; color:var(--text-primary);">
+                    <div class="pr-display-row" style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+                        <span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>
+                        <div class="pr-value" style="font-size:calc(0.95rem - 4px); font-weight:700; color:var(--text-primary);">
                             ${prWeight > 0 ? `${prWeight} kg` : '0 kg'} ${prReps > 0 ? `<span class="text-xs font-normal text-muted">× ${prReps}</span>` : ''}
                         </div>
-                        <span class="pr-crown-badge" title="Persoonlijk Record (PR)">👑 <span class="pr-crown-text">PR</span></span>
                     </div>
                 `;
             }
