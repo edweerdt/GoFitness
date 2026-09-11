@@ -4369,6 +4369,209 @@ describe('add and remove sets during workout', () => {
             });
         });
     });
+
+    describe('GOF-38: Session | Alternatieven historie', () => {
+        beforeEach(() => {
+            app.activeWorkout = null;
+            document.body.innerHTML = `
+                <div id="view-workout">
+                    <h2 id="workout-title"></h2>
+                    <div id="workout-exercise-list"></div>
+                    <button id="btn-finish-workout"></button>
+                    <div class="sticky-footer"></div>
+                </div>
+                <div id="modal-substitute-exercise" class="hidden"></div>
+                <div id="modal-exercise-history" class="hidden">
+                    <span id="exercise-history-modal-title"></span>
+                    <div id="exercise-history-modal-content"></div>
+                </div>
+            `;
+        });
+
+        it('should display history of the first alternative initially, and switch to the selected alternative history when toggling variations (GOF-38)', () => {
+            store.logs = [
+                {
+                    id: 'log-goblet',
+                    date: '2026-09-01T10:00:00.000Z',
+                    sessionName: 'Sessie A',
+                    exercises: [
+                        {
+                            name: 'Goblet Squat',
+                            canonicalId: 'def_goblet_squat',
+                            details: [
+                                { setNumber: 1, weight: '24', reps: '12' },
+                                { setNumber: 2, weight: '24', reps: '12' }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    id: 'log-legpress',
+                    date: '2026-09-05T10:00:00.000Z',
+                    sessionName: 'Sessie B',
+                    exercises: [
+                        {
+                            name: 'Leg Press',
+                            canonicalId: 'def_leg_press',
+                            details: [
+                                { setNumber: 1, weight: '150', reps: '10' },
+                                { setNumber: 2, weight: '160', reps: '8' }
+                            ]
+                        }
+                    ]
+                }
+            ];
+            store._logsVersion = (store._logsVersion || 0) + 1;
+
+            const testSession = {
+                id: 'session-alt-test',
+                name: 'Test Alternatieven Sessie',
+                exercises: [
+                    {
+                        id: 'ex-squat-alt',
+                        name: 'Goblet Squat of Leg Press',
+                        sets: 2,
+                        repsMin: 8,
+                        repsMax: 12
+                    }
+                ]
+            };
+
+            app.startWorkout(testSession);
+            expect(app.activeWorkout).toBeDefined();
+
+            // 1. Initial state: First variation ('Goblet Squat') is active
+            const ex = app.activeWorkout.exercises[0];
+            expect(app.getActiveExerciseName(ex)).toBe('Goblet Squat');
+
+            const prevDetailsInitial = app.getPreviousExerciseDetails(app.getActiveExerciseName(ex), ex);
+            expect(prevDetailsInitial).not.toBeNull();
+            expect(prevDetailsInitial[0].weight).toBe('24');
+            expect(prevDetailsInitial[0].reps).toBe('12');
+
+            // Render workout exercises DOM
+            app.renderWorkoutExercises();
+            const inputsWeight = document.querySelectorAll('#workout-exercise-list input[data-type="weight"]');
+            const inputsReps = document.querySelectorAll('#workout-exercise-list input[data-type="reps"]');
+            expect(inputsWeight[0].placeholder).toBe('24');
+            expect(inputsReps[0].placeholder).toBe('12');
+
+            // 2. Switch variation to 'Leg Press'
+            app.selectVariation(0, 'Leg Press');
+            expect(app.activeWorkout.exercises[0].chosenVariation).toBe('Leg Press');
+            expect(app.getActiveExerciseName(app.activeWorkout.exercises[0])).toBe('Leg Press');
+
+            // Previous details and placeholders must now belong to 'Leg Press' (150 kg x 10 reps)
+            const prevDetailsSwitched = app.getPreviousExerciseDetails(app.getActiveExerciseName(app.activeWorkout.exercises[0]), app.activeWorkout.exercises[0]);
+            expect(prevDetailsSwitched).not.toBeNull();
+            expect(prevDetailsSwitched[0].weight).toBe('150');
+            expect(prevDetailsSwitched[0].reps).toBe('10');
+
+            // Re-query DOM inputs after render
+            const switchedWeights = document.querySelectorAll('#workout-exercise-list input[data-type="weight"]');
+            const switchedReps = document.querySelectorAll('#workout-exercise-list input[data-type="reps"]');
+            expect(switchedWeights[0].placeholder).toBe('150');
+            expect(switchedReps[0].placeholder).toBe('10');
+            expect(switchedWeights[1].placeholder).toBe('160');
+            expect(switchedReps[1].placeholder).toBe('8');
+
+            // 3. Auto-fill via toggleSet on Set 0 must fill Leg Press data
+            app.toggleSet(0, 0);
+            expect(app.activeWorkout.exercises[0].weights[0]).toBe('150');
+            expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('10');
+            expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(true);
+
+            // 4. Switching back to 'Goblet Squat' restores Goblet Squat data and does not leak Leg Press set 0
+            app.selectVariation(0, 'Goblet Squat');
+            expect(app.getActiveExerciseName(app.activeWorkout.exercises[0])).toBe('Goblet Squat');
+            const restoredWeights = document.querySelectorAll('#workout-exercise-list input[data-type="weight"]');
+            expect(restoredWeights[0].placeholder).toBe('24');
+            expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(false);
+
+            // 5. Switching forward to 'Leg Press' restores the completed Set 0 for Leg Press
+            app.selectVariation(0, 'Leg Press');
+            expect(app.activeWorkout.exercises[0].weights[0]).toBe('150');
+            expect(app.activeWorkout.exercises[0].actualReps[0]).toBe('10');
+            expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(true);
+        });
+
+        it('should reset uncompleted set inputs and show new placeholders when using quickSwapActiveExercise (GOF-38)', () => {
+            store.logs = [
+                {
+                    id: 'log-bench',
+                    date: '2026-09-02T10:00:00.000Z',
+                    sessionName: 'Borst Focus',
+                    exercises: [
+                        {
+                            name: 'Barbell Bench Press',
+                            canonicalId: 'def_bench_press',
+                            details: [{ setNumber: 1, weight: '80', reps: '8' }]
+                        }
+                    ]
+                },
+                {
+                    id: 'log-pushup',
+                    date: '2026-09-03T10:00:00.000Z',
+                    sessionName: 'Thuis Sessie',
+                    exercises: [
+                        {
+                            name: 'Push-Up',
+                            canonicalId: 'def_pushup',
+                            details: [{ setNumber: 1, weight: '0', reps: '20' }]
+                        }
+                    ]
+                }
+            ];
+            store._logsVersion = (store._logsVersion || 0) + 1;
+
+            const session = {
+                id: 's-swap-test',
+                name: 'Swap Test',
+                exercises: [{ id: 'ex-bench', name: 'Barbell Bench Press', sets: 1 }]
+            };
+
+            app.startWorkout(session);
+            app.renderWorkoutExercises();
+
+            let weightInput = document.querySelector('#workout-exercise-list input[data-type="weight"]');
+            expect(weightInput.placeholder).toBe('80');
+
+            // Quick swap to Push-Up
+            app.quickSwapActiveExercise(0, 'Push-Up');
+            expect(app.activeWorkout.exercises[0].name).toBe('Push-up');
+            expect(app.activeWorkout.exercises[0].chosenVariation).toBe('Push-up');
+
+            const repsInput = document.querySelector('#workout-exercise-list input[data-type="reps"]');
+            expect(repsInput.placeholder).toBe('20');
+        });
+
+        it('should save the chosen variation name and correct details upon finishWorkout (GOF-38)', () => {
+            store.logs = [];
+            const session = {
+                id: 's-finish-test',
+                name: 'Finish Test',
+                exercises: [{ id: 'ex-alt', name: 'Goblet Squat of Leg Press', sets: 1 }]
+            };
+
+            app.startWorkout(session);
+            app.selectVariation(0, 'Leg Press');
+
+            app.activeWorkout.exercises[0].weights[0] = '165';
+            app.activeWorkout.exercises[0].actualReps[0] = '10';
+            app.activeWorkout.exercises[0].setsCompleted[0] = true;
+
+            app.finishWorkout();
+
+            const lastLog = store.logs[store.logs.length - 1];
+            expect(lastLog).toBeDefined();
+            const loggedEx = lastLog.exercises[0];
+            expect(loggedEx.name).toBe('Leg Press');
+            expect(loggedEx.originalName).toBe('Goblet Squat of Leg Press');
+            expect(loggedEx.chosenVariation).toBe('Leg Press');
+            expect(loggedEx.details[0].weight).toBe('165');
+            expect(loggedEx.details[0].reps).toBe('10');
+        });
+    });
 });
 
 describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
