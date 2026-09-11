@@ -1065,7 +1065,10 @@ describe('renderHistory', () => {
         const html = document.getElementById('history-list').innerHTML;
         expect(html).toContain('Plan X');
         expect(html).toContain('Bench Press');
-        expect(html).toContain('Set 1: 40kg x 10');
+        // Set-details staan nu in een tabel (Set | kg | reps)
+        expect(html).toContain('history-set-table');
+        expect(html).toMatch(/<td class="num">40\s*<\/td>/);
+        expect(html).toMatch(/<td class="num">10<\/td>/);
         // Nieuwste sessie staat bovenaan binnen de plan-groep
         expect(html.indexOf('Pull')).toBeLessThan(html.indexOf('Push'));
     });

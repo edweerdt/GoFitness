@@ -3193,6 +3193,113 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         return `${formatTime(startD)} - ${formatTime(endD)}`;
     },
 
+    // --- LOGBOEK ---
+    historyPageSize: 20,
+    historyVisibleCount: 20,
+
+    loadMoreHistory() {
+        this.historyVisibleCount += this.historyPageSize;
+        this.renderHistory();
+    },
+
+    // Stabiele kleur per schemanaam voor de chip op de kaart (hue 0-359)
+    planChipHue(planName) {
+        const s = String(planName || '');
+        let h = 0;
+        for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+        return h % 360;
+    },
+
+    formatVolume(kg) {
+        return Math.round(kg).toLocaleString('nl-NL');
+    },
+
+    // Tijdgroepen voor het logboek: Deze week, Vorige week, daarna per maand.
+    // Verwacht logs nieuwste-eerst; geeft groepen in dezelfde volgorde terug.
+    groupHistoryLogs(logsDesc, now = new Date()) {
+        const thisWeekStart = this.getWeekStart(now);
+        const lastWeekStart = thisWeekStart - 7 * 86400000;
+        const groups = [];
+        const byKey = new Map();
+        logsDesc.forEach(log => {
+            const t = this.parseLogDate(log.date);
+            let key, label;
+            if (!t) {
+                key = 'onbekend'; label = 'Onbekende datum';
+            } else if (t >= thisWeekStart) {
+                key = 'deze-week'; label = 'Deze week';
+            } else if (t >= lastWeekStart) {
+                key = 'vorige-week'; label = 'Vorige week';
+            } else {
+                const d = new Date(t);
+                key = `${d.getFullYear()}-${d.getMonth()}`;
+                const month = d.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' });
+                label = month.charAt(0).toUpperCase() + month.slice(1);
+            }
+            if (!byKey.has(key)) {
+                const g = { key, label, logs: [] };
+                byKey.set(key, g);
+                groups.push(g);
+            }
+            byKey.get(key).logs.push(log);
+        });
+        return groups;
+    },
+
+    // Eén chronologische pass over alle logs: per set of hij een PR was op dat moment
+    // (alleen als er al eerdere data van die oefening was, net als in de workout-view),
+    // het verschil met de vorige keer per set, en het totale volume per sessie.
+    buildHistoryAnnotations() {
+        const logsAsc = [...(store.logs || [])].sort((a, b) => this.parseLogDate(a.date) - this.parseLogDate(b.date));
+        const max1RM = new Map();
+        const maxReps = new Map();
+        const lastDetails = new Map();
+        const result = new Map();
+        const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+
+        logsAsc.forEach(log => {
+            let volume = 0;
+            let prCount = 0;
+            const exercises = (log.exercises || []).map(ex => {
+                const key = this.getCanonicalExerciseKey(ex.name) || String(ex.name || '').toLowerCase();
+                const prev = lastDetails.get(key) || null;
+                const prSets = new Set();
+                const deltas = [];
+                (ex.details || []).forEach((d, i) => {
+                    const w = num(d && d.weight);
+                    const r = num(d && d.reps);
+                    if (w > 0 && r > 0) volume += w * r;
+
+                    const had1RM = max1RM.get(key) || 0;
+                    const hadReps = maxReps.get(key) || 0;
+                    if (w > 0 && r > 0) {
+                        const est = this.estimate1RM(w, r) || 0;
+                        if (had1RM > 0 && est > had1RM + 0.01) prSets.add(i);
+                        if (est > had1RM) max1RM.set(key, est);
+                    } else if (w === 0 && r > 0) {
+                        if (had1RM === 0 && hadReps > 0 && r > hadReps) prSets.add(i);
+                        if (r > hadReps) maxReps.set(key, r);
+                    }
+
+                    const p = prev && prev[i];
+                    if (p) {
+                        const pw = num(p.weight), pr = num(p.reps);
+                        if (w > 0 && pw > 0 && w !== pw) deltas.push({ kind: 'kg', value: Math.round((w - pw) * 10) / 10 });
+                        else if (w === 0 && pw === 0 && r > 0 && pr > 0 && r !== pr) deltas.push({ kind: 'reps', value: r - pr });
+                        else deltas.push(null);
+                    } else {
+                        deltas.push(null);
+                    }
+                });
+                prCount += prSets.size;
+                if (Array.isArray(ex.details) && ex.details.length > 0) lastDetails.set(key, ex.details);
+                return { prSets, deltas };
+            });
+            result.set(log.id, { volume, prCount, exercises });
+        });
+        return result;
+    },
+
     renderHistory() {
         const hList = document.getElementById('history-list');
         if (!hList) return;
@@ -3203,92 +3310,126 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             return;
         }
 
-        const groupedLogs = {};
-        store.logs.forEach(log => {
-            const pName = log.planName || 'Overige Sessies';
-            if (!groupedLogs[pName]) groupedLogs[pName] = [];
-            groupedLogs[pName].push(log);
-        });
+        const annotations = this.buildHistoryAnnotations();
+        const logsDesc = [...store.logs].sort((a, b) => this.parseLogDate(b.date) - this.parseLogDate(a.date));
+        const visible = logsDesc.slice(0, this.historyVisibleCount);
+        const groups = this.groupHistoryLogs(visible);
 
-        for (const [planName, logs] of Object.entries(groupedLogs)) {
-            const sortedLogs = [...logs].sort((a, b) => (a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)));
+        // Groepskoppen plakken onder de sticky top-nav van de view
+        const topNav = document.querySelector('#view-progress .top-nav');
+        const stickyTop = topNav && topNav.offsetHeight ? topNav.offsetHeight : 0;
 
-            const planSection = document.createElement('div');
-            planSection.className = 'mt-4';
+        const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
+        const fmt = v => (isNonEmpty(v) ? String(v).replace('.', ',') : '');
 
-            const titleEl = document.createElement('h4');
-            titleEl.style.color = 'var(--text-primary)';
-            titleEl.style.marginBottom = '8px';
-            titleEl.style.marginTop = '16px';
-            titleEl.textContent = planName;
-            planSection.appendChild(titleEl);
-            
-            const listWrapper = document.createElement('div');
-            listWrapper.className = 'flex-col gap-3';
+        groups.forEach(group => {
+            const header = document.createElement('div');
+            header.className = 'history-group-header';
+            header.style.top = stickyTop + 'px';
+            header.innerHTML = html`<span>${group.label}</span><span class="history-group-count">${group.logs.length}</span>`;
+            hList.appendChild(header);
 
-            sortedLogs.forEach(log => {
+            group.logs.forEach(log => {
+                const ann = annotations.get(log.id) || { volume: 0, prCount: 0, exercises: [] };
                 const dateStr = new Date(log.date).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
-                const timeRange = app.formatLogTimeRange(log);
-                const timeRangeStr = timeRange ? ` (${timeRange})` : '';
-                
-                const summaryParts = [];
-                if (log.exercises && log.exercises.length > 0) {
-                    log.exercises.forEach(ex => {
-                        // Per set: gewicht, reps en/of stand tonen; kaal afgevinkte sets ook benoemen
-                        const exDetails = (ex.details || []).map(d => {
-                            let text = `Set ${d.setNumber}:`;
-                            const hasW = d.weight !== null && d.weight !== undefined && String(d.weight).trim() !== '';
-                            const hasR = d.reps !== null && d.reps !== undefined && String(d.reps).trim() !== '';
-                            const hasL = d.level !== null && d.level !== undefined && String(d.level).trim() !== '';
-                            if (hasW) text += ` ${d.weight}kg`;
-                            if (hasR) text += ` x ${d.reps}`;
-                            if (hasL) text += ` • Stand ${d.level}`;
-                            if (!hasW && !hasR && !hasL) text += ` Afgevinkt`;
-                            return text;
-                        });
+                const timeRange = this.formatLogTimeRange(log);
+                const planName = log.planName || 'Overige Sessies';
+                const exercises = log.exercises || [];
 
-                        summaryParts.push(html`
-                            <div class="mt-2 pt-2" style="border-top: 1px solid rgba(0,0,0,0.05);">
-                                <div style="font-weight:600; font-size:0.9rem;">${ex.name} (${ex.setsCompleted}/${ex.totalSets} sets)</div>
-                                <div class="text-sm text-muted" style="margin-top:2px;">
-                                    ${exDetails.length > 0 ? exDetails.join(', ') : 'Afgevinkt (geen details)'}
-                                </div>
-                            </div>
-                        `);
+                const metaParts = [];
+                if (log.duration != null) metaParts.push(`${log.duration} min`);
+                metaParts.push(`${exercises.length || log.exercisesCompleted || 0} oefening${(exercises.length || log.exercisesCompleted || 0) === 1 ? '' : 'en'}`);
+                if (ann.volume > 0) metaParts.push(`${this.formatVolume(ann.volume)} kg`);
+
+                // Set-strip: per oefening een stipje per set (gevuld = gedaan, goud = PR)
+                const strip = exercises.map((ex, exIdx) => {
+                    const done = (ex.details || []).length || ex.setsCompleted || 0;
+                    const total = Math.max(ex.totalSets || 0, done);
+                    const exAnn = ann.exercises[exIdx] || { prSets: new Set() };
+                    const dots = [];
+                    for (let i = 0; i < total; i++) {
+                        const cls = i < done ? (exAnn.prSets.has(i) ? 'set-dot done pr' : 'set-dot done') : 'set-dot missed';
+                        dots.push(html`<span class="${cls}"></span>`);
+                    }
+                    return html`<span class="set-strip-ex" title="${ex.name}: ${done}/${total} sets">${dots}</span>`;
+                });
+
+                // Detail: tabel per oefening met PR-markering en verschil met de vorige keer
+                const anyLevel = exercises.some(ex => (ex.details || []).some(d => isNonEmpty(d && d.level)));
+                const detailParts = exercises.length > 0 ? exercises.map((ex, exIdx) => {
+                    const exAnn = ann.exercises[exIdx] || { prSets: new Set(), deltas: [] };
+                    const details = ex.details || [];
+                    const rows = details.map((d, i) => {
+                        const delta = exAnn.deltas[i];
+                        const deltaHtml = delta
+                            ? html`<span class="set-delta ${delta.value > 0 ? 'up' : 'down'}">${delta.value > 0 ? '+' : ''}${fmt(delta.value)}${delta.kind === 'reps' ? ' r' : ''}</span>`
+                            : '';
+                        const prHtml = exAnn.prSets.has(i) ? html`<span class="pr-crown-badge" title="Persoonlijk Record (PR)"><span class="pr-crown-text">PR</span></span>` : '';
+                        const isBare = !isNonEmpty(d.weight) && !isNonEmpty(d.reps) && !isNonEmpty(d.level);
+                        return html`
+                            <tr class="${exAnn.prSets.has(i) ? 'is-pr' : ''}">
+                                <td class="set-col">${d.setNumber || i + 1} ${prHtml}</td>
+                                <td class="num">${isBare ? rawHtml('<span class="text-muted">afgevinkt</span>') : fmt(d.weight)} ${!isBare ? deltaHtml : ''}</td>
+                                <td class="num">${fmt(d.reps)}</td>
+                                ${anyLevel ? html`<td class="num">${fmt(d.level)}</td>` : ''}
+                            </tr>`;
                     });
-                } else {
-                    summaryParts.push(html`<div class="text-sm text-muted mt-2">Geen details beschikbaar (oude sessie).</div>`);
-                }
+                    return html`
+                        <div class="history-exercise">
+                            <div class="history-exercise-title">${ex.name} <span class="text-muted">(${ex.setsCompleted != null ? ex.setsCompleted : details.length}/${ex.totalSets != null ? ex.totalSets : details.length} sets)</span></div>
+                            ${rows.length > 0 ? html`
+                                <table class="history-set-table">
+                                    <thead><tr><th>Set</th><th class="num">kg</th><th class="num">reps</th>${anyLevel ? html`<th class="num">stand</th>` : ''}</tr></thead>
+                                    <tbody>${rows}</tbody>
+                                </table>` : html`<div class="text-sm text-muted">Afgevinkt, geen details</div>`}
+                        </div>`;
+                }) : [html`<div class="text-sm text-muted mt-2">Afgevinkt, geen details (oude sessie).</div>`];
 
-                const editIcon = (log.exercises && log.exercises.length > 0)
-                    ? html`<span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.showEditLogModal(${rawHtml(this.jsArg(log.id))})">edit_note</span>`
+                const editIcon = exercises.length > 0
+                    ? html`<button class="icon-btn" aria-label="Sessie bewerken" title="Bewerken" onclick="app.showEditLogModal(${rawHtml(this.jsArg(log.id))})"><span class="material-icons-round" aria-hidden="true" style="font-size:1.4rem; color:var(--text-muted);">edit_note</span></button>`
                     : '';
-                summaryParts.push(html`
-                    <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding-top:12px; border-top: 1px solid rgba(0,0,0,0.05);">
+                const footer = html`
+                    <div class="history-actions">
                         ${editIcon}
-                        <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('log', ${rawHtml(this.jsArg(log.id))})">delete_outline</span>
-                    </div>
-                `);
+                        <button class="icon-btn" aria-label="Sessie verwijderen" title="Verwijderen" onclick="app.showDeleteModal('log', ${rawHtml(this.jsArg(log.id))})"><span class="material-icons-round" aria-hidden="true" style="font-size:1.4rem; color:#ff5252;">delete_outline</span></button>
+                    </div>`;
 
                 const el = document.createElement('div');
-                el.className = 'glass-panel';
+                el.className = 'glass-panel history-card';
                 el.innerHTML = html`
-                    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="this.nextElementSibling.classList.toggle('hidden')">
-                        <div>
-                            <div style="font-weight:600;">${log.sessionName || 'Sessie'}</div>
-                            <div class="text-sm text-muted">${dateStr}${timeRangeStr} • ${log.duration != null ? log.duration : '?'} min • ${log.exercisesCompleted != null ? log.exercisesCompleted : '?'} oefeningen</div>
+                    <div class="history-card-head" role="button" tabindex="0" aria-expanded="false"
+                         onclick="const d=this.nextElementSibling; d.classList.toggle('hidden'); this.setAttribute('aria-expanded', d.classList.contains('hidden') ? 'false' : 'true');"
+                         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                        <div class="history-card-main">
+                            <div class="history-title-row">
+                                <span class="history-session-name">${log.sessionName || 'Sessie'}</span>
+                                <span class="plan-chip" style="--chip-h:${this.planChipHue(planName)}">${planName}</span>
+                            </div>
+                            <div class="history-meta text-sm text-muted">
+                                <span>${dateStr}${timeRange ? ` · ${timeRange}` : ''}</span>
+                                <span>${metaParts.join(' · ')}</span>
+                                ${ann.prCount > 0 ? html`<span class="pr-crown-badge" title="${ann.prCount} persoonlijke record${ann.prCount === 1 ? '' : 's'}"><span class="pr-crown-text">${ann.prCount} PR</span></span>` : ''}
+                            </div>
+                            ${strip.length > 0 ? html`<div class="set-strip" aria-hidden="true">${strip}</div>` : ''}
                         </div>
-                        <span class="material-icons-round text-muted" style="font-size:1.2rem;">expand_more</span>
+                        <span class="material-icons-round text-muted history-chevron" aria-hidden="true">expand_more</span>
                     </div>
                     <div class="hidden history-details">
-                        ${summaryParts}
+                        ${detailParts}
+                        ${footer}
                     </div>
                 `;
-                listWrapper.appendChild(el);
+                hList.appendChild(el);
             });
-            
-            planSection.appendChild(listWrapper);
-            hList.appendChild(planSection);
+        });
+
+        const remaining = logsDesc.length - visible.length;
+        if (remaining > 0) {
+            const more = document.createElement('button');
+            more.className = 'btn-secondary w-full mt-3 history-load-more';
+            more.textContent = `Eerdere sessies laden (${remaining} resterend)`;
+            more.onclick = () => this.loadMoreHistory();
+            hList.appendChild(more);
         }
     },
 
