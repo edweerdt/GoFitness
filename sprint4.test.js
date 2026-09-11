@@ -128,8 +128,10 @@ describe('renderHistory', () => {
         app.renderHistory();
         const card = document.querySelector('.history-card');
         expect(card.textContent).toContain('geen details');
-        expect(card.querySelector('[aria-label="Sessie verwijderen"]')).not.toBeNull();
-        expect(card.querySelector('[aria-label="Sessie bewerken"]')).toBeNull();
+        const items = [...card.querySelectorAll('.history-menu-label')].map(b => b.textContent.trim());
+        expect(items).toContain('Verwijderen');
+        expect(items).not.toContain('Bewerken');
+        expect(items).not.toContain('Herhalen');
     });
 
     it('rendert maximaal 20 sessies en laadt de rest met een knop', () => {

@@ -2343,7 +2343,7 @@ textarea:focus-visible,
     font-weight: 600;
     opacity: 0.7;
 }
-.history-card { padding: 12px 14px; }
+.history-card { padding: 12px 14px; position: relative; }
 .history-card-head {
     display: flex;
     justify-content: space-between;
@@ -2443,3 +2443,66 @@ textarea:focus-visible,
     border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 .theme-light .history-actions { border-top-color: rgba(0, 0, 0, 0.06); }
+
+/* Logboek: delta's, actiemenu en undo-toast */
+.volume-delta, .ex-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.ex-trend { margin-left: 6px; }
+.ex-trend .material-icons-round { font-size: 0.95rem; }
+.volume-delta.up, .ex-trend.up { color: var(--status-green); }
+.volume-delta.down, .ex-trend.down { color: var(--status-red); }
+.volume-delta.flat, .ex-trend.flat { color: var(--text-muted); }
+
+.history-menu-wrap { position: relative; flex-shrink: 0; }
+.history-menu-btn { margin: -8px -6px -8px 0; }
+.history-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% - 4px);
+    min-width: 190px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-color);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    z-index: 30;
+}
+.theme-light .history-menu { border-color: rgba(0, 0, 0, 0.08); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15); }
+.history-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.9rem;
+    text-align: left;
+    cursor: pointer;
+}
+.history-menu-item .material-icons-round { font-size: 1.2rem; color: var(--text-muted); }
+.history-menu-item:hover, .history-menu-item:focus-visible { background: var(--surface-light); }
+.history-menu-item.danger, .history-menu-item.danger .material-icons-round { color: var(--status-red); }
+
+.toast.action-toast { border-left: 4px solid var(--accent-color); }
+.toast.action-toast .toast-action {
+    background: var(--accent-color);
+    color: #fff;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    padding: 6px 12px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
