@@ -59,6 +59,18 @@ describe('buildHistoryAnnotations', () => {
         expect(second.volume).toBe(450 + 320);
     });
 
+    it('telt duur-oefeningen (seconden in het reps-veld) niet mee in volume of 1RM, wel als tijd-PR', () => {
+        store.logs = [
+            log('l1', daysAgo(10), 'Cardio', 'P', [ex('Row Machine', [set(1, '', 600, 5)]), ex('Plank', [set(1, 10, 45)])]),
+            log('l2', daysAgo(3), 'Cardio', 'P', [ex('Row Machine', [set(1, '', 720, 6)]), ex('Plank', [set(1, 10, 60)])])
+        ];
+        const ann = app.buildHistoryAnnotations();
+        expect(ann.get('l1').volume).toBe(0); // 10 kg x 45 s is geen volume
+        expect(ann.get('l2').volume).toBe(0);
+        expect(ann.get('l2').prCount).toBe(2); // langer geroeid en langer geplankt
+        expect(ann.get('l2').exercises[0].trend).toEqual({ kind: 'reps', value: 120 });
+    });
+
     it('vergelijkt bodyweight-oefeningen op herhalingen', () => {
         store.logs = [
             log('l1', daysAgo(10), 'Core', 'P', [ex('Plank', [set(1, '', 40)])]),
@@ -87,20 +99,20 @@ describe('renderHistory', () => {
         expect(newest.querySelector('.plan-chip').textContent).toBe('Kracht A');
         expect(newest.querySelector('.plan-chip').style.getPropertyValue('--chip-h')).toBe(String(app.planChipHue('Kracht A')));
         expect(newest.querySelector('.history-meta').textContent).toContain('45 min');
-        expect(newest.querySelector('.history-meta').textContent).toContain('855 kg'); // 450 + 405
+        expect(newest.querySelector('.history-meta').textContent).toContain('2/3 sets');
+        expect(newest.querySelector('.history-meta').textContent).not.toContain('kg'); // volume alleen in het detail
         expect(newest.querySelector('.history-meta .pr-crown-badge').textContent).toContain('1 PR');
+        expect(newest.querySelector('.history-volume').textContent).toContain('855 kg'); // 450 + 405
 
-        const dots = newest.querySelectorAll('.set-strip .set-dot');
-        expect(dots.length).toBe(3);
-        expect(dots[0].classList.contains('pr')).toBe(true);
-        expect(dots[1].classList.contains('done')).toBe(true);
-        expect(dots[2].classList.contains('missed')).toBe(true);
+        const segs = newest.querySelectorAll('.set-bar .set-bar-seg');
+        expect(segs.length).toBe(1);
+        expect(segs[0].querySelector('.set-bar-fill').style.width).toBe('67%');
     });
 
     it('toont details als tabel met PR-rij en delta, en een stand-kolom alleen als die er is', () => {
         store.logs = [
-            log('l1', daysAgo(10), 'Pull', 'P', [ex('Row Machine', [set(1, 50, 10, 4)])]),
-            log('l2', daysAgo(1), 'Pull', 'P', [ex('Row Machine', [set(1, 55, 10, 5)])]),
+            log('l1', daysAgo(10), 'Pull', 'P', [ex('Chest Press Machine', [set(1, 50, 10, 4)])]),
+            log('l2', daysAgo(1), 'Pull', 'P', [ex('Chest Press Machine', [set(1, 55, 10, 5)])]),
             log('l3', daysAgo(0), 'Push', 'P', [ex('Bench Press', [set(1, 60, 5)])])
         ];
         app.renderHistory();

@@ -3211,6 +3211,16 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         return h % 360;
     },
 
+    // Duur-oefeningen (plank, roeimachine, ...) loggen seconden in het reps-veld;
+    // die mogen niet meetellen als gewicht x herhalingen of in een 1RM-schatting
+    isDurationLogExercise(ex) {
+        if (!ex) return false;
+        const name = ex.originalName || ex.name;
+        if (typeof this.isHoldExercise === 'function' && this.isHoldExercise({ name })) return true;
+        const t = typeof this.detectExerciseType === 'function' ? this.detectExerciseType(name) : null;
+        return !!(t && t.exerciseType === 'duration');
+    },
+
     formatVolume(kg) {
         return Math.round(kg).toLocaleString('nl-NL');
     },
@@ -3264,21 +3274,22 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             let prCount = 0;
             const exercises = (log.exercises || []).map(ex => {
                 const key = this.getCanonicalExerciseKey(ex.name) || String(ex.name || '').toLowerCase();
+                const isDuration = this.isDurationLogExercise(ex);
                 const prev = lastDetails.get(key) || null;
                 const prSets = new Set();
                 const deltas = [];
                 (ex.details || []).forEach((d, i) => {
                     const w = num(d && d.weight);
                     const r = num(d && d.reps);
-                    if (w > 0 && r > 0) volume += w * r;
+                    if (!isDuration && w > 0 && r > 0) volume += w * r;
 
                     const had1RM = max1RM.get(key) || 0;
                     const hadReps = maxReps.get(key) || 0;
-                    if (w > 0 && r > 0) {
+                    if (!isDuration && w > 0 && r > 0) {
                         const est = this.estimate1RM(w, r) || 0;
                         if (had1RM > 0 && est > had1RM + 0.01) prSets.add(i);
                         if (est > had1RM) max1RM.set(key, est);
-                    } else if (w === 0 && r > 0) {
+                    } else if ((isDuration || w === 0) && r > 0) {
                         if (had1RM === 0 && hadReps > 0 && r > hadReps) prSets.add(i);
                         if (r > hadReps) maxReps.set(key, r);
                     }
@@ -3293,13 +3304,14 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         deltas.push(null);
                     }
                 });
-                prCount += prSets.size;
+                // Eén PR per oefening tellen: "7 PR" op drie oefeningen leest als ruis
+                if (prSets.size > 0) prCount += 1;
 
                 // Trend per oefening t.o.v. de vorige keer: volume (kg x reps), of reps bij bodyweight
                 const sums = details => (details || []).reduce((acc, d) => {
                     const w = num(d && d.weight), r = num(d && d.reps);
-                    if (w > 0 && r > 0) acc.volume += w * r;
-                    else if (w === 0 && r > 0) acc.reps += r;
+                    if (!isDuration && w > 0 && r > 0) acc.volume += w * r;
+                    else if ((isDuration || w === 0) && r > 0) acc.reps += r;
                     return acc;
                 }, { volume: 0, reps: 0 });
                 let trend = null;
@@ -3317,9 +3329,10 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             const sessionKey = (log.planId || log.planName || '') + '|' + (log.sessionName || '');
             const prevVolume = lastSessionVolume.get(sessionKey);
             const volumeDelta = (prevVolume !== undefined && prevVolume > 0 && volume > 0) ? Math.round(volume - prevVolume) : null;
+            const volumePct = volumeDelta !== null ? Math.round(((volume - prevVolume) / prevVolume) * 100) : null;
             if (volume > 0) lastSessionVolume.set(sessionKey, volume);
 
-            result.set(log.id, { volume, prCount, volumeDelta, exercises });
+            result.set(log.id, { volume, prCount, volumeDelta, volumePct, prevVolume: prevVolume !== undefined ? prevVolume : null, exercises });
         });
         return result;
     },
@@ -3557,7 +3570,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             hList.appendChild(header);
 
             group.logs.forEach(log => {
-                const ann = annotations.get(log.id) || { volume: 0, prCount: 0, volumeDelta: null, exercises: [] };
+                const ann = annotations.get(log.id) || { volume: 0, prCount: 0, volumeDelta: null, volumePct: null, prevVolume: null, exercises: [] };
                 const dateStr = new Date(log.date).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
                 const timeRange = this.formatLogTimeRange(log);
                 const planName = log.planName || 'Overige Sessies';
@@ -3566,19 +3579,16 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 const metaParts = [];
                 if (log.duration != null) metaParts.push(`${log.duration} min`);
                 metaParts.push(`${exercises.length || log.exercisesCompleted || 0} oefening${(exercises.length || log.exercisesCompleted || 0) === 1 ? '' : 'en'}`);
-                if (ann.volume > 0) metaParts.push(`${this.formatVolume(ann.volume)} kg`);
+                const doneSets = exercises.reduce((n, ex) => n + ((ex.details || []).length || ex.setsCompleted || 0), 0);
+                const totalSets = exercises.reduce((n, ex) => n + Math.max(ex.totalSets || 0, (ex.details || []).length || ex.setsCompleted || 0), 0);
+                if (totalSets > 0) metaParts.push(`${doneSets}/${totalSets} sets`);
 
-                // Set-strip: per oefening een stipje per set (gevuld = gedaan, goud = PR)
-                const strip = exercises.map((ex, exIdx) => {
+                // Rustige voortgangsbalk: één segment per oefening, gevuld naar rato van de gedane sets
+                const barSegments = exercises.map(ex => {
                     const done = (ex.details || []).length || ex.setsCompleted || 0;
                     const total = Math.max(ex.totalSets || 0, done);
-                    const exAnn = ann.exercises[exIdx] || { prSets: new Set() };
-                    const dots = [];
-                    for (let i = 0; i < total; i++) {
-                        const cls = i < done ? (exAnn.prSets.has(i) ? 'set-dot done pr' : 'set-dot done') : 'set-dot missed';
-                        dots.push(html`<span class="${cls}"></span>`);
-                    }
-                    return html`<span class="set-strip-ex" title="${ex.name}: ${done}/${total} sets">${dots}</span>`;
+                    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                    return html`<span class="set-bar-seg" title="${ex.name}: ${done}/${total} sets"><span class="set-bar-fill" style="width:${pct}%"></span></span>`;
                 });
 
                 // Detail: tabel per oefening met PR-markering en verschil met de vorige keer
@@ -3639,15 +3649,16 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                             <div class="history-meta text-sm text-muted">
                                 <span>${dateStr}${timeRange ? ` · ${timeRange}` : ''}</span>
                                 <span>${metaParts.join(' · ')}</span>
-                                ${ann.volumeDelta !== null && ann.volumeDelta !== undefined ? html`<span class="volume-delta ${ann.volumeDelta > 0 ? 'up' : (ann.volumeDelta < 0 ? 'down' : 'flat')}" title="Verschil in volume met de vorige keer dat je deze sessie deed">${ann.volumeDelta > 0 ? '+' : ''}${ann.volumeDelta === 0 ? 'gelijk' : this.formatVolume(ann.volumeDelta) + ' kg'}</span>` : ''}
+                                ${ann.volumePct !== null && ann.volumePct !== undefined ? html`<span class="volume-delta ${ann.volumePct > 0 ? 'up' : (ann.volumePct < 0 ? 'down' : 'flat')}" title="Trainingsvolume (gewicht x herhalingen) ten opzichte van de vorige keer dat je deze sessie deed">${ann.volumePct > 0 ? '+' : ''}${ann.volumePct === 0 ? 'gelijk' : ann.volumePct + '%'}</span>` : ''}
                                 ${ann.prCount > 0 ? html`<span class="pr-crown-badge" title="${ann.prCount} persoonlijke record${ann.prCount === 1 ? '' : 's'}"><span class="pr-crown-text">${ann.prCount} PR</span></span>` : ''}
                             </div>
-                            ${strip.length > 0 ? html`<div class="set-strip" aria-hidden="true">${strip}</div>` : ''}
+                            ${barSegments.length > 0 ? html`<div class="set-bar" aria-hidden="true">${barSegments}</div>` : ''}
                         </div>
                         ${menu}
                         <span class="material-icons-round text-muted history-chevron" aria-hidden="true">expand_more</span>
                     </div>
                     <div class="hidden history-details">
+                        ${ann.volume > 0 ? html`<div class="history-volume text-sm text-muted">Volume <strong>${this.formatVolume(ann.volume)} kg</strong> (gewicht x herhalingen, opgeteld)${ann.prevVolume ? ` · vorige keer ${this.formatVolume(ann.prevVolume)} kg` : ''}</div>` : ''}
                         ${detailParts}
                     </div>
                 `;
