@@ -75,6 +75,7 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
 
 .text-muted { color: var(--text-muted); }
 .text-sm { font-size: 0.875rem; }
+.text-xs { font-size: 0.75rem; }
 .text-error { color: var(--status-red); }
 .text-accent { color: var(--accent-color); }
 
@@ -1387,6 +1388,26 @@ button:disabled {
     :root:not(.theme-dark) .pr-crown-badge .pr-crown-text {
         color: #b45309;
     }
+}
+
+.pr-display-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.pr-value {
+    font-size: calc(0.95rem - 4px);
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.pr-value .pr-reps,
+.pr-value .text-xs {
+    font-size: 0.85em;
+    font-weight: normal;
+    color: var(--text-muted);
 }
 
 /* Progress Weeks Stepper Widget */

@@ -1289,6 +1289,15 @@ describe('exercise progress', () => {
         expect(prBadge.textContent).toContain('👑');
         expect(card.textContent).toContain('100 kg');
         expect(card.textContent).toContain('× 5');
+
+        // GOF-37: PR label links uitgelijnd voor de behaalde waarde, en formaat met 4px verkleind
+        const prRow = card.querySelector('.pr-display-row');
+        expect(prRow).toBeDefined();
+        expect(prRow.firstElementChild).toBe(prBadge);
+        const prVal = card.querySelector('.pr-value');
+        expect(prVal).toBeDefined();
+        expect(prBadge.nextElementSibling).toBe(prVal);
+        expect(prVal.style.fontSize).toContain('calc(0.95rem - 4px)');
     });
 
     it('should display hold exercises in seconds and omit estimated 1RM', () => {
@@ -1298,11 +1307,40 @@ describe('exercise progress', () => {
         ];
         app.renderExerciseProgress();
 
-        const html = document.getElementById('exercise-progress-list').innerHTML;
+        const container = document.getElementById('exercise-progress-list');
+        const card = container.querySelector('.progress-card');
+        const html = container.innerHTML;
         expect(html).toContain('Plank Hold');
         expect(html).toContain('+10 sec');
         expect(html).toContain('Laatst: 60 sec');
         expect(html).not.toContain('Geschat 1RM');
+
+        // Check hold PR alignment and font size
+        const prRow = card.querySelector('.pr-display-row');
+        expect(prRow).toBeDefined();
+        const prBadge = prRow.querySelector('.pr-crown-badge');
+        expect(prRow.firstElementChild).toBe(prBadge);
+        const prVal = prRow.querySelector('.pr-value');
+        expect(prVal.textContent).toContain('60 sec');
+        expect(prVal.style.fontSize).toContain('calc(0.95rem - 4px)');
+    });
+
+    it('should display bodyweight exercise PR with left-aligned badge before reps and reduced font size', () => {
+        store.logs = [
+            { date: '2026-07-01T10:00:00.000Z', exercises: [{ name: 'Push-Up', exerciseType: 'bodyweight_reps', details: [{ setNumber: 1, reps: '20' }] }] },
+            { date: '2026-07-08T10:00:00.000Z', exercises: [{ name: 'Push-Up', exerciseType: 'bodyweight_reps', details: [{ setNumber: 1, reps: '25' }] }] }
+        ];
+        app.renderExerciseProgress();
+
+        const container = document.getElementById('exercise-progress-list');
+        const card = container.querySelector('.progress-card');
+        const prRow = card.querySelector('.pr-display-row');
+        expect(prRow).toBeDefined();
+        const prBadge = prRow.querySelector('.pr-crown-badge');
+        expect(prRow.firstElementChild).toBe(prBadge);
+        const prVal = prRow.querySelector('.pr-value');
+        expect(prVal.textContent).toContain('25 reps');
+        expect(prVal.style.fontSize).toContain('calc(0.95rem - 4px)');
     });
 
     it('should group singular and plural exercise names together in progress series', () => {
