@@ -3774,12 +3774,16 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (exObj) {
             const variations = this.getExerciseVariations(exObj);
             // Als er meerdere variaties mogelijk zijn (bijv. "Goblet Squat of Leg Press"),
-            // tonen we pas historie zodra de gebruiker expliciet een variatie kiest!
+            // tonen we pas historie zodra de gebruiker expliciet een variatie kiest of er een actief is!
             if (variations && variations.length > 1) {
                 if (exObj.chosenVariation && String(exObj.chosenVariation).trim() !== '') {
                     processStr(exObj.chosenVariation);
-                } else {
+                } else if (exObj.chosenVariation === '') {
                     return tokens; // Wacht op variatieselectie -> lege set!
+                } else if (typeof input === 'string' && variations.includes(input)) {
+                    processStr(input);
+                } else {
+                    processStr(variations[0]);
                 }
             } else {
                 if (exObj.chosenVariation && String(exObj.chosenVariation).trim() !== '') {
@@ -3829,8 +3833,26 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             this._logMatchCacheState = { logs, length: logs.length, version };
         }
 
-        const targetCanonical = this.getCanonicalExerciseKey(exerciseName || (exObj && exObj.name));
-        const targetTokens = this.extractExerciseNameTokens(exerciseName, exObj);
+        let targetExerciseName = exerciseName;
+        if (exObj) {
+            if (exObj.chosenVariation && String(exObj.chosenVariation).trim() !== '') {
+                targetExerciseName = exObj.chosenVariation.trim();
+            } else if (exerciseName && this.getExerciseVariations(exObj).includes(exerciseName)) {
+                targetExerciseName = exerciseName;
+            } else {
+                const variations = this.getExerciseVariations(exObj);
+                if (variations && variations.length > 0 && exObj.chosenVariation !== '') {
+                    targetExerciseName = variations[0].trim();
+                } else if (exObj.name) {
+                    targetExerciseName = exObj.name.trim();
+                }
+            }
+        }
+
+        const targetTokens = this.extractExerciseNameTokens(targetExerciseName, exObj);
+        let targetCanonical = (targetTokens.size === 0 && exObj && exObj.chosenVariation === '')
+            ? ''
+            : this.getCanonicalExerciseKey(targetExerciseName || (exObj && (exObj.chosenVariation || exObj.name)));
         const key = targetCanonical + '|' + [...targetTokens].sort().join('\u0001');
         const hit = this._logMatchCache.get(key);
         if (hit) return hit;
@@ -3900,16 +3922,17 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
     getPreviousAchievedDuration(ex, setIndex) {
         if (!ex) return 0;
+        const activeName = this.getActiveExerciseName ? this.getActiveExerciseName(ex) : (ex.chosenVariation || ex.name || '');
 
         // 1. Try to get previous details for this specific set
-        const prevSet = this.getPreviousSetDetails ? this.getPreviousSetDetails(ex.name, setIndex, ex) : null;
+        const prevSet = this.getPreviousSetDetails ? this.getPreviousSetDetails(activeName, setIndex, ex) : null;
         if (prevSet && prevSet.reps !== undefined && prevSet.reps !== null && String(prevSet.reps).trim() !== '') {
             const val = parseInt(prevSet.reps, 10);
             if (!isNaN(val) && val > 0) return val;
         }
 
         // 2. Try previous session details for this exercise (same set index, or any set in previous session)
-        const prevDetails = this.getPreviousExerciseDetails ? this.getPreviousExerciseDetails(ex.name, ex) : null;
+        const prevDetails = this.getPreviousExerciseDetails ? this.getPreviousExerciseDetails(activeName, ex) : null;
         if (prevDetails && Array.isArray(prevDetails) && prevDetails.length > 0) {
             const matchSet = (typeof setIndex === 'number' && prevDetails[setIndex]) ? prevDetails[setIndex] : prevDetails[0];
             if (matchSet && matchSet.reps !== undefined && matchSet.reps !== null && String(matchSet.reps).trim() !== '') {
@@ -3920,7 +3943,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         // 3. Try to check highest historical duration across all logs for this exercise
         let maxHistoricalDuration = 0;
-        for (const m of this.findLogExerciseMatches(ex.name, ex).all) {
+        for (const m of this.findLogExerciseMatches(activeName, ex).all) {
             const e = m.ex;
             if (!Array.isArray(e.details)) continue;
             for (const d of e.details) {
@@ -4146,7 +4169,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         let maxHistoricalReps = 0;
         let hasPreviousLogs = false;
 
-        for (const m of this.findLogExerciseMatches(ex.name, ex).all) {
+        const activeName = this.getActiveExerciseName ? this.getActiveExerciseName(ex) : (ex.chosenVariation || ex.name || '');
+
+        for (const m of this.findLogExerciseMatches(activeName, ex).all) {
             const e = m.ex;
             if (!Array.isArray(e.details)) continue;
             for (const d of e.details) {
@@ -4176,7 +4201,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         }
 
         // 2. Progressive Overload Check: compare against previous session details
-        const prevDetails = this.getPreviousExerciseDetails(ex.name, ex) || [];
+        const prevDetails = this.getPreviousExerciseDetails(activeName, ex) || [];
         if (prevDetails.length > 0) {
             const prevSet = (prevDetails[setIndex] && (prevDetails[setIndex].weight || prevDetails[setIndex].reps))
                 ? prevDetails[setIndex] : (prevDetails[0] || {});
@@ -4259,7 +4284,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         sortedExercises.forEach((ex) => {
             const exIndex = this.activeWorkout.exercises.findIndex(e => e.id === ex.id);
             const variations = app.getExerciseVariations(ex);
-            const prevDetails = this.getPreviousExerciseDetails(ex.name, ex) || [];
+            const activeExerciseName = app.getActiveExerciseName(ex);
+            const prevDetails = this.getPreviousExerciseDetails(activeExerciseName, ex) || [];
 
             if (!ex.setsCompleted) ex.setsCompleted = Array(ex.sets || 1).fill(false);
             if (!ex.weights) ex.weights = Array(ex.sets || 1).fill('');
@@ -4370,7 +4396,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     else checked = 'checked';
                 }
                 
-                const prevSet = app.getPreviousSetDetails(ex.name, i, ex);
+                const prevSet = app.getPreviousSetDetails(activeExerciseName, i, ex);
                 const weightPlaceholder = (prevSet && prevSet.weight) ? prevSet.weight : 'kg';
                 const repsPlaceholder = (prevSet && prevSet.reps) ? prevSet.reps : 'reps';
 
@@ -4378,7 +4404,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
                 let wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : false;
                 let wantsDuration = (ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false) || isHold;
-                const wantsLevel = (ex.trackMetrics ? (ex.trackMetrics.includes('level') || ex.trackMetrics.includes('stand')) : false) || ex.name.toLowerCase().includes('row machine') || ex.name.toLowerCase().includes('roeimachine');
+                const wantsLevel = (ex.trackMetrics ? (ex.trackMetrics.includes('level') || ex.trackMetrics.includes('stand')) : false) || activeExerciseName.toLowerCase().includes('row machine') || activeExerciseName.toLowerCase().includes('roeimachine');
 
                 if (!wantsReps && !wantsDuration) {
                     wantsReps = true;
@@ -4577,7 +4603,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 <button id="wissel-btn-${exIndex}" class="btn-secondary exercise-action-btn${wisselActiveCls}" onclick="${wisselAction}" title="Vervang deze oefening met een alternatief">
                                     <span class="material-icons-round">swap_horiz</span> Wissel
                                 </button>
-                                <button class="btn-secondary exercise-action-btn" onclick="app.showExerciseHistoryModal(${app.jsArg(chosenName || ex.name)})" title="Bekijk geschiedenis">
+                                <button class="btn-secondary exercise-action-btn" onclick="app.showExerciseHistoryModal(${app.jsArg(activeExerciseName)})" title="Bekijk geschiedenis">
                                     <span class="material-icons-round">history</span> Historie
                                 </button>
                             </div>
@@ -4711,7 +4737,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (!Array.isArray(ex.levels)) ex.levels = [];
 
         const newSetIndex = ex.setsCompleted.length;
-        const prevSetDetail = this.getPreviousSetDetails(ex.name, newSetIndex, ex);
+        const activeExerciseName = this.getActiveExerciseName(ex);
+        const prevSetDetail = this.getPreviousSetDetails(activeExerciseName, newSetIndex, ex);
 
         const initialWeight = (prevSetDetail && prevSetDetail.weight !== undefined && prevSetDetail.weight !== null) ? String(prevSetDetail.weight) : '';
         const initialReps = (prevSetDetail && prevSetDetail.reps !== undefined && prevSetDetail.reps !== null) ? String(prevSetDetail.reps) : '';
@@ -4755,7 +4782,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         if (isTurningOn) {
             const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
-            const prevSetDetail = this.getPreviousSetDetails(ex.name, setIndex, ex);
+            const activeExerciseName = this.getActiveExerciseName(ex);
+            const prevSetDetail = this.getPreviousSetDetails(activeExerciseName, setIndex, ex);
 
             // Auto-fill missing weight if empty
             if (!ex.weights) ex.weights = Array(ex.sets).fill('');
@@ -5328,7 +5356,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const exerciseLogs = [];
 
         this.activeWorkout.exercises.forEach(ex => {
-            const prevDetails = this.getPreviousExerciseDetails(ex.name, ex) || [];
+            const activeExerciseName = this.getActiveExerciseName(ex);
+            const prevDetails = this.getPreviousExerciseDetails(activeExerciseName, ex) || [];
 
             if (!ex.setsCompleted) ex.setsCompleted = Array(ex.sets || 1).fill(false);
             if (!ex.weights) ex.weights = Array(ex.sets || 1).fill('');
@@ -5403,7 +5432,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             if (setDetails.length > 0) {
                 totalExercisesCompleted++;
                 exerciseLogs.push({
-                    name: ex.chosenVariation || ex.name,
+                    name: this.getActiveExerciseName(ex),
                     originalName: ex.name,
                     chosenVariation: ex.chosenVariation || '',
                     muscleGroups: ex.muscleGroups || [],
@@ -7357,15 +7386,61 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         return [];
     },
 
-    selectVariation(exIndex, variationName) {
-        if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
-        const ex = this.activeWorkout.exercises[exIndex];
-        // Toggle: deselect if already chosen
-        if (ex.chosenVariation === variationName) {
-            ex.chosenVariation = '';
-        } else {
-            ex.chosenVariation = variationName;
+    getActiveExerciseName(ex) {
+        if (!ex) return '';
+        if (typeof ex === 'string') return ex.trim();
+        if (ex.chosenVariation && String(ex.chosenVariation).trim() !== '') {
+            return ex.chosenVariation.trim();
         }
+        const variations = this.getExerciseVariations ? this.getExerciseVariations(ex) : [];
+        if (variations && variations.length > 0) {
+            return variations[0].trim();
+        }
+        return (ex.name || '').trim();
+    },
+
+    selectVariation(exIndex, variationName) {
+        if (!this.activeWorkout || !this.activeWorkout.exercises || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+        const variations = this.getExerciseVariations(ex);
+        const currentVariation = ex.chosenVariation || (variations && variations.length > 0 ? variations[0] : ex.name);
+
+        if (currentVariation === variationName && ex.chosenVariation === variationName) return;
+
+        if (!ex.variationData) {
+            ex.variationData = {};
+        }
+
+        // Save current variation state
+        if (currentVariation) {
+            ex.variationData[currentVariation] = {
+                weights: Array.isArray(ex.weights) ? [...ex.weights] : [],
+                actualReps: Array.isArray(ex.actualReps) ? [...ex.actualReps] : [],
+                levels: Array.isArray(ex.levels) ? [...ex.levels] : [],
+                setsCompleted: Array.isArray(ex.setsCompleted) ? [...ex.setsCompleted] : []
+            };
+        }
+
+        ex.chosenVariation = variationName;
+
+        // Restore or initialize new variation state
+        if (ex.variationData[variationName]) {
+            const saved = ex.variationData[variationName];
+            ex.weights = [...saved.weights];
+            ex.actualReps = [...saved.actualReps];
+            ex.levels = [...saved.levels];
+            ex.setsCompleted = [...saved.setsCompleted];
+            if (saved.setsCompleted && saved.setsCompleted.length > 0) {
+                ex.sets = saved.setsCompleted.length;
+            }
+        } else {
+            const setCount = ex.sets || 1;
+            ex.weights = Array(setCount).fill('');
+            ex.actualReps = Array(setCount).fill('');
+            ex.levels = Array(setCount).fill('');
+            ex.setsCompleted = Array(setCount).fill(false);
+        }
+
         store.saveActiveWorkoutState(this.activeWorkout);
         this.renderWorkoutExercises();
     },
@@ -8030,12 +8105,29 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             const exIndex = this.subModalState.exIndex;
             if (this.activeWorkout && this.activeWorkout.exercises && this.activeWorkout.exercises[exIndex]) {
                 const ex = this.activeWorkout.exercises[exIndex];
+                if (!ex.originalName) ex.originalName = ex.name;
                 ex.name = newName;
                 ex.chosenVariation = newName;
                 ex.id = newEx.id;
                 ex.category = newEx.type.toLowerCase();
                 ex.movementPattern = newEx.movement_pattern;
                 ex.muscleGroups = (newEx.primary_muscles || []).map(m => m.toLowerCase());
+
+                const setCount = ex.sets || 1;
+                if (!ex.setsCompleted || !ex.setsCompleted.some(Boolean)) {
+                    ex.weights = Array(setCount).fill('');
+                    ex.actualReps = Array(setCount).fill('');
+                    ex.levels = Array(setCount).fill('');
+                    ex.setsCompleted = Array(setCount).fill(false);
+                } else {
+                    for (let i = 0; i < setCount; i++) {
+                        if (!ex.setsCompleted[i]) {
+                            if (ex.weights) ex.weights[i] = '';
+                            if (ex.actualReps) ex.actualReps[i] = '';
+                            if (ex.levels) ex.levels[i] = '';
+                        }
+                    }
+                }
 
                 const saveToPlanCheckbox = document.getElementById('sub-modal-save-to-plan');
                 if (saveToPlanCheckbox && saveToPlanCheckbox.checked && this.subModalState.planId && this.subModalState.sessionId) {
@@ -8254,12 +8346,29 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             }
         }
 
+        if (!ex.originalName) ex.originalName = ex.name;
         ex.name = targetName;
         ex.chosenVariation = targetName;
         ex.id = targetId;
         if (targetPattern) ex.movementPattern = targetPattern;
         if (targetCategory) ex.category = targetCategory;
         if (targetMuscles.length > 0) ex.muscleGroups = targetMuscles;
+
+        const setCount = ex.sets || 1;
+        if (!ex.setsCompleted || !ex.setsCompleted.some(Boolean)) {
+            ex.weights = Array(setCount).fill('');
+            ex.actualReps = Array(setCount).fill('');
+            ex.levels = Array(setCount).fill('');
+            ex.setsCompleted = Array(setCount).fill(false);
+        } else {
+            for (let i = 0; i < setCount; i++) {
+                if (!ex.setsCompleted[i]) {
+                    if (ex.weights) ex.weights[i] = '';
+                    if (ex.actualReps) ex.actualReps[i] = '';
+                    if (ex.levels) ex.levels[i] = '';
+                }
+            }
+        }
 
         store.saveActiveWorkoutState(this.activeWorkout);
         this.renderWorkoutExercises();
