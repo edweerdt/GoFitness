@@ -52,7 +52,8 @@ describe('delta ten opzichte van de vorige keer', () => {
         const newest = document.querySelectorAll('.history-card')[0];
         const delta = newest.querySelector('.volume-delta');
         expect(delta.classList.contains('up')).toBe(true);
-        expect(delta.textContent).toBe('+50 kg');
+        expect(delta.textContent).toBe('+13%'); // 400 -> 450 kg volume
+        expect(newest.querySelector('.history-volume').textContent).toContain('vorige keer 400 kg');
         expect(newest.querySelector('.ex-trend.up').textContent).toContain('+50 kg');
         const oldest = document.querySelectorAll('.history-card')[1];
         expect(oldest.querySelector('.volume-delta')).toBeNull();
