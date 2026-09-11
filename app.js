@@ -854,14 +854,14 @@ const app = {
 
         // Wake lock vervalt zodra de app naar de achtergrond gaat; vraag opnieuw aan
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') this.flushActiveWorkoutSave();
+            if (document.visibilityState === 'hidden') { this.flushActiveWorkoutSave(); this.flushPendingLogDeletes(); }
             if (document.visibilityState === 'visible' && this.activeWorkout && this.currentView === 'workout') {
                 this.requestWakeLock();
                 this.updateSessionTimer();
             }
         });
         if (typeof window !== 'undefined') {
-            window.addEventListener('pagehide', () => this.flushActiveWorkoutSave());
+            window.addEventListener('pagehide', () => { this.flushActiveWorkoutSave(); this.flushPendingLogDeletes(); });
         }
 
         this.setupNavigation();
@@ -1071,6 +1071,7 @@ const app = {
     setupKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
+            if (this.closeHistoryMenus()) { e.preventDefault(); return; }
             if (this.closeTopmostModal()) e.preventDefault();
         });
     },
@@ -3254,6 +3255,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const max1RM = new Map();
         const maxReps = new Map();
         const lastDetails = new Map();
+        const lastSessionVolume = new Map();
         const result = new Map();
         const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 
@@ -3292,12 +3294,234 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     }
                 });
                 prCount += prSets.size;
+
+                // Trend per oefening t.o.v. de vorige keer: volume (kg x reps), of reps bij bodyweight
+                const sums = details => (details || []).reduce((acc, d) => {
+                    const w = num(d && d.weight), r = num(d && d.reps);
+                    if (w > 0 && r > 0) acc.volume += w * r;
+                    else if (w === 0 && r > 0) acc.reps += r;
+                    return acc;
+                }, { volume: 0, reps: 0 });
+                let trend = null;
+                if (prev) {
+                    const cur = sums(ex.details), was = sums(prev);
+                    if (cur.volume > 0 && was.volume > 0) trend = { kind: 'kg', value: Math.round(cur.volume - was.volume) };
+                    else if (cur.volume === 0 && was.volume === 0 && cur.reps > 0 && was.reps > 0) trend = { kind: 'reps', value: cur.reps - was.reps };
+                }
+
                 if (Array.isArray(ex.details) && ex.details.length > 0) lastDetails.set(key, ex.details);
-                return { prSets, deltas };
+                return { prSets, deltas, trend };
             });
-            result.set(log.id, { volume, prCount, exercises });
+
+            // Volume-delta t.o.v. de vorige keer dat deze sessie (zelfde schema + naam) gedaan is
+            const sessionKey = (log.planId || log.planName || '') + '|' + (log.sessionName || '');
+            const prevVolume = lastSessionVolume.get(sessionKey);
+            const volumeDelta = (prevVolume !== undefined && prevVolume > 0 && volume > 0) ? Math.round(volume - prevVolume) : null;
+            if (volume > 0) lastSessionVolume.set(sessionKey, volume);
+
+            result.set(log.id, { volume, prCount, volumeDelta, exercises });
         });
         return result;
+    },
+
+    // --- LOGBOEK: acties, undo en herhalen ---
+    pendingLogDeletes: new Map(),
+    _historyMenuListenerBound: false,
+
+    ensureHistoryMenuListener() {
+        if (this._historyMenuListenerBound || typeof document === 'undefined') return;
+        this._historyMenuListenerBound = true;
+        document.addEventListener('click', (e) => {
+            if (e.target && e.target.closest && e.target.closest('.history-menu-wrap')) return;
+            this.closeHistoryMenus();
+        });
+    },
+
+    closeHistoryMenus() {
+        let closed = false;
+        document.querySelectorAll('.history-menu:not(.hidden)').forEach(menu => {
+            menu.classList.add('hidden');
+            const btn = menu.parentElement ? menu.parentElement.querySelector('.history-menu-btn') : null;
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+            closed = true;
+        });
+        return closed;
+    },
+
+    toggleHistoryMenu(btn) {
+        if (!btn) return;
+        const wrap = btn.closest('.history-menu-wrap');
+        const menu = wrap ? wrap.querySelector('.history-menu') : null;
+        if (!menu) return;
+        const willOpen = menu.classList.contains('hidden');
+        this.closeHistoryMenus();
+        if (willOpen) {
+            menu.classList.remove('hidden');
+            btn.setAttribute('aria-expanded', 'true');
+            const first = menu.querySelector('[role="menuitem"]');
+            if (first && typeof first.focus === 'function') first.focus();
+        }
+    },
+
+    // Toast met een actieknop (bijv. "Ongedaan maken"); blijft langer staan dan een gewone toast
+    showActionToast(message, actionLabel, onAction, durationMs = 6000) {
+        const container = document.getElementById('toast-container');
+        if (!container) return null;
+        const toast = document.createElement('div');
+        toast.className = 'toast action-toast';
+        toast.innerHTML = html`
+            <div style="flex: 1; font-weight: 500; font-size: 0.9rem;">${message}</div>
+            <button type="button" class="toast-action">${actionLabel}</button>
+        `;
+        const remove = () => { if (container.contains(toast)) container.removeChild(toast); };
+        toast.querySelector('.toast-action').addEventListener('click', () => { remove(); if (typeof onAction === 'function') onAction(); });
+        container.appendChild(toast);
+        toast._timer = setTimeout(remove, durationMs);
+        toast.remove = remove;
+        return toast;
+    },
+
+    // Verwijderen met undo: de sessie verdwijnt direct uit het logboek, maar wordt
+    // pas na de undo-periode echt verwijderd (incl. tombstone voor sync). Zo kan een
+    // teruggedraaide verwijdering nooit al als tombstone naar de cloud zijn.
+    deleteLogWithUndo(logId) {
+        if (!logId || this.pendingLogDeletes.has(logId)) return;
+        const log = store.logs.find(l => l.id === logId);
+        if (!log) return;
+        const timer = setTimeout(() => this.finalizeLogDelete(logId), 6000);
+        this.pendingLogDeletes.set(logId, { timer, toast: null });
+        this.renderHistory();
+        const toast = this.showActionToast(`Sessie '${log.sessionName || 'Sessie'}' verwijderd.`, 'Ongedaan maken', () => this.undoLogDelete(logId), 6000);
+        const pending = this.pendingLogDeletes.get(logId);
+        if (pending) pending.toast = toast;
+    },
+
+    undoLogDelete(logId) {
+        const pending = this.pendingLogDeletes.get(logId);
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        if (pending.toast && pending.toast.remove) pending.toast.remove();
+        this.pendingLogDeletes.delete(logId);
+        this.renderHistory();
+        this.showToast('Verwijderen ongedaan gemaakt.', 'success');
+    },
+
+    finalizeLogDelete(logId) {
+        const pending = this.pendingLogDeletes.get(logId);
+        if (pending) {
+            clearTimeout(pending.timer);
+            if (pending.toast && pending.toast.remove) pending.toast.remove();
+            this.pendingLogDeletes.delete(logId);
+        }
+        if (!store.logs.some(l => l.id === logId)) return;
+        store.recordDeletion('logs', logId);
+        store.logs = store.logs.filter(l => l.id !== logId);
+        store.save();
+        this.renderProgress();
+        this.renderHome();
+        this.pushFriendStats();
+    },
+
+    // Bij het verlaten van de app mag een lopende undo-periode geen verwijdering kwijtraken
+    flushPendingLogDeletes() {
+        [...this.pendingLogDeletes.keys()].forEach(id => this.finalizeLogDelete(id));
+    },
+
+    // Bouwt een workout-oefening uit een gelogde oefening (voor "Herhalen" zonder schema)
+    buildExerciseFromLog(logEx) {
+        const isNonEmpty = v => v !== null && v !== undefined && String(v).trim() !== '';
+        const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+        const details = Array.isArray(logEx.details) ? logEx.details : [];
+        const hasWeight = details.some(d => num(d && d.weight) > 0);
+        const hasLevel = details.some(d => isNonEmpty(d && d.level));
+        const typeInfo = this.detectExerciseType(logEx.originalName || logEx.name);
+        let trackMetrics;
+        if (typeInfo.exerciseType === 'duration') trackMetrics = ['duration_seconds'];
+        else if (typeInfo.exerciseType === 'bodyweight_reps' || (!hasWeight && details.length > 0)) trackMetrics = ['reps'];
+        else trackMetrics = ['weight', 'reps'];
+        if (hasLevel && !trackMetrics.includes('level')) trackMetrics.push('level');
+
+        const firstReps = details.find(d => isNonEmpty(d && d.reps));
+        const exObj = {
+            id: 'ex_' + Math.random().toString(36).slice(2, 11),
+            name: logEx.originalName || logEx.name,
+            muscleGroups: logEx.muscleGroups || [],
+            exerciseType: typeInfo.exerciseType,
+            category: typeInfo.category,
+            trackMetrics,
+            sets: Math.max(parseInt(logEx.totalSets, 10) || 0, details.length, 1)
+        };
+        if (logEx.chosenVariation) exObj.chosenVariation = logEx.chosenVariation;
+        if (firstReps) exObj.reps = String(firstReps.reps);
+        return exObj;
+    },
+
+    // Zet de gewichten (en standen) van een gelogde sessie als startpunt in de actieve workout
+    prefillWorkoutFromLog(log) {
+        if (!this.activeWorkout || !Array.isArray(this.activeWorkout.exercises)) return;
+        const isNonEmpty = v => v !== null && v !== undefined && String(v).trim() !== '';
+        const logExercises = (log.exercises || []).filter(e => e && e.name);
+        const keyOf = e => this.getCanonicalExerciseKey(e.chosenVariation || e.name);
+        const used = new Set();
+        this.activeWorkout.exercises.forEach((ex, idx) => {
+            let match = logExercises[idx] && !used.has(idx) && keyOf(logExercises[idx]) === keyOf(ex) ? logExercises[idx] : null;
+            if (!match) {
+                const j = logExercises.findIndex((le, k) => !used.has(k) && keyOf(le) === keyOf(ex));
+                if (j !== -1) match = logExercises[j];
+            }
+            if (!match) return;
+            used.add(logExercises.indexOf(match));
+            const details = Array.isArray(match.details) ? match.details : [];
+            if (!Array.isArray(ex.weights)) ex.weights = Array(ex.sets || 0).fill('');
+            details.forEach((d, i) => {
+                if (i >= (ex.sets || 0)) return;
+                if (isNonEmpty(d && d.weight) && parseFloat(d.weight) > 0) ex.weights[i] = String(d.weight);
+                if (isNonEmpty(d && d.level)) {
+                    if (!Array.isArray(ex.levels)) ex.levels = Array(ex.sets || 0).fill('');
+                    ex.levels[i] = String(d.level);
+                }
+            });
+            if (match.chosenVariation && !ex.chosenVariation) ex.chosenVariation = match.chosenVariation;
+        });
+    },
+
+    // "Herhaal deze sessie": start een workout met dezelfde oefeningen en de gewichten
+    // van toen als startpunt. Bestaat de sessie nog in het schema, dan gebruiken we die
+    // definitie (alternatieven, rep-ranges); anders wordt hij uit het log opgebouwd.
+    repeatLoggedSession(logId) {
+        const log = store.logs.find(l => l.id === logId);
+        if (!log) return;
+        if (this.activeWorkout) {
+            this.showToast('Rond eerst je huidige training af of annuleer die.', 'error');
+            return;
+        }
+        const logExercises = (log.exercises || []).filter(e => e && e.name);
+        if (logExercises.length === 0) {
+            this.showToast('Deze sessie heeft geen oefeningen om te herhalen.', 'error');
+            return;
+        }
+
+        const plan = log.planId ? store.plans.find(p => p.id === log.planId) : null;
+        const planSession = (plan && Array.isArray(plan.sessions))
+            ? plan.sessions.find(s => (s.id || s.sessionId) === log.sessionId)
+            : null;
+
+        if (planSession && Array.isArray(planSession.exercises) && planSession.exercises.length > 0) {
+            this.startWorkout(planSession, plan);
+        } else {
+            const session = {
+                id: 'repeat_' + Date.now(),
+                name: log.sessionName || 'Sessie',
+                exercises: logExercises.map(ex => this.buildExerciseFromLog(ex))
+            };
+            const repeatPlan = plan || { id: log.planId || 'custom_plan', name: log.planName || 'Overige Sessies' };
+            this.startWorkout(session, repeatPlan);
+        }
+
+        this.prefillWorkoutFromLog(log);
+        store.saveActiveWorkoutState(this.activeWorkout);
+        if (document.getElementById('workout-exercise-list')) this.renderWorkoutExercises();
+        this.showToast(`Sessie '${log.sessionName || 'Sessie'}' gestart met de gewichten van de vorige keer.`, 'success');
     },
 
     renderHistory() {
@@ -3310,8 +3534,11 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             return;
         }
 
+        this.ensureHistoryMenuListener();
         const annotations = this.buildHistoryAnnotations();
-        const logsDesc = [...store.logs].sort((a, b) => this.parseLogDate(b.date) - this.parseLogDate(a.date));
+        const logsDesc = [...store.logs]
+            .filter(l => l && !this.pendingLogDeletes.has(l.id))
+            .sort((a, b) => this.parseLogDate(b.date) - this.parseLogDate(a.date));
         const visible = logsDesc.slice(0, this.historyVisibleCount);
         const groups = this.groupHistoryLogs(visible);
 
@@ -3330,7 +3557,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             hList.appendChild(header);
 
             group.logs.forEach(log => {
-                const ann = annotations.get(log.id) || { volume: 0, prCount: 0, exercises: [] };
+                const ann = annotations.get(log.id) || { volume: 0, prCount: 0, volumeDelta: null, exercises: [] };
                 const dateStr = new Date(log.date).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
                 const timeRange = this.formatLogTimeRange(log);
                 const planName = log.planName || 'Overige Sessies';
@@ -3376,7 +3603,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     });
                     return html`
                         <div class="history-exercise">
-                            <div class="history-exercise-title">${ex.name} <span class="text-muted">(${ex.setsCompleted != null ? ex.setsCompleted : details.length}/${ex.totalSets != null ? ex.totalSets : details.length} sets)</span></div>
+                            <div class="history-exercise-title">${ex.name} <span class="text-muted">(${ex.setsCompleted != null ? ex.setsCompleted : details.length}/${ex.totalSets != null ? ex.totalSets : details.length} sets)</span>
+                                ${exAnn.trend ? html`<span class="ex-trend ${exAnn.trend.value > 0 ? 'up' : (exAnn.trend.value < 0 ? 'down' : 'flat')}" title="Verschil met de vorige keer"><span class="material-icons-round" aria-hidden="true">${exAnn.trend.value > 0 ? 'trending_up' : (exAnn.trend.value < 0 ? 'trending_down' : 'trending_flat')}</span>${exAnn.trend.value > 0 ? '+' : ''}${exAnn.trend.value === 0 ? 'gelijk' : (exAnn.trend.kind === 'kg' ? this.formatVolume(exAnn.trend.value) + ' kg' : exAnn.trend.value + ' reps')}</span>` : ''}
+                            </div>
                             ${rows.length > 0 ? html`
                                 <table class="history-set-table">
                                     <thead><tr><th>Set</th><th class="num">kg</th><th class="num">reps</th>${anyLevel ? html`<th class="num">stand</th>` : ''}</tr></thead>
@@ -3385,13 +3614,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         </div>`;
                 }) : [html`<div class="text-sm text-muted mt-2">Afgevinkt, geen details (oude sessie).</div>`];
 
-                const editIcon = exercises.length > 0
-                    ? html`<button class="icon-btn" aria-label="Sessie bewerken" title="Bewerken" onclick="app.showEditLogModal(${rawHtml(this.jsArg(log.id))})"><span class="material-icons-round" aria-hidden="true" style="font-size:1.4rem; color:var(--text-muted);">edit_note</span></button>`
-                    : '';
-                const footer = html`
-                    <div class="history-actions">
-                        ${editIcon}
-                        <button class="icon-btn" aria-label="Sessie verwijderen" title="Verwijderen" onclick="app.showDeleteModal('log', ${rawHtml(this.jsArg(log.id))})"><span class="material-icons-round" aria-hidden="true" style="font-size:1.4rem; color:#ff5252;">delete_outline</span></button>
+                const idArg = rawHtml(this.jsArg(log.id));
+                const menu = html`
+                    <div class="history-menu-wrap">
+                        <button type="button" class="icon-btn history-menu-btn" aria-label="Acties voor deze sessie" aria-haspopup="menu" aria-expanded="false" onclick="event.stopPropagation(); app.toggleHistoryMenu(this)"><span class="material-icons-round" aria-hidden="true">more_vert</span></button>
+                        <div class="history-menu hidden" role="menu">
+                            ${exercises.length > 0 ? html`<button type="button" role="menuitem" class="history-menu-item" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.showEditLogModal(${idArg})"><span class="material-icons-round" aria-hidden="true">edit_note</span><span class="history-menu-label">Bewerken</span></button>` : ''}
+                            ${exercises.length > 0 ? html`<button type="button" role="menuitem" class="history-menu-item" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.repeatLoggedSession(${idArg})"><span class="material-icons-round" aria-hidden="true">replay</span><span class="history-menu-label">Herhalen</span></button>` : ''}
+                            <button type="button" role="menuitem" class="history-menu-item danger" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.deleteLogWithUndo(${idArg})"><span class="material-icons-round" aria-hidden="true">delete_outline</span><span class="history-menu-label">Verwijderen</span></button>
+                        </div>
                     </div>`;
 
                 const el = document.createElement('div');
@@ -3408,15 +3639,16 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                             <div class="history-meta text-sm text-muted">
                                 <span>${dateStr}${timeRange ? ` · ${timeRange}` : ''}</span>
                                 <span>${metaParts.join(' · ')}</span>
+                                ${ann.volumeDelta !== null && ann.volumeDelta !== undefined ? html`<span class="volume-delta ${ann.volumeDelta > 0 ? 'up' : (ann.volumeDelta < 0 ? 'down' : 'flat')}" title="Verschil in volume met de vorige keer dat je deze sessie deed">${ann.volumeDelta > 0 ? '+' : ''}${ann.volumeDelta === 0 ? 'gelijk' : this.formatVolume(ann.volumeDelta) + ' kg'}</span>` : ''}
                                 ${ann.prCount > 0 ? html`<span class="pr-crown-badge" title="${ann.prCount} persoonlijke record${ann.prCount === 1 ? '' : 's'}"><span class="pr-crown-text">${ann.prCount} PR</span></span>` : ''}
                             </div>
                             ${strip.length > 0 ? html`<div class="set-strip" aria-hidden="true">${strip}</div>` : ''}
                         </div>
+                        ${menu}
                         <span class="material-icons-round text-muted history-chevron" aria-hidden="true">expand_more</span>
                     </div>
                     <div class="hidden history-details">
                         ${detailParts}
-                        ${footer}
                     </div>
                 `;
                 hList.appendChild(el);
