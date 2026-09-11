@@ -7,6 +7,8 @@
     --text-muted: #a0aab2;
     --accent-color: #3b82f6; /* Soft blue */
     --accent-hover: #2563eb;
+    --accent-text: #ffffff;
+    --accent-rgb: 59, 130, 246;
     
     /* Traffic Light Colors */
     --status-green: #10b981;
@@ -256,12 +258,12 @@ button:disabled {
 
 .btn-primary {
     background: var(--accent-color);
-    color: white;
+    color: var(--accent-text, #ffffff);
     padding: 14px 20px;
     border-radius: var(--border-radius-sm);
     font-weight: 600;
     font-size: 1rem;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 4px 12px rgba(var(--accent-rgb, 59, 130, 246), 0.3);
 }
 
 .btn-primary:active { transform: scale(0.98); background: var(--accent-hover); }
@@ -947,6 +949,8 @@ button:disabled {
         --text-muted: #6b7280;
         --accent-color: #2563eb;
         --accent-hover: #1d4ed8;
+        --accent-text: #ffffff;
+        --accent-rgb: 37, 99, 235;
     }
     :root:not(.theme-dark) .glass-panel {
         border: 1px solid rgba(0, 0, 0, 0.05);
@@ -958,6 +962,329 @@ button:disabled {
     :root:not(.theme-dark) .check-btn { background: var(--surface-color); border: 1px solid rgba(0,0,0,0.2); }
     :root:not(.theme-dark) .check-btn.checked { background: var(--status-green); color: white; border-color: var(--status-green); }
     :root:not(.theme-dark) .set-row { border-bottom: 1px solid rgba(0,0,0,0.05); }
+}
+
+/* ==========================================================================
+   Color Palettes (10 Sets)
+   ========================================================================== */
+
+/* 1. Limoengroen */
+:root[data-palette="limoengroen"], :root.palette-limoengroen {
+    --accent-color: #a3e635;
+    --accent-hover: #84cc16;
+    --accent-text: #0d1117;
+    --accent-rgb: 163, 230, 53;
+}
+:root.theme-light[data-palette="limoengroen"], :root.theme-light.palette-limoengroen {
+    --accent-color: #16a34a;
+    --accent-hover: #15803d;
+    --accent-text: #ffffff;
+    --accent-rgb: 22, 163, 74;
+}
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark)[data-palette="limoengroen"], :root:not(.theme-dark).palette-limoengroen {
+        --accent-color: #16a34a;
+        --accent-hover: #15803d;
+        --accent-text: #ffffff;
+        --accent-rgb: 22, 163, 74;
+    }
+}
+
+/* 2. Blauw (Standaard) */
+:root[data-palette="blauw"], :root.palette-blauw {
+    --accent-color: #3b82f6;
+    --accent-hover: #2563eb;
+    --accent-text: #ffffff;
+    --accent-rgb: 59, 130, 246;
+}
+:root.theme-light[data-palette="blauw"], :root.theme-light.palette-blauw {
+    --accent-color: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-text: #ffffff;
+    --accent-rgb: 37, 99, 235;
+}
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark)[data-palette="blauw"], :root:not(.theme-dark).palette-blauw {
+        --accent-color: #2563eb;
+        --accent-hover: #1d4ed8;
+        --accent-text: #ffffff;
+        --accent-rgb: 37, 99, 235;
+    }
+}
+
+/* 3. Oranje */
+:root[data-palette="oranje"], :root.palette-oranje {
+    --accent-color: #ff5722;
+    --accent-hover: #ea580c;
+    --accent-text: #ffffff;
+    --accent-rgb: 255, 87, 34;
+}
+:root.theme-light[data-palette="oranje"], :root.theme-light.palette-oranje {
+    --accent-color: #ea580c;
+    --accent-hover: #c2410c;
+    --accent-text: #ffffff;
+    --accent-rgb: 234, 88, 12;
+}
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark)[data-palette="oranje"], :root:not(.theme-dark).palette-oranje {
+        --accent-color: #ea580c;
+        --accent-hover: #c2410c;
+        --accent-text: #ffffff;
+        --accent-rgb: 234, 88, 12;
+    }
+}
+
+/* 4. Paars */
+:root[data-palette="paars"], :root.palette-paars {
+    --accent-color: #c084fc;
+    --accent-hover: #a855f7;
+    --accent-text: #110d17;
+    --accent-rgb: 192, 132, 252;
+}
+:root.theme-light[data-palette="paars"], :root.theme-light.palette-paars {
+    --accent-color: #9333ea;
+    --accent-hover: #7e22ce;
+    --accent-text: #ffffff;
+    --accent-rgb: 147, 51, 234;
+}
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark)[data-palette="paars"], :root:not(.theme-dark).palette-paars {
+        --accent-color: #9333ea;
+        --accent-hover: #7e22ce;
+        --accent-text: #ffffff;
+        --accent-rgb: 147, 51, 234;
+    }
+}
+
+/* 5. Zachtroze */
+:root[data-palette="zachtroze"], :root.palette-zachtroze {
+    --accent-color: #fb7185;
+    --accent-hover: #f43f5e;
+    --accent-text: #140f11;
+    --accent-rgb: 251, 113, 133;
+}
+:root.theme-light[data-palette="zachtroze"], :root.theme-light.palette-zachtroze {
+    --accent-color: #e11d48;
+    --accent-hover: #be123c;
+    --accent-text: #ffffff;
+    --accent-rgb: 225, 29, 72;
+}
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark)[data-palette="zachtroze"], :root:not(.theme-dark).palette-zachtroze {
+        --accent-color: #e11d48;
+        --accent-hover: #be123c;
+        --accent-text: #ffffff;
+        --accent-rgb: 225, 29, 72;
+    }
+}
+
+/* 6. Rood */
+:root[data-palette="rood"], :root.palette-rood {
+    --accent-color: #ef4444;
+    --accent-hover: #dc2626;
+    --accent-text: #ffffff;
+    --accent-rgb: 239, 68, 68;
+}
+:root.theme-light[data-palette="rood"], :root.theme-light.palette-rood {
+    --accent-color: #b91c1c;
+    --accent-hover: #991b1b;
+    --accent-text: #ffffff;
+    --accent-rgb: 185, 28, 28;
+}
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark)[data-palette="rood"], :root:not(.theme-dark).palette-rood {
+        --accent-color: #b91c1c;
+        --accent-hover: #991b1b;
+        --accent-text: #ffffff;
+        --accent-rgb: 185, 28, 28;
+    }
+}
+
+/* 7. Smaragdgroen */
+:root[data-palette="smaragdgroen"], :root.palette-smaragdgroen {
+    --accent-color: #10b981;
+    --accent-hover: #059669;
+    --accent-text: #0a120e;
+    --accent-rgb: 16, 185, 129;
+}
+:root.theme-light[data-palette="smaragdgroen"], :root.theme-light.palette-smaragdgroen {
+    --accent-color: #059669;
+    --accent-hover: #047857;
+    --accent-text: #ffffff;
+    --accent-rgb: 5, 150, 105;
+}
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark)[data-palette="smaragdgroen"], :root:not(.theme-dark).palette-smaragdgroen {
+        --accent-color: #059669;
+        --accent-hover: #047857;
+        --accent-text: #ffffff;
+        --accent-rgb: 5, 150, 105;
+    }
+}
+
+/* 8. Amber */
+:root[data-palette="amber"], :root.palette-amber {
+    --accent-color: #f59e0b;
+    --accent-hover: #d97706;
+    --accent-text: #12100b;
+    --accent-rgb: 245, 158, 11;
+}
+:root.theme-light[data-palette="amber"], :root.theme-light.palette-amber {
+    --accent-color: #d97706;
+    --accent-hover: #b45309;
+    --accent-text: #ffffff;
+    --accent-rgb: 217, 119, 6;
+}
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark)[data-palette="amber"], :root:not(.theme-dark).palette-amber {
+        --accent-color: #d97706;
+        --accent-hover: #b45309;
+        --accent-text: #ffffff;
+        --accent-rgb: 217, 119, 6;
+    }
+}
+
+/* 9. Cyaan */
+:root[data-palette="cyaan"], :root.palette-cyaan {
+    --accent-color: #06b6d4;
+    --accent-hover: #0891b2;
+    --accent-text: #081016;
+    --accent-rgb: 6, 182, 212;
+}
+:root.theme-light[data-palette="cyaan"], :root.theme-light.palette-cyaan {
+    --accent-color: #0891b2;
+    --accent-hover: #0e7490;
+    --accent-text: #ffffff;
+    --accent-rgb: 8, 145, 178;
+}
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark)[data-palette="cyaan"], :root:not(.theme-dark).palette-cyaan {
+        --accent-color: #0891b2;
+        --accent-hover: #0e7490;
+        --accent-text: #ffffff;
+        --accent-rgb: 8, 145, 178;
+    }
+}
+
+/* 10. Monochroom */
+:root[data-palette="monochroom"], :root.palette-monochroom {
+    --accent-color: #e2e8f0;
+    --accent-hover: #cbd5e1;
+    --accent-text: #090a0c;
+    --accent-rgb: 226, 232, 240;
+}
+:root.theme-light[data-palette="monochroom"], :root.theme-light.palette-monochroom {
+    --accent-color: #0f172a;
+    --accent-hover: #1e293b;
+    --accent-text: #ffffff;
+    --accent-rgb: 15, 23, 42;
+}
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark)[data-palette="monochroom"], :root:not(.theme-dark).palette-monochroom {
+        --accent-color: #0f172a;
+        --accent-hover: #1e293b;
+        --accent-text: #ffffff;
+        --accent-rgb: 15, 23, 42;
+    }
+}
+
+/* Thema & Kleuren Modal */
+.theme-mode-selector {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    background: var(--surface-light);
+    padding: 4px;
+    border-radius: var(--border-radius-sm);
+}
+
+.theme-mode-btn {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 6px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.theme-mode-btn:hover {
+    color: var(--text-primary);
+}
+
+.theme-mode-btn.active {
+    background: var(--surface-color);
+    color: var(--text-primary);
+    font-weight: 600;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.theme-palette-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.theme-palette-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--border-radius-sm);
+    background: var(--surface-light);
+    border: 2px solid transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+    transition: var(--transition);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.theme-palette-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.theme-light .theme-palette-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.theme-palette-item.active {
+    border-color: var(--accent-color);
+    background: rgba(var(--accent-rgb, 59, 130, 246), 0.12);
+}
+
+.palette-swatch-circle {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.palette-check-icon {
+    font-size: 16px;
+    color: var(--accent-text, #ffffff);
+    font-weight: bold;
+}
+
+.palette-name {
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Rusttimer tussen sets (bovenaan onder de sessieheader) */

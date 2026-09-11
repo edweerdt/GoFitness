@@ -325,6 +325,19 @@ const PRESET_PLANS = [
     }
 ];
 
+const COLOR_PALETTES = [
+    { id: 'limoengroen', name: 'Limoengroen', color: '#a3e635', colorLight: '#16a34a' },
+    { id: 'blauw', name: 'Blauw', color: '#3b82f6', colorLight: '#2563eb' },
+    { id: 'oranje', name: 'Oranje', color: '#ff5722', colorLight: '#ea580c' },
+    { id: 'paars', name: 'Paars', color: '#c084fc', colorLight: '#9333ea' },
+    { id: 'zachtroze', name: 'Zachtroze', color: '#fb7185', colorLight: '#e11d48' },
+    { id: 'rood', name: 'Rood', color: '#ef4444', colorLight: '#b91c1c' },
+    { id: 'smaragdgroen', name: 'Smaragdgroen', color: '#10b981', colorLight: '#059669' },
+    { id: 'amber', name: 'Amber', color: '#f59e0b', colorLight: '#d97706' },
+    { id: 'cyaan', name: 'Cyaan', color: '#06b6d4', colorLight: '#0891b2' },
+    { id: 'monochroom', name: 'Monochroom', color: '#e2e8f0', colorLight: '#0f172a' }
+];
+
 class DataStore {
     constructor() {
         // Only load if localStorage is defined (useful for testing environments)
@@ -336,6 +349,7 @@ class DataStore {
             this.logs = [];
             this.activeWorkoutState = null;
             this.theme = 'auto';
+            this.palette = 'blauw';
             this.holdTimerDelaySeconds = 3;
             this.deleted = { plans: [], logs: [] };
             this.customExercises = [];
@@ -411,6 +425,7 @@ class DataStore {
         this.logs = this.safeParse('logs', []);
         this.activeWorkoutState = this.safeParse('activeWorkoutState', null);
         this.theme = localStorage.getItem('theme') || 'auto';
+        this.palette = localStorage.getItem('palette') || 'blauw';
         this.holdTimerDelaySeconds = (typeof localStorage !== 'undefined' && localStorage.getItem('holdTimerDelaySeconds')) ? (parseInt(localStorage.getItem('holdTimerDelaySeconds'), 10) || 3) : 3;
         this.customExercises = this.safeParse('customExercises', []);
         // Tombstones: ids van verwijderde items, zodat cloud-sync ze niet terugbrengt
@@ -418,6 +433,20 @@ class DataStore {
         this.sortLogs();
         this.sanitizeLogPlanIds();
         this.invalidateCache();
+    }
+    setColorPalette(paletteId) {
+        const valid = COLOR_PALETTES.some(p => p.id === paletteId);
+        if (valid) {
+            this.palette = paletteId;
+            this.save();
+        }
+    }
+    setTheme(themeMode) {
+        const validModes = ['auto', 'light', 'dark'];
+        if (validModes.includes(themeMode)) {
+            this.theme = themeMode;
+            this.save();
+        }
     }
     setHoldTimerDelaySeconds(val) {
         const parsed = parseInt(val, 10);
@@ -479,6 +508,7 @@ class DataStore {
             }
             localStorage.setItem('logs', JSON.stringify(this.logs));
             localStorage.setItem('theme', this.theme);
+            localStorage.setItem('palette', this.palette || 'blauw');
             localStorage.setItem('holdTimerDelaySeconds', String(this.holdTimerDelaySeconds || 3));
             localStorage.setItem('customExercises', JSON.stringify(this.customExercises || []));
             localStorage.setItem('deleted', JSON.stringify(this.deleted));
@@ -884,29 +914,119 @@ const app = {
         }, 3000);
     },
 
+    showThemeModal() {
+        const modal = document.getElementById('modal-theme');
+        if (!modal) return;
+        this.renderThemeModalContent();
+        modal.classList.remove('hidden');
+    },
+
+    hideThemeModal() {
+        const modal = document.getElementById('modal-theme');
+        if (!modal) return;
+        modal.classList.add('hidden');
+    },
+
+    selectThemeMode(mode) {
+        if (store && store.setTheme) {
+            store.setTheme(mode);
+        } else if (store) {
+            store.theme = mode;
+            store.save();
+        }
+        this.applyTheme();
+    },
+
+    selectColorPalette(paletteId) {
+        if (store && store.setColorPalette) {
+            store.setColorPalette(paletteId);
+        } else if (store) {
+            store.palette = paletteId;
+            store.save();
+        }
+        this.applyTheme();
+    },
+
+    renderThemeModalContent() {
+        if (typeof document === 'undefined') return;
+
+        const modeContainer = document.getElementById('theme-mode-selector');
+        if (modeContainer) {
+            const currentTheme = (store && store.theme) ? store.theme : 'auto';
+            const modes = [
+                { id: 'auto', name: 'Systeem', icon: 'brightness_auto' },
+                { id: 'light', name: 'Licht', icon: 'light_mode' },
+                { id: 'dark', name: 'Donker', icon: 'dark_mode' }
+            ];
+
+            modeContainer.innerHTML = modes.map(m => `
+                <button type="button" class="theme-mode-btn ${currentTheme === m.id ? 'active' : ''}" onclick="app.selectThemeMode('${m.id}')">
+                    <span class="material-icons-round" style="font-size: 1.1rem;">${m.icon}</span>
+                    <span>${m.name}</span>
+                </button>
+            `).join('');
+        }
+
+        const paletteContainer = document.getElementById('theme-palette-grid');
+        if (paletteContainer) {
+            const currentPalette = (store && store.palette) ? store.palette : 'blauw';
+            const isLight = document.documentElement && document.documentElement.classList.contains('theme-light');
+
+            paletteContainer.innerHTML = COLOR_PALETTES.map(p => {
+                const isActive = p.id === currentPalette;
+                const swatchColor = isLight ? (p.colorLight || p.color) : p.color;
+                return `
+                    <button type="button" class="theme-palette-item ${isActive ? 'active' : ''}" onclick="app.selectColorPalette('${p.id}')">
+                        <span class="palette-swatch-circle" style="background-color: ${swatchColor};">
+                            ${isActive ? '<span class="material-icons-round palette-check-icon">check</span>' : ''}
+                        </span>
+                        <span class="palette-name">${p.name}</span>
+                    </button>
+                `;
+            }).join('');
+        }
+    },
+
     applyTheme() {
         if (typeof document === 'undefined' || !document.documentElement) return;
+        const root = document.documentElement;
         const btns = document.querySelectorAll('.theme-toggle-btn');
         
-        if (document.documentElement.classList) {
-            document.documentElement.classList.remove('theme-light', 'theme-dark');
+        if (root.classList) {
+            root.classList.remove('theme-light', 'theme-dark');
         }
         
         let iconName = 'brightness_auto';
         if (store.theme === 'light') {
-            if (document.documentElement.classList) document.documentElement.classList.add('theme-light');
+            if (root.classList) root.classList.add('theme-light');
             iconName = 'light_mode';
         } else if (store.theme === 'dark') {
-            if (document.documentElement.classList) document.documentElement.classList.add('theme-dark');
+            if (root.classList) root.classList.add('theme-dark');
             iconName = 'dark_mode';
+        }
+
+        // Color palette
+        const currentPalette = (store && store.palette) ? store.palette : 'blauw';
+        if (root.setAttribute) {
+            root.setAttribute('data-palette', currentPalette);
+        }
+        if (root.classList) {
+            const toRemove = [];
+            root.classList.forEach(cls => {
+                if (typeof cls === 'string' && cls.startsWith('palette-')) toRemove.push(cls);
+            });
+            toRemove.forEach(cls => root.classList.remove(cls));
+            root.classList.add(`palette-${currentPalette}`);
         }
 
         if (btns) {
             btns.forEach(btn => {
                 const icon = btn ? btn.querySelector('.material-icons-round') : null;
-                if (icon) icon.textContent = iconName;
+                if (icon && icon.textContent !== 'palette') icon.textContent = iconName;
             });
         }
+
+        this.renderThemeModalContent();
     },
 
     navigate(viewId) {
@@ -8287,5 +8407,5 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !(typeof
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { DataStore, app, store, html, rawHtml, PRESET_PLANS, DEFAULT_EXERCISES };
+    module.exports = { DataStore, app, store, html, rawHtml, PRESET_PLANS, DEFAULT_EXERCISES, COLOR_PALETTES };
 }

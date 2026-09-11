@@ -33,8 +33,8 @@
                 <header class="home-header">
                     <div class="home-header-row">
                         <h1 id="home-date">Vandaag</h1>
-                        <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen" aria-label="Thema aanpassen">
-                            <span class="material-icons-round">brightness_auto</span>
+                        <button class="icon-btn theme-toggle-btn" onclick="app.showThemeModal()" title="Thema en kleuren aanpassen" aria-label="Thema en kleuren aanpassen">
+                            <span class="material-icons-round">palette</span>
                         </button>
                     </div>
                     <div id="recovery-status" class="status-badge green">
@@ -87,8 +87,8 @@
                             <h2 id="workout-title">Training</h2>
                             <span id="workout-session-timer" class="workout-session-timer" title="Totale sessieduur" aria-label="Totale sessieduur">00:00</span>
                         </div>
-                        <button class="icon-btn theme-toggle-btn" onclick="app.toggleTheme()" title="Thema aanpassen" aria-label="Thema aanpassen">
-                            <span class="material-icons-round">brightness_auto</span>
+                        <button class="icon-btn theme-toggle-btn" onclick="app.showThemeModal()" title="Thema en kleuren aanpassen" aria-label="Thema en kleuren aanpassen">
+                            <span class="material-icons-round">palette</span>
                         </button>
                     </header>
                     <div id="rest-timer" class="rest-timer glass-panel hidden" role="button" tabindex="0" aria-label="Rusttimer, tik om over te slaan" onclick="app.stopRestTimer()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" title="Tik om over te slaan">
@@ -648,6 +648,39 @@
                         <input type="checkbox" id="sub-modal-save-to-plan"> Ook permanent opslaan in schema
                     </label>
                     <button class="btn-secondary" style="padding:4px 12px; font-size:0.85rem;" onclick="app.hideSubstitutionModal()" data-modal-close>Sluiten</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Thema & Kleurenkiezer -->
+        <div id="modal-theme" class="modal-overlay hidden" onclick="if(event.target===this) app.hideThemeModal();">
+            <div class="modal-content glass-panel" style="max-width: 440px; width: 100%; max-height: 85vh; display: flex; flex-direction: column; padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="material-icons-round text-accent" style="font-size: 1.4rem;">palette</span>
+                        <h3 style="margin: 0; text-transform: none; color: var(--text-primary); font-size: 1.15rem; font-weight: 600;">Thema &amp; Kleuren</h3>
+                    </div>
+                    <button class="icon-btn" onclick="app.hideThemeModal()" aria-label="Sluiten" data-modal-close>
+                        <span class="material-icons-round" aria-hidden="true">close</span>
+                    </button>
+                </div>
+
+                <div style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 18px; padding-right: 2px;">
+                    <!-- Modus Selectie -->
+                    <div>
+                        <div class="text-xs text-muted" style="text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 8px;">Weergave</div>
+                        <div class="theme-mode-selector" id="theme-mode-selector"></div>
+                    </div>
+
+                    <!-- Kleurenpalet Selectie -->
+                    <div>
+                        <div class="text-xs text-muted" style="text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 8px;">Kleurenpalet (10 Opties)</div>
+                        <div class="theme-palette-grid" id="theme-palette-grid"></div>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 18px;">
+                    <button class="btn-primary w-full" onclick="app.hideThemeModal()">Klaar</button>
                 </div>
             </div>
         </div>
