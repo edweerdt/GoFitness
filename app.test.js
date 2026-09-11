@@ -1286,7 +1286,7 @@ describe('exercise progress', () => {
         const prBadge = card.querySelector('.pr-crown-badge');
         expect(prBadge).toBeDefined();
         expect(prBadge.textContent).toContain('PR');
-        expect(prBadge.textContent).toContain('👑');
+        expect(prBadge.textContent).not.toContain('👑');
         expect(card.textContent).toContain('100 kg');
         expect(card.textContent).toContain('× 5');
 
@@ -1319,6 +1319,7 @@ describe('exercise progress', () => {
         const prRow = card.querySelector('.pr-display-row');
         expect(prRow).toBeDefined();
         const prBadge = prRow.querySelector('.pr-crown-badge');
+        expect(prBadge.textContent).not.toContain('👑');
         expect(prRow.firstElementChild).toBe(prBadge);
         const prVal = prRow.querySelector('.pr-value');
         expect(prVal.textContent).toContain('60 sec');
@@ -1337,6 +1338,7 @@ describe('exercise progress', () => {
         const prRow = card.querySelector('.pr-display-row');
         expect(prRow).toBeDefined();
         const prBadge = prRow.querySelector('.pr-crown-badge');
+        expect(prBadge.textContent).not.toContain('👑');
         expect(prRow.firstElementChild).toBe(prBadge);
         const prVal = prRow.querySelector('.pr-value');
         expect(prVal.textContent).toContain('25 reps');
