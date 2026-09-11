@@ -1,4 +1,4 @@
-const { DataStore, app, store, html, rawHtml, PRESET_PLANS } = require('./app');
+const { DataStore, app, store, html, rawHtml, PRESET_PLANS, COLOR_PALETTES } = require('./app');
 
 describe('DataStore', () => {
     let mockLocalStorage;
@@ -4367,6 +4367,224 @@ describe('add and remove sets during workout', () => {
                 app.openWorkoutView();
                 expect(app.sessionTimerInterval).not.toBeNull();
             });
+        });
+    });
+});
+
+describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
+    let mockLocalStorage;
+
+    beforeEach(() => {
+        mockLocalStorage = {
+            store: {},
+            getItem: jest.fn(key => mockLocalStorage.store[key] || null),
+            setItem: jest.fn((key, value) => {
+                mockLocalStorage.store[key] = String(value);
+            }),
+            removeItem: jest.fn(key => {
+                delete mockLocalStorage.store[key];
+            }),
+            clear: jest.fn(() => {
+                mockLocalStorage.store = {};
+            })
+        };
+
+        if (typeof window !== 'undefined') {
+            Object.defineProperty(window, 'localStorage', {
+                value: mockLocalStorage,
+                writable: true,
+                configurable: true
+            });
+        }
+        global.localStorage = mockLocalStorage;
+
+        document.body.innerHTML = `
+            <div id="app">
+                <header class="home-header">
+                    <button class="icon-btn theme-toggle-btn" onclick="app.showThemeModal()">
+                        <span class="material-icons-round">palette</span>
+                    </button>
+                </header>
+                <div id="modal-theme" class="modal-overlay hidden">
+                    <div class="modal-content">
+                        <button class="icon-btn" onclick="app.hideThemeModal()" data-modal-close>
+                            <span class="material-icons-round">close</span>
+                        </button>
+                        <div id="theme-mode-selector" class="theme-mode-selector"></div>
+                        <div id="theme-palette-grid" class="theme-palette-grid"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    describe('COLOR_PALETTES configuration', () => {
+        it('should define all 10 color palettes with Dutch names (Optie A)', () => {
+            expect(Array.isArray(COLOR_PALETTES)).toBe(true);
+            expect(COLOR_PALETTES.length).toBe(10);
+
+            const expected = [
+                { id: 'limoengroen', name: 'Limoengroen' },
+                { id: 'blauw', name: 'Blauw' },
+                { id: 'oranje', name: 'Oranje' },
+                { id: 'paars', name: 'Paars' },
+                { id: 'zachtroze', name: 'Zachtroze' },
+                { id: 'rood', name: 'Rood' },
+                { id: 'smaragdgroen', name: 'Smaragdgroen' },
+                { id: 'amber', name: 'Amber' },
+                { id: 'cyaan', name: 'Cyaan' },
+                { id: 'monochroom', name: 'Monochroom' }
+            ];
+
+            expected.forEach(exp => {
+                const found = COLOR_PALETTES.find(p => p.id === exp.id);
+                expect(found).toBeDefined();
+                expect(found.name).toBe(exp.name);
+                expect(found.color).toMatch(/^#[0-9a-fA-F]{6}$/);
+                expect(found.colorLight).toMatch(/^#[0-9a-fA-F]{6}$/);
+            });
+        });
+    });
+
+    describe('DataStore palette management', () => {
+        it('should default palette to blauw when localStorage is empty', () => {
+            const testStore = new DataStore();
+            expect(testStore.palette).toBe('blauw');
+        });
+
+        it('should load stored palette from localStorage', () => {
+            mockLocalStorage.setItem('palette', 'oranje');
+            const testStore = new DataStore();
+            expect(testStore.palette).toBe('oranje');
+        });
+
+        it('should allow setting valid color palette via setColorPalette and persist', () => {
+            const testStore = new DataStore();
+            testStore.setColorPalette('smaragdgroen');
+
+            expect(testStore.palette).toBe('smaragdgroen');
+            expect(mockLocalStorage.setItem).toHaveBeenCalledWith('palette', 'smaragdgroen');
+        });
+
+        it('should ignore invalid color palette names', () => {
+            const testStore = new DataStore();
+            testStore.setColorPalette('cyber_neon_ultra');
+
+            expect(testStore.palette).toBe('blauw');
+        });
+
+        it('should allow setting theme mode via setTheme and persist', () => {
+            const testStore = new DataStore();
+            testStore.setTheme('dark');
+
+            expect(testStore.theme).toBe('dark');
+            expect(mockLocalStorage.setItem).toHaveBeenCalledWith('theme', 'dark');
+
+            testStore.setTheme('light');
+            expect(testStore.theme).toBe('light');
+
+            testStore.setTheme('invalid_theme');
+            expect(testStore.theme).toBe('light');
+        });
+    });
+
+    describe('app.applyTheme() integration', () => {
+        it('should set data-palette attribute and palette-* class on document.documentElement', () => {
+            store.palette = 'paars';
+            store.theme = 'dark';
+            app.applyTheme();
+
+            expect(document.documentElement.getAttribute('data-palette')).toBe('paars');
+            expect(document.documentElement.classList.contains('palette-paars')).toBe(true);
+            expect(document.documentElement.classList.contains('theme-dark')).toBe(true);
+        });
+
+        it('should replace previous palette class when palette changes', () => {
+            store.palette = 'paars';
+            app.applyTheme();
+            expect(document.documentElement.classList.contains('palette-paars')).toBe(true);
+
+            store.palette = 'limoengroen';
+            app.applyTheme();
+            expect(document.documentElement.classList.contains('palette-paars')).toBe(false);
+            expect(document.documentElement.classList.contains('palette-limoengroen')).toBe(true);
+            expect(document.documentElement.getAttribute('data-palette')).toBe('limoengroen');
+        });
+    });
+
+    describe('Thema & Kleuren Modal UI', () => {
+        it('should open and close modal with showThemeModal and hideThemeModal', () => {
+            const modal = document.getElementById('modal-theme');
+            expect(modal.classList.contains('hidden')).toBe(true);
+
+            app.showThemeModal();
+            expect(modal.classList.contains('hidden')).toBe(false);
+
+            app.hideThemeModal();
+            expect(modal.classList.contains('hidden')).toBe(true);
+        });
+
+        it('should render all 3 theme modes with active class on current mode', () => {
+            store.theme = 'light';
+            app.showThemeModal();
+
+            const modeBtns = document.querySelectorAll('.theme-mode-btn');
+            expect(modeBtns.length).toBe(3);
+
+            const activeModeBtn = document.querySelector('.theme-mode-btn.active');
+            expect(activeModeBtn).not.toBeNull();
+            expect(activeModeBtn.textContent).toContain('Licht');
+        });
+
+        it('should render all 10 palette items with active class on current palette', () => {
+            store.palette = 'zachtroze';
+            app.showThemeModal();
+
+            const paletteItems = document.querySelectorAll('.theme-palette-item');
+            expect(paletteItems.length).toBe(10);
+
+            const activeItem = document.querySelector('.theme-palette-item.active');
+            expect(activeItem).not.toBeNull();
+            expect(activeItem.textContent).toContain('Zachtroze');
+        });
+
+        it('should switch palette on item click, update store and apply DOM changes', () => {
+            app.showThemeModal();
+            app.selectColorPalette('rood');
+
+            expect(store.palette).toBe('rood');
+            expect(document.documentElement.getAttribute('data-palette')).toBe('rood');
+
+            const activeItem = document.querySelector('.theme-palette-item.active');
+            expect(activeItem.textContent).toContain('Rood');
+        });
+
+        it('should switch mode on mode button click and apply DOM changes', () => {
+            app.showThemeModal();
+            app.selectThemeMode('dark');
+
+            expect(store.theme).toBe('dark');
+            expect(document.documentElement.classList.contains('theme-dark')).toBe(true);
+
+            const activeModeBtn = document.querySelector('.theme-mode-btn.active');
+            expect(activeModeBtn.textContent).toContain('Donker');
+        });
+    });
+
+    describe('style.css palette coverage', () => {
+        it('should define all 10 palettes and modal styles in style.css', () => {
+            const fs = require('fs');
+            const css = fs.readFileSync('style.css', 'utf8');
+
+            COLOR_PALETTES.forEach(p => {
+                expect(css).toContain(`[data-palette="${p.id}"]`);
+                expect(css).toContain(`.palette-${p.id}`);
+            });
+
+            expect(css).toContain('.theme-mode-selector');
+            expect(css).toContain('.theme-palette-grid');
+            expect(css).toContain('.palette-swatch-circle');
+            expect(css).toContain('var(--accent-text, #ffffff)');
         });
     });
 });
