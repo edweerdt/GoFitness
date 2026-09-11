@@ -3328,6 +3328,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             this.hideDeleteModal('log');
             this.renderProgress();
             this.renderHome();
+            this.pushFriendStats();
         } else if (type === 'exercise') {
             store.deleteCustomExercise(this.itemToDelete.id);
             this.hideDeleteModal('exercise');
@@ -5586,9 +5587,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.activeWorkout = null;
         store.saveActiveWorkoutState(null);
         
-        if (typeof FriendsManager !== 'undefined' && FriendsManager.pushStats) {
-            FriendsManager.pushStats().catch(e => console.warn("Friends pushStats fout:", e));
-        }
+        this.pushFriendStats();
 
         const bottomNavEl = document.getElementById('bottom-nav');
         if (bottomNavEl) bottomNavEl.classList.remove('hidden');
@@ -5976,9 +5975,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.renderProgress();
         this.renderHome();
 
-        if (typeof FriendsManager !== 'undefined' && FriendsManager.pushStats) {
-            FriendsManager.pushStats().catch(e => console.warn("Friends pushStats error:", e));
-        }
+        this.pushFriendStats();
 
         this.showToast('Sessie gewijzigd.', 'success');
     },
@@ -7385,6 +7382,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.renderHome();
         this.renderProgress();
         this.renderAchievements();
+        this.pushFriendStats();
         this.showToast('Backup succesvol hersteld!', 'success');
     },
 
@@ -7565,6 +7563,24 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.renderWorkoutExercises();
     },
 
+    // Eigen statistieken naar Firestore, alleen als de logs sinds de vorige push
+    // veranderd zijn. Wordt ook na verwijderen, restore en sync-merge aangeroepen,
+    // zodat vrienden geen verwijderde of verouderde PR's blijven zien.
+    pushFriendStats() {
+        if (typeof FriendsManager === 'undefined' || !FriendsManager || typeof FriendsManager.pushStats !== 'function') return;
+        if (!FriendsManager.user) return;
+        const logs = (typeof store !== 'undefined' && Array.isArray(store.logs)) ? store.logs : [];
+        const signature = logs.length + ':' + logs.map(l => (l && l.id) + '@' + ((l && l.updatedAt) || '')).join('|');
+        if (signature === this._lastPushedStatsSignature) return;
+        this._lastPushedStatsSignature = signature;
+        Promise.resolve()
+            .then(() => FriendsManager.pushStats())
+            .catch(e => {
+                this._lastPushedStatsSignature = null; // volgende keer opnieuw proberen
+                console.warn('Friends pushStats fout:', e);
+            });
+    },
+
     toggleProfileWidget() {
         this.isProfileExpanded = !this.isProfileExpanded;
         this.renderFriends();
@@ -7716,234 +7732,277 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             // 4. Comparison View for Selected Friend
             const selectedFriend = friends.find(f => f.uid === FriendsManager.selectedFriendUid) || friends[0];
             if (selectedFriend) {
-                const myMaxesByGroup = this.calculateExerciseMaxesByMuscleGroup();
-                const friendMaxes = (selectedFriend.stats && selectedFriend.stats.muscleGroups) ? selectedFriend.stats.muscleGroups : {};
-                const friendName = selectedFriend.displayName || 'Vriend';
-
-                const muscleGroupDefs = [
-                    { id: 'chest', name: 'Borst', icon: 'fitness_center' },
-                    { id: 'back', name: 'Rug', icon: 'shield' },
-                    { id: 'legs', name: 'Benen', icon: 'directions_run' },
-                    { id: 'shoulders', name: 'Schouders', icon: 'accessibility_new' },
-                    { id: 'arms', name: 'Armen', icon: 'sports_gymnastics' },
-                    { id: 'glutes', name: 'Billen', icon: 'sports_kabaddi' },
-                    { id: 'core', name: 'Core', icon: 'grid_view' }
-                ];
-
-                // Helper to parse dates into timestamp ms
-                const parseTime = (dateStr) => {
-                    if (!dateStr) return 0;
-                    return (this.parseLogDate ? this.parseLogDate(dateStr) : new Date(dateStr).getTime()) || 0;
-                };
-
-                // Calculate most recent activity timestamp for each muscle group across both users
-                const getGroupLatestTime = (mgId) => {
-                    const myExs = myMaxesByGroup[mgId] || [];
-                    const fData = friendMaxes[mgId];
-                    let fExs = [];
-                    if (fData) {
-                        if (Array.isArray(fData.exercises)) fExs = fData.exercises;
-                        else if (fData.exercise) fExs = [fData];
-                    }
-                    let maxTime = 0;
-                    myExs.forEach(e => {
-                        if (e && e.date) {
-                            const t = parseTime(e.date);
-                            if (t > maxTime) maxTime = t;
-                        }
-                    });
-                    fExs.forEach(e => {
-                        if (e && e.date) {
-                            const t = parseTime(e.date);
-                            if (t > maxTime) maxTime = t;
-                        }
-                    });
-                    return maxTime;
-                };
-
-                // Sorteer spiergroepen op meest recente activiteit bovenaan
-                const sortedMuscleGroupDefs = [...muscleGroupDefs].sort((a, b) => {
-                    const timeA = getGroupLatestTime(a.id);
-                    const timeB = getGroupLatestTime(b.id);
-                    if (timeB !== timeA) return timeB - timeA;
-                    return 0; // retain standard order when equal
-                });
-
-                html += `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <h3 style="margin:0; text-transform:none; font-size:1.1rem; color:var(--text-primary);">Vergelijking met ${this.escapeHTML(friendName)}</h3>
-                        <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; color:var(--status-red);" onclick="if(confirm('Weet je zeker dat je ' + ${this.jsArg(friendName)} + ' wilt verwijderen uit je vriendenlijst?')){ FriendsManager.removeFriend(${this.jsArg(selectedFriend.uid)}); }">Verwijder vriend</button>
-                    </div>
-                `;
-
-                sortedMuscleGroupDefs.forEach(mgDef => {
-                    const myExercises = myMaxesByGroup[mgDef.id] || [];
-                    // Friend data: supports both old (single object) and new (exercises array) format
-                    const friendMgData = friendMaxes[mgDef.id];
-                    let friendExercises = [];
-                    if (friendMgData) {
-                        if (Array.isArray(friendMgData.exercises)) {
-                            friendExercises = friendMgData.exercises;
-                        } else if (friendMgData.exercise) {
-                            // Legacy single-exercise format
-                            friendExercises = [friendMgData];
-                        }
-                    }
-
-                    const getCanonName = name => (name ? this.getCanonicalExerciseName(name) : '');
-
-                    // Merge all unique exercise names (only if at least one user has valid data: maxKg > 0 or maxReps > 0)
-                    const allExerciseNames = new Set();
-                    myExercises.forEach(e => {
-                        if (e.maxKg > 0 || e.maxReps > 0 || e.estimated1RM > 0) {
-                            allExerciseNames.add(getCanonName(e.exercise));
-                        }
-                    });
-                    friendExercises.forEach(e => {
-                        if (e.maxKg > 0 || e.maxReps > 0 || e.estimated1RM > 0) {
-                            allExerciseNames.add(getCanonName(e.exercise));
-                        }
-                    });
-
-                    if (allExerciseNames.size === 0) return; // skip empty groups
-
-                    const findStat = (list, canonName) => list.find(e => getCanonName(e.exercise) === canonName);
-
-                    // Sorteer oefeningen: nieuwste datum eerst, bij gelijke datum matchende oefeningen eerst, daarna alfabetisch
-                    const sortedExerciseNames = Array.from(allExerciseNames).sort((a, b) => {
-                        const aMy = findStat(myExercises, a);
-                        const aFr = findStat(friendExercises, a);
-                        const aTimeMy = aMy && aMy.date ? parseTime(aMy.date) : 0;
-                        const aTimeFr = aFr && aFr.date ? parseTime(aFr.date) : 0;
-                        const aLatestTime = Math.max(aTimeMy, aTimeFr);
-
-                        const bMy = findStat(myExercises, b);
-                        const bFr = findStat(friendExercises, b);
-                        const bTimeMy = bMy && bMy.date ? parseTime(bMy.date) : 0;
-                        const bTimeFr = bFr && bFr.date ? parseTime(bFr.date) : 0;
-                        const bLatestTime = Math.max(bTimeMy, bTimeFr);
-
-                        // 1. Nieuwste datum eerst
-                        if (bLatestTime !== aLatestTime) {
-                            return bLatestTime - aLatestTime;
-                        }
-
-                        // 2. Matchende oefeningen (data bij beiden) eerst
-                        const aHasMy = aMy && (aMy.maxKg > 0 || aMy.maxReps > 0 || aMy.estimated1RM > 0);
-                        const aHasFr = aFr && (aFr.maxKg > 0 || aFr.maxReps > 0 || aFr.estimated1RM > 0);
-                        const aMatch = aHasMy && aHasFr;
-
-                        const bHasMy = bMy && (bMy.maxKg > 0 || bMy.maxReps > 0 || bMy.estimated1RM > 0);
-                        const bHasFr = bFr && (bFr.maxKg > 0 || bFr.maxReps > 0 || bFr.estimated1RM > 0);
-                        const bMatch = bHasMy && bHasFr;
-
-                        if (aMatch && !bMatch) return -1;
-                        if (!aMatch && bMatch) return 1;
-
-                        // 3. Alfabetisch
-                        return a.localeCompare(b);
-                    });
-
-                    html += `
-                        <div class="muscle-group-section">
-                            <div class="muscle-group-header">
-                                <span class="material-icons-round text-accent" style="font-size:1.2rem;">${mgDef.icon}</span>
-                                ${mgDef.name}
-                                <span class="text-sm text-muted" style="font-weight:400;">(${sortedExerciseNames.length} oefening${sortedExerciseNames.length !== 1 ? 'en' : ''})</span>
-                            </div>
-                    `;
-
-                    sortedExerciseNames.forEach(exName => {
-                        const myStat = findStat(myExercises, exName) || null;
-                        const fStat = findStat(friendExercises, exName) || null;
-                        const my1RM = myStat ? (myStat.estimated1RM || 0) : 0;
-                        const f1RM = fStat ? (fStat.estimated1RM || 0) : 0;
-                        const myReps = myStat ? (myStat.maxReps || 0) : 0;
-                        const fReps = fStat ? (fStat.maxReps || 0) : 0;
-                        const myKg = myStat ? (myStat.maxKg || 0) : 0;
-                        const fKg = fStat ? (fStat.maxKg || 0) : 0;
-
-                        const isBodyweightCompare = (myStat && myKg === 0) || (fStat && fKg === 0);
-
-                        let leaderBadge = '';
-                        if (myStat && fStat) {
-                            if (isBodyweightCompare && myReps > 0 && fReps > 0) {
-                                if (myReps > fReps) {
-                                    leaderBadge = `<span class="status-badge green" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap;">+${myReps - fReps} reps</span>`;
-                                } else if (fReps > myReps) {
-                                    leaderBadge = `<span class="status-badge orange" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap;">-${fReps - myReps} reps</span>`;
-                                } else {
-                                    leaderBadge = `<span class="status-badge" style="padding:2px 8px; font-size:0.65rem; background:rgba(255,255,255,0.1); color:var(--text-primary); white-space:nowrap;">Gelijk</span>`;
-                                }
-                            } else if (my1RM > 0 && f1RM > 0) {
-                                if (my1RM > f1RM) {
-                                    const diff = Math.round((my1RM - f1RM) * 10) / 10;
-                                    leaderBadge = `<span class="status-badge green" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap;">+${diff} kg</span>`;
-                                } else if (f1RM > my1RM) {
-                                    const diff = Math.round((f1RM - my1RM) * 10) / 10;
-                                    leaderBadge = `<span class="status-badge orange" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap;">-${diff} kg</span>`;
-                                } else {
-                                    leaderBadge = `<span class="status-badge" style="padding:2px 8px; font-size:0.65rem; background:rgba(255,255,255,0.1); color:var(--text-primary); white-space:nowrap;">Gelijk</span>`;
-                                }
-                            }
-                        }
-
-                        const myScore = isBodyweightCompare ? myReps : my1RM;
-                        const fScore = isBodyweightCompare ? fReps : f1RM;
-                        const totalScore = (myScore + fScore) || 1;
-                        const myPct = Math.round((myScore / totalScore) * 100) || 50;
-                        const fPct = 100 - myPct;
-
-                        const myDateStr = myStat && myStat.date ? this.formatShortDate(myStat.date) : '';
-                        const fDateStr = fStat && fStat.date ? this.formatShortDate(fStat.date) : '';
-
-                        const hasMyData = Boolean(myStat && (myKg > 0 || myReps > 0 || my1RM > 0));
-                        const hasFriendData = Boolean(fStat && (fKg > 0 || fReps > 0 || f1RM > 0));
-
-                        html += `
-                            <div class="exercise-compare-card">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                    <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">${this.escapeHTML(exName)}</div>
-                                    ${leaderBadge}
-                                </div>
-                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                                    <div style="background:rgba(59, 130, 246, 0.06); border-left:3px solid var(--accent-color); padding:8px 10px; border-radius:6px;">
-                                        <div class="text-sm text-muted" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:4px; font-size:0.65rem; font-weight:600;">
-                                            <span>JIJ</span>
-                                            ${myDateStr ? `<span style="font-weight:600; opacity:0.8; white-space:nowrap;">${this.escapeHTML(myDateStr)}</span>` : ''}
-                                        </div>
-                                        ${hasMyData ? `
-                                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${myKg > 0 ? `${myKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${myReps > 0 ? `× ${myReps}` : ''}</span></div>
-                                            <div class="text-accent" style="font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${myKg > 0 ? `1RM: ${my1RM} kg` : `Max: ${myReps} reps`}</div>
-                                        ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
-                                    </div>
-                                    <div style="background:rgba(245, 158, 11, 0.06); border-left:3px solid var(--status-orange); padding:8px 10px; border-radius:6px;">
-                                        <div class="text-sm text-muted" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:4px; font-size:0.65rem; font-weight:600;">
-                                            <span style="text-transform:uppercase;">${this.escapeHTML(friendName)}</span>
-                                            ${fDateStr ? `<span style="font-weight:600; opacity:0.8; white-space:nowrap;">${this.escapeHTML(fDateStr)}</span>` : ''}
-                                        </div>
-                                        ${hasFriendData ? `
-                                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${fKg > 0 ? `${fKg} kg` : '0 kg'} <span class="text-sm font-normal text-muted">${fReps > 0 ? `× ${fReps}` : ''}</span></div>
-                                            <div style="color:var(--status-orange); font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${fKg > 0 ? `1RM: ${f1RM} kg` : `Max: ${fReps} reps`}</div>
-                                        ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
-                                    </div>
-                                </div>
-                                ${(myScore > 0 || fScore > 0) ? `
-                                    <div style="background:rgba(255,255,255,0.05); height:4px; border-radius:2px; overflow:hidden; display:flex; margin-top:8px;">
-                                        <div style="width:${myPct}%; background:var(--accent-color); transition:width 0.3s ease;"></div>
-                                        <div style="width:${fPct}%; background:var(--status-orange); transition:width 0.3s ease;"></div>
-                                    </div>
-                                ` : ''}
-                            </div>
-                        `;
-                    });
-
-                    html += `</div>`;
-                });
+                html += this.renderFriendComparisonHtml(selectedFriend);
             }
         }
 
         container.innerHTML = html;
+    },
+
+    // --- VRIENDEN-VERGELIJKING ---
+    // Vaste groepen in vaste volgorde; die volgorde bepaalt ook aan welke groep een
+    // oefening wordt toegekend als hij in meerdere groepen voorkomt (geen dubbele kaarten)
+    FRIEND_COMPARE_GROUPS: [
+        { id: 'chest', name: 'Borst', icon: 'fitness_center' },
+        { id: 'back', name: 'Rug', icon: 'shield' },
+        { id: 'legs', name: 'Benen', icon: 'directions_run' },
+        { id: 'shoulders', name: 'Schouders', icon: 'accessibility_new' },
+        { id: 'arms', name: 'Armen', icon: 'sports_gymnastics' },
+        { id: 'glutes', name: 'Billen', icon: 'sports_kabaddi' },
+        { id: 'core', name: 'Core', icon: 'grid_view' },
+        { id: 'other', name: 'Overig', icon: 'more_horiz' }
+    ],
+
+    // Fijnere spiergroepen (biceps, quads, ...) vallen in de vergelijking onder hun
+    // hoofdgroep; alles wat niet bekend is komt onder "Overig" in plaats van te verdwijnen
+    friendCompareGroupFor(rawGroup) {
+        const mg = String(rawGroup || '').toLowerCase().trim();
+        const map = {
+            biceps: 'arms', triceps: 'arms', forearms: 'arms',
+            quads: 'legs', hamstrings: 'legs', calves: 'legs',
+            abs: 'core', obliques: 'core',
+            lats: 'back', traps: 'back',
+            rear_shoulders: 'shoulders', delts: 'shoulders'
+        };
+        const mapped = map[mg] || mg;
+        return this.FRIEND_COMPARE_GROUPS.some(g => g.id === mapped && g.id !== 'other') ? mapped : 'other';
+    },
+
+    // Epley met een plafond op 10 herhalingen: daarboven is de schatting niet meer
+    // bruikbaar voor een vergelijking. Afgerond op hele kilo's.
+    comparable1RM(stat) {
+        if (!stat) return 0;
+        const kg = parseFloat(stat.maxKg) || 0;
+        const reps = parseInt(stat.maxReps, 10) || 0;
+        if (kg <= 0) return 0;
+        if (reps <= 1) return Math.round(kg);
+        return Math.round(kg * (1 + Math.min(reps, 10) / 30));
+    },
+
+    // Pure opbouw van de vergelijking, los van HTML (testbaar).
+    // Resultaat: { hasFriendStats, groups: [{ id, name, icon, latestTime, exercises: [...] }] }
+    buildFriendComparison(myMaxesByGroup, friendMuscleGroups) {
+        const hasData = s => !!s && ((parseFloat(s.maxKg) || 0) > 0 || (parseInt(s.maxReps, 10) || 0) > 0 || (parseFloat(s.estimated1RM) || 0) > 0);
+        const canon = name => (name ? this.getCanonicalExerciseName(name) : '');
+        const parseTime = d => (d ? ((this.parseLogDate ? this.parseLogDate(d) : new Date(d).getTime()) || 0) : 0);
+        const score = s => (parseFloat(s.maxKg) || 0) > 0 ? this.comparable1RM(s) : (parseInt(s.maxReps, 10) || 0);
+        const better = (a, b) => (!a ? b : (!b ? a : (score(b) > score(a) ? b : a)));
+
+        // Beide kanten normaliseren naar Map<groepId, Map<canonName, beste stat>>
+        const bucketize = (source, listOf) => {
+            const out = new Map();
+            Object.keys(source || {}).forEach(rawGroup => {
+                const target = this.friendCompareGroupFor(rawGroup);
+                const list = listOf(source[rawGroup]);
+                if (!out.has(target)) out.set(target, new Map());
+                const bucket = out.get(target);
+                list.forEach(s => {
+                    if (!hasData(s)) return;
+                    const key = canon(s.exercise);
+                    if (!key) return;
+                    bucket.set(key, better(bucket.get(key), s));
+                });
+            });
+            return out;
+        };
+        const mine = bucketize(myMaxesByGroup, v => (Array.isArray(v) ? v : []));
+        const theirs = bucketize(friendMuscleGroups, v => {
+            if (!v) return [];
+            if (Array.isArray(v.exercises)) return v.exercises;
+            if (Array.isArray(v)) return v;
+            if (v.exercise) return [v]; // legacy: één object per groep
+            return [];
+        });
+
+        // Beste stat per oefening over alle groepen heen: een oefening krijgt één kaart
+        // (in de eerste groep waarin hij voorkomt), maar mag data uit een andere groep
+        // van de tegenpartij niet verliezen
+        const bestByName = buckets => {
+            const out = new Map();
+            buckets.forEach(bucket => bucket.forEach((s, name) => out.set(name, better(out.get(name), s))));
+            return out;
+        };
+        const myByName = bestByName(mine);
+        const frByName = bestByName(theirs);
+
+        const seen = new Set();
+        const groups = [];
+        this.FRIEND_COMPARE_GROUPS.forEach(def => {
+            const myBucket = mine.get(def.id) || new Map();
+            const frBucket = theirs.get(def.id) || new Map();
+            const names = [...new Set([...myBucket.keys(), ...frBucket.keys()])].filter(n => !seen.has(n));
+            if (names.length === 0) return;
+            names.forEach(n => seen.add(n));
+
+            let latestTime = 0;
+            const exercises = names.map(name => {
+                const my = myByName.get(name) || null;
+                const fr = frByName.get(name) || null;
+                const myKg = my ? (parseFloat(my.maxKg) || 0) : 0;
+                const fKg = fr ? (parseFloat(fr.maxKg) || 0) : 0;
+                const myReps = my ? (parseInt(my.maxReps, 10) || 0) : 0;
+                const fReps = fr ? (parseInt(fr.maxReps, 10) || 0) : 0;
+                const my1RM = this.comparable1RM(my);
+                const f1RM = this.comparable1RM(fr);
+                const latest = Math.max(my ? parseTime(my.date) : 0, fr ? parseTime(fr.date) : 0);
+                if (latest > latestTime) latestTime = latest;
+
+                // Vergelijkingsmodus: alleen gelijksoortige prestaties tegen elkaar zetten
+                let mode = 'single';
+                let leader = null;
+                let diff = 0;
+                if (my && fr) {
+                    if (myKg > 0 && fKg > 0) {
+                        mode = 'weight';
+                        diff = my1RM - f1RM;
+                    } else if (myKg === 0 && fKg === 0) {
+                        mode = 'reps';
+                        diff = myReps - fReps;
+                    } else {
+                        mode = 'mixed'; // gewicht versus lichaamsgewicht is niet te vergelijken
+                    }
+                    if (mode !== 'mixed') leader = diff > 0 ? 'me' : (diff < 0 ? 'friend' : 'tie');
+                }
+
+                const myScore = my ? score(my) : 0;
+                const fScore = fr ? score(fr) : 0;
+                const total = myScore + fScore;
+                let myPct = 50;
+                if (mode !== 'mixed' && total > 0) myPct = Math.max(0, Math.min(100, Math.round((myScore / total) * 100)));
+
+                return {
+                    name, my, friend: fr, myKg, fKg, myReps, fReps, my1RM, f1RM,
+                    mode, leader, diff: Math.abs(diff), matched: !!(my && fr), latest,
+                    showBar: mode !== 'mixed' && total > 0, myPct, fPct: 100 - myPct
+                };
+            });
+
+            // Nieuwste eerst, dan oefeningen met data bij beiden, dan alfabetisch
+            exercises.sort((a, b) => {
+                if (b.latest !== a.latest) return b.latest - a.latest;
+                if (a.matched !== b.matched) return a.matched ? -1 : 1;
+                return a.name.localeCompare(b.name);
+            });
+
+            groups.push({ id: def.id, name: def.name, icon: def.icon, latestTime, exercises });
+        });
+
+        // Groepen met de meest recente activiteit bovenaan; bij gelijke stand de vaste volgorde
+        groups.sort((a, b) => b.latestTime - a.latestTime);
+
+        return {
+            hasFriendStats: !!friendMuscleGroups && Object.keys(friendMuscleGroups).length > 0,
+            groups
+        };
+    },
+
+    renderFriendComparisonHtml(selectedFriend) {
+        const myMaxesByGroup = this.calculateExerciseMaxesByMuscleGroup();
+        const friendMaxes = (selectedFriend.stats && selectedFriend.stats.muscleGroups) ? selectedFriend.stats.muscleGroups : {};
+        const friendName = selectedFriend.displayName || 'Vriend';
+        const comparison = this.buildFriendComparison(myMaxesByGroup, friendMaxes);
+
+        // Versheid: de cijfers van een vriend zijn een momentopname van zijn laatste push
+        let freshness = '';
+        const lastUpdated = selectedFriend.stats && selectedFriend.stats.lastUpdated;
+        if (lastUpdated) {
+            const ms = new Date(lastUpdated).getTime();
+            if (!isNaN(ms)) {
+                const daysOld = (Date.now() - ms) / 86400000;
+                freshness = `Bijgewerkt op ${this.formatShortDate(lastUpdated)}${daysOld > 30 ? ' (mogelijk verouderd)' : ''}`;
+            }
+        }
+
+        let html = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <div>
+                    <h3 style="margin:0; text-transform:none; font-size:1.1rem; color:var(--text-primary);">Vergelijking met ${this.escapeHTML(friendName)}</h3>
+                    ${freshness ? `<div class="text-sm text-muted friend-stats-freshness" style="font-size:0.72rem;">${this.escapeHTML(freshness)}</div>` : ''}
+                </div>
+                <button class="btn-secondary" style="padding:2px 8px; font-size:0.75rem; color:var(--status-red);" onclick="if(confirm('Weet je zeker dat je ' + ${this.jsArg(friendName)} + ' wilt verwijderen uit je vriendenlijst?')){ FriendsManager.removeFriend(${this.jsArg(selectedFriend.uid)}); }">Verwijder vriend</button>
+            </div>
+        `;
+
+        if (!comparison.hasFriendStats) {
+            html += `
+                <div class="glass-panel text-center p-4 mb-4 friend-compare-empty">
+                    <p class="text-muted text-sm">${this.escapeHTML(friendName)} heeft nog geen statistieken gedeeld. Die verschijnen hier zodra ${this.escapeHTML(friendName)} een sessie afrondt.</p>
+                </div>
+            `;
+            return html;
+        }
+        if (comparison.groups.length === 0) {
+            html += `
+                <div class="glass-panel text-center p-4 mb-4 friend-compare-empty">
+                    <p class="text-muted text-sm">Nog geen oefeningen met data om te vergelijken.</p>
+                </div>
+            `;
+            return html;
+        }
+
+        const badge = (cls, text, extraStyle = '') => `<span class="status-badge ${cls}" style="padding:2px 8px; font-size:0.65rem; white-space:nowrap; ${extraStyle}">${text}</span>`;
+        const neutralStyle = 'background:rgba(255,255,255,0.1); color:var(--text-primary);';
+
+        comparison.groups.forEach(group => {
+            html += `
+                <div class="muscle-group-section">
+                    <div class="muscle-group-header">
+                        <span class="material-icons-round text-accent" style="font-size:1.2rem;">${group.icon}</span>
+                        ${group.name}
+                        <span class="text-sm text-muted" style="font-weight:400;">(${group.exercises.length} oefening${group.exercises.length !== 1 ? 'en' : ''})</span>
+                    </div>
+            `;
+
+            group.exercises.forEach(ex => {
+                let leaderBadge = '';
+                if (ex.mode === 'mixed') {
+                    leaderBadge = badge('', 'Niet vergelijkbaar', neutralStyle);
+                } else if (ex.mode === 'weight' || ex.mode === 'reps') {
+                    const unit = ex.mode === 'weight' ? 'kg' : 'reps';
+                    if (ex.leader === 'me') leaderBadge = badge('green', `+${ex.diff} ${unit}`);
+                    else if (ex.leader === 'friend') leaderBadge = badge('orange', `-${ex.diff} ${unit}`);
+                    else leaderBadge = badge('', 'Gelijk', neutralStyle);
+                }
+
+                const myDateStr = ex.my && ex.my.date ? this.formatShortDate(ex.my.date) : '';
+                const fDateStr = ex.friend && ex.friend.date ? this.formatShortDate(ex.friend.date) : '';
+                const side = (stat, kg, reps, oneRm, label, dateStr, accentStyle, valueStyle) => `
+                    <div style="${accentStyle} padding:8px 10px; border-radius:6px;">
+                        <div class="text-sm text-muted" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:4px; font-size:0.65rem; font-weight:600;">
+                            <span style="text-transform:uppercase;">${label}</span>
+                            ${dateStr ? `<span style="font-weight:600; opacity:0.8; white-space:nowrap;">${this.escapeHTML(dateStr)}</span>` : ''}
+                        </div>
+                        ${stat ? `
+                            <div style="font-size:1rem; font-weight:700; margin-top:2px;">${kg > 0 ? `${kg} kg` : 'Bodyweight'} <span class="text-sm font-normal text-muted">${reps > 0 ? `× ${reps}` : ''}</span></div>
+                            <div style="${valueStyle} font-size:0.7rem; font-weight:600; margin-top:2px; font-family:monospace;">${kg > 0 ? `1RM: ±${oneRm} kg` : `Max: ${reps} reps`}</div>
+                        ` : `<div class="text-sm text-muted" style="margin-top:4px;">Geen data</div>`}
+                    </div>
+                `;
+
+                html += `
+                    <div class="exercise-compare-card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">${this.escapeHTML(ex.name)}</div>
+                            ${leaderBadge}
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                            ${side(ex.my, ex.myKg, ex.myReps, ex.my1RM, 'Jij', myDateStr, 'background:rgba(59, 130, 246, 0.06); border-left:3px solid var(--accent-color);', 'color:var(--accent-color);')}
+                            ${side(ex.friend, ex.fKg, ex.fReps, ex.f1RM, this.escapeHTML(friendName), fDateStr, 'background:rgba(245, 158, 11, 0.06); border-left:3px solid var(--status-orange);', 'color:var(--status-orange);')}
+                        </div>
+                        ${ex.showBar ? `
+                            <div class="compare-bar" role="img" aria-label="Jij ${ex.myPct} procent, ${this.escapeHTML(friendName)} ${ex.fPct} procent" style="background:rgba(255,255,255,0.05); height:4px; border-radius:2px; overflow:hidden; display:flex; margin-top:8px;">
+                                <div style="width:${ex.myPct}%; background:var(--accent-color); transition:width 0.3s ease;"></div>
+                                <div style="width:${ex.fPct}%; background:var(--status-orange); transition:width 0.3s ease;"></div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+        });
+
+        return html;
     },
 
     // =========================================================================

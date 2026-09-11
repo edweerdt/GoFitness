@@ -376,6 +376,11 @@ const CloudSync = {
         ['renderHome', 'renderPlans', 'renderProgress', 'renderAchievements'].forEach(fn => {
             try { this.app[fn](); } catch (e) { /* view mogelijk nog niet in de DOM */ }
         });
+        // Gemergde logs kunnen de maxima veranderen: vrienden-statistieken bijwerken
+        // (pushFriendStats slaat over als er niets veranderd is)
+        if (typeof this.app.pushFriendStats === 'function') {
+            try { this.app.pushFriendStats(); } catch (e) { /* best effort */ }
+        }
     },
 
     renderPanel() {
