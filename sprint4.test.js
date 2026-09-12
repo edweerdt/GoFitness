@@ -104,9 +104,12 @@ describe('renderHistory', () => {
         expect(newest.querySelector('.history-meta .pr-crown-badge').textContent).toContain('1 PR');
         expect(newest.querySelector('.history-volume').textContent).toContain('855 kg'); // 450 + 405
 
-        const segs = newest.querySelectorAll('.set-bar .set-bar-seg');
-        expect(segs.length).toBe(1);
-        expect(segs[0].querySelector('.set-bar-fill').style.width).toBe('67%');
+        const dots = newest.querySelectorAll('.set-strip .set-dot');
+        expect(dots.length).toBe(3);
+        expect(dots[0].classList.contains('pr')).toBe(true);
+        expect(dots[1].classList.contains('done')).toBe(true);
+        expect(dots[1].classList.contains('pr')).toBe(false);
+        expect(dots[2].classList.contains('missed')).toBe(true);
     });
 
     it('toont details als tabel met PR-rij en delta, en een stand-kolom alleen als die er is', () => {

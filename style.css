@@ -2390,26 +2390,30 @@ textarea:focus-visible,
     :root:not(.theme-dark) .plan-chip { color: hsl(var(--chip-h, 210), 55%, 34%); }
 }
 
-/* Voortgangsbalk: één segment per oefening, themakleur-neutraal en rustig */
-.set-bar {
+/* Set-strip: per oefening een groepje stipjes, één per set.
+   Gedaan is neutraal grijs, gemist een open rondje; de PR-set krijgt de accentkleur
+   van het palet plus een ring, zodat hij in elk thema (ook oranje) afsteekt. */
+.set-strip {
     display: flex;
-    gap: 3px;
+    flex-wrap: wrap;
+    gap: 6px 12px;
     margin-top: 10px;
-    height: 4px;
 }
-.set-bar-seg {
-    flex: 1;
-    height: 100%;
-    border-radius: 2px;
-    background: rgba(128, 128, 128, 0.22);
-    overflow: hidden;
+.set-strip-ex { display: inline-flex; align-items: center; gap: 4px; }
+.set-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    box-sizing: border-box;
+    border: 1.5px solid var(--text-muted);
 }
-.set-bar-fill {
-    display: block;
-    height: 100%;
-    border-radius: 2px;
-    background: var(--text-muted);
-    opacity: 0.85;
+.set-dot.done { background: var(--text-muted); }
+.set-dot.missed { background: transparent; opacity: 0.55; }
+.set-dot.pr {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px var(--surface-color), 0 0 0 3.5px var(--accent-color);
+    margin: 0 2px;
 }
 .history-volume { margin-top: 8px; }
 

@@ -3583,12 +3583,19 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 const totalSets = exercises.reduce((n, ex) => n + Math.max(ex.totalSets || 0, (ex.details || []).length || ex.setsCompleted || 0), 0);
                 if (totalSets > 0) metaParts.push(`${doneSets}/${totalSets} sets`);
 
-                // Rustige voortgangsbalk: één segment per oefening, gevuld naar rato van de gedane sets
-                const barSegments = exercises.map(ex => {
+                // Set-strip: per oefening een stipje per set. Gedaan = neutraal grijs,
+                // gemist = open rondje, PR = accentkleur van het palet met een ring, zodat
+                // het onderscheid in elk kleurpalet door vorm én kleur zichtbaar is.
+                const strip = exercises.map((ex, exIdx) => {
                     const done = (ex.details || []).length || ex.setsCompleted || 0;
                     const total = Math.max(ex.totalSets || 0, done);
-                    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                    return html`<span class="set-bar-seg" title="${ex.name}: ${done}/${total} sets"><span class="set-bar-fill" style="width:${pct}%"></span></span>`;
+                    const exAnn = ann.exercises[exIdx] || { prSets: new Set() };
+                    const dots = [];
+                    for (let i = 0; i < total; i++) {
+                        const cls = i < done ? (exAnn.prSets.has(i) ? 'set-dot done pr' : 'set-dot done') : 'set-dot missed';
+                        dots.push(html`<span class="${cls}"></span>`);
+                    }
+                    return html`<span class="set-strip-ex" title="${ex.name}: ${done}/${total} sets${exAnn.prSets.size > 0 ? ', PR' : ''}">${dots}</span>`;
                 });
 
                 // Detail: tabel per oefening met PR-markering en verschil met de vorige keer
@@ -3652,7 +3659,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 ${ann.volumePct !== null && ann.volumePct !== undefined ? html`<span class="volume-delta ${ann.volumePct > 0 ? 'up' : (ann.volumePct < 0 ? 'down' : 'flat')}" title="Trainingsvolume (gewicht x herhalingen) ten opzichte van de vorige keer dat je deze sessie deed">${ann.volumePct > 0 ? '+' : ''}${ann.volumePct === 0 ? 'gelijk' : ann.volumePct + '%'}</span>` : ''}
                                 ${ann.prCount > 0 ? html`<span class="pr-crown-badge" title="${ann.prCount} persoonlijke record${ann.prCount === 1 ? '' : 's'}"><span class="pr-crown-text">${ann.prCount} PR</span></span>` : ''}
                             </div>
-                            ${barSegments.length > 0 ? html`<div class="set-bar" aria-hidden="true">${barSegments}</div>` : ''}
+                            ${strip.length > 0 ? html`<div class="set-strip" aria-hidden="true">${strip}</div>` : ''}
                         </div>
                         ${menu}
                         <span class="material-icons-round text-muted history-chevron" aria-hidden="true">expand_more</span>
