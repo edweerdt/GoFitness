@@ -2774,8 +2774,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             let anchor = 'middle';
             if (i === 0 && points.length > 1) anchor = 'start';
             else if (i === points.length - 1) anchor = 'end';
-            const above = c.y > padTop + 6;
-            const ly = above ? c.y - 7 : c.y + 13;
+            const ly = c.y - 7;
             return `<text x="${c.x.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anchor}" font-size="12" font-weight="600" fill="var(--text-primary)">${this.escapeHTML(String(c.weight))}</text>`;
         }).join('');
 
@@ -7571,7 +7570,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                             else if (i === points.length - 1) anchor = 'right';
 
                             ctx.textAlign = anchor;
-                            const ly = c.y > sparkY + padTop + 6 ? c.y - 7 : c.y + 14;
+                            const ly = c.y - 7;
                             ctx.fillText(String(c.weight), c.x, ly);
                         });
                         ctx.textAlign = 'left';
