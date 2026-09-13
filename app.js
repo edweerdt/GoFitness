@@ -1666,6 +1666,22 @@ const app = {
 
         let stepsHtml = '';
         if (steps.length > 0) {
+            // Check if any step has a type badge and determine uniform badge width (GOF-34)
+            const hasAnyBadges = steps.some(s => s && typeof s === 'object' && s.type);
+            let badgeWidth = 78;
+            if (hasAnyBadges) {
+                let maxLen = 0;
+                steps.forEach(s => {
+                    if (s && typeof s === 'object' && s.type) {
+                        const label = this.formatWarmupType(s.type);
+                        if (label.length > maxLen) maxLen = label.length;
+                    }
+                });
+                if (maxLen > 9) {
+                    badgeWidth = Math.max(78, Math.round(maxLen * 7.2 + 16));
+                }
+            }
+
             stepsHtml = steps.map((step, idx) => {
                 if (typeof step === 'string') {
                     return `
@@ -1677,10 +1693,12 @@ const app = {
                 const typeLabel = this.formatWarmupType(step.type);
                 const typeBadgeStyle = this.getWarmupTypeBadgeStyle(step.type);
                 const typeBadge = typeLabel ? `
-                    <span class="status-badge" style="padding:2px 8px; font-size:0.7rem; font-weight:600; border-radius:4px; flex-shrink:0; text-transform:none; ${typeBadgeStyle}">
+                    <span class="status-badge warmup-badge" style="width:${badgeWidth}px !important; min-width:${badgeWidth}px !important; max-width:${badgeWidth}px !important; justify-content:center !important; text-align:center; padding:2px 6px; font-size:0.7rem; font-weight:600; border-radius:4px; flex-shrink:0; text-transform:none; box-sizing:border-box; ${typeBadgeStyle}">
                         ${this.escapeHTML(typeLabel)}
                     </span>
-                ` : '';
+                ` : (hasAnyBadges ? `
+                    <span class="warmup-badge-placeholder" style="width:${badgeWidth}px; min-width:${badgeWidth}px; max-width:${badgeWidth}px; flex-shrink:0; display:inline-block;"></span>
+                ` : '');
 
                 const sentence = this.formatWarmupStepSentence(step);
 

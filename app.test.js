@@ -1955,6 +1955,78 @@ describe('Warmup formatting helpers (GOF-32)', () => {
     });
 });
 
+describe('Warmup badge alignment (GOF-34)', () => {
+    it('should assign identical badge width to both cardio and activatie so descriptions align equally', () => {
+        const warmup = {
+            durationMinutes: 8,
+            steps: [
+                { type: 'cardio', name: 'Fietsen of stevig wandelen', durationMinutes: 5, notes: 'Rustig tempo' },
+                { type: 'activation', name: 'Lichte opwarmsets van de eerste 2 oefeningen', durationMinutes: 3, notes: '1 lichte set per oefening' }
+            ]
+        };
+        const html = app.formatWarmupHTML(warmup);
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+
+        const badges = temp.querySelectorAll('.warmup-badge');
+        expect(badges.length).toBe(2);
+
+        // Both badges must have identical width styles for equal alignment
+        const cardioBadge = badges[0];
+        const activatieBadge = badges[1];
+
+        expect(cardioBadge.textContent.trim()).toBe('Cardio');
+        expect(activatieBadge.textContent.trim()).toBe('Activatie');
+
+        expect(cardioBadge.style.width).toBe('78px');
+        expect(activatieBadge.style.width).toBe('78px');
+        expect(cardioBadge.style.minWidth).toBe('78px');
+        expect(activatieBadge.style.minWidth).toBe('78px');
+        expect(cardioBadge.style.justifyContent).toBe('center');
+        expect(activatieBadge.style.justifyContent).toBe('center');
+    });
+
+    it('should provide a matching placeholder when a step lacks a type so its text remains aligned', () => {
+        const warmup = {
+            steps: [
+                { type: 'cardio', name: 'Wandelen', durationMinutes: 5 },
+                { name: 'Algemene opmerking zonder type', notes: 'Goed ademhalen' }
+            ]
+        };
+        const html = app.formatWarmupHTML(warmup);
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+
+        const badge = temp.querySelector('.warmup-badge');
+        const placeholder = temp.querySelector('.warmup-badge-placeholder');
+
+        expect(badge).not.toBeNull();
+        expect(placeholder).not.toBeNull();
+        expect(placeholder.style.width).toBe('78px');
+    });
+
+    it('should dynamically expand uniform width when longer badges are present while keeping alignment equal', () => {
+        const warmup = {
+            steps: [
+                { type: 'cardio', name: 'Fietsen', durationMinutes: 5 },
+                { type: 'dynamic_stretch', name: 'Dynamisch rekken van de benen', durationMinutes: 3 }
+            ]
+        };
+        const html = app.formatWarmupHTML(warmup);
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+
+        const badges = temp.querySelectorAll('.warmup-badge');
+        expect(badges.length).toBe(2);
+
+        // Dynamisch rekken has 16 chars, so badgeWidth expands beyond 78px
+        const width0 = badges[0].style.width;
+        const width1 = badges[1].style.width;
+        expect(width0).toBe(width1);
+        expect(parseInt(width0, 10)).toBeGreaterThan(78);
+    });
+});
+
 describe('rest timer', () => {
     beforeEach(() => {
         jest.useFakeTimers();
