@@ -831,7 +831,29 @@ function html(strings, ...values) {
     return new HtmlString(strings.reduce((out, s, i) => (i === 0 ? s : out + render(values[i - 1]) + s), ''));
 }
 
+const _MUSCLE_META = (typeof MUSCLE_META !== 'undefined')
+    ? MUSCLE_META
+    : (typeof require !== 'undefined' ? (function() { try { return require('./muscleIcons').MUSCLE_META; } catch(e) { return {}; } })() : {});
+
 const app = {
+    MUSCLE_META: _MUSCLE_META,
+
+    getMuscleMeta(key) {
+        const k = String(key || '').toLowerCase().trim();
+        const fallbackName = k ? (k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' ')) : 'Overig';
+        const source = (this.MUSCLE_META && Object.keys(this.MUSCLE_META).length > 0) ? this.MUSCLE_META : _MUSCLE_META;
+        return (source && source[k]) || { name: fallbackName, color: '#a78bfa', icon: 'fitness_center', svg: '' };
+    },
+
+    getMuscleIconHtml(key, size = 20) {
+        const meta = this.getMuscleMeta(key);
+        if (meta && meta.svg) {
+            return meta.svg;
+        }
+        const iconName = (meta && meta.icon) ? meta.icon : 'fitness_center';
+        return `<span class="material-icons-round" style="font-size:${size}px;">${iconName}</span>`;
+    },
+
     currentView: 'home',
     activeWorkout: null,
 
@@ -2928,20 +2950,6 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const grid = document.getElementById('muscle-stats-grid');
         if (!grid) return;
 
-        // Metadata for UI
-        const muscleMeta = {
-            'chest': { name: 'Borst', icon: 'fitness_center', color: '#fca5a5' },
-            'back': { name: 'Rug', icon: 'flight_takeoff', color: '#93c5fd' },
-            'legs': { name: 'Benen', icon: 'directions_run', color: '#86efac' },
-            'glutes': { name: 'Billen', icon: 'sports_gymnastics', color: '#fbcfe8' },
-            'shoulders': { name: 'Schouders', icon: 'accessibility_new', color: '#fde047' },
-            'biceps': { name: 'Biceps', icon: 'sports_martial_arts', color: '#c4b5fd' },
-            'triceps': { name: 'Triceps', icon: 'sports_mma', color: '#a78bfa' },
-            'arms': { name: 'Armen', icon: 'sports_martial_arts', color: '#c4b5fd' },
-            'core': { name: 'Core', icon: 'sports_mma', color: '#fdba74' },
-            'overig': { name: 'Overig', icon: 'more_horiz', color: '#d1d5db' }
-        };
-
         const stats = {};
 
         // Build a fallback map from all plans
@@ -3013,15 +3021,14 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         let html = '';
         muscleKeys.forEach(m => {
             const data = stats[m];
-            const fallbackName = m ? (m.charAt(0).toUpperCase() + m.slice(1).replace(/_/g, ' ')) : 'Overig';
-            const meta = muscleMeta[m] || { name: fallbackName, icon: 'fitness_center', color: '#a78bfa' };
+            const meta = this.getMuscleMeta(m);
             const maxWeightDisplay = data.maxWeight > 0 ? `${data.maxWeight} kg` : '-';
             
             html += `
                 <div class="glass-panel" style="display:flex; flex-direction:column; gap:12px; padding:16px;">
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <div class="stat-icon-wrapper" style="width:36px; height:36px; padding:6px; background:rgba(255,255,255,0.05); color:${meta.color};">
-                            <span class="material-icons-round" style="font-size:18px;">${meta.icon}</span>
+                        <div class="stat-icon-wrapper" style="width:36px; height:36px; padding:4px; border-radius:10px; display:grid; place-items:center; background:rgba(255,255,255,0.05); color:${meta.color};">
+                            ${this.getMuscleIconHtml(m, 20)}
                         </div>
                         <div style="font-weight:600; font-size:1rem;">${this.escapeHTML(meta.name)}</div>
                     </div>
@@ -7265,18 +7272,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             }
         }
 
-        const muscleMeta = {
-            'chest': { name: 'Borst', icon: 'fitness_center', color: '#fca5a5' },
-            'back': { name: 'Rug', icon: 'flight_takeoff', color: '#93c5fd' },
-            'legs': { name: 'Benen', icon: 'directions_run', color: '#86efac' },
-            'glutes': { name: 'Billen', icon: 'sports_gymnastics', color: '#fbcfe8' },
-            'shoulders': { name: 'Schouders', icon: 'accessibility_new', color: '#fde047' },
-            'biceps': { name: 'Biceps', icon: 'sports_martial_arts', color: '#c4b5fd' },
-            'triceps': { name: 'Triceps', icon: 'sports_mma', color: '#a78bfa' },
-            'arms': { name: 'Armen', icon: 'sports_martial_arts', color: '#c4b5fd' },
-            'core': { name: 'Core', icon: 'sports_mma', color: '#fdba74' },
-            'overig': { name: 'Overig', icon: 'more_horiz', color: '#d1d5db' }
-        };
+        const muscleMeta = this.MUSCLE_META || _MUSCLE_META;
 
         let muscleStatsData = {};
         let muscleKeys = [];
@@ -7641,8 +7637,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     drawCard(cardX, cardY, cardW, cardH, 16);
 
                     const data = muscleStatsData[m];
-                    const fallbackName = m ? (m.charAt(0).toUpperCase() + m.slice(1).replace(/_/g, ' ')) : 'Overig';
-                    const meta = muscleMeta[m] || { name: fallbackName, icon: 'fitness_center', color: '#a78bfa' };
+                    const meta = this.getMuscleMeta(m);
                     const maxWeightDisplay = data.maxWeight > 0 ? `${data.maxWeight} kg` : '-';
 
                     // Icon Badge Box
@@ -8153,11 +8148,11 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     // oefening wordt toegekend als hij in meerdere groepen voorkomt (geen dubbele kaarten)
     FRIEND_COMPARE_GROUPS: [
         { id: 'chest', name: 'Borst', icon: 'fitness_center' },
-        { id: 'back', name: 'Rug', icon: 'shield' },
+        { id: 'back', name: 'Rug', icon: 'rowing' },
         { id: 'legs', name: 'Benen', icon: 'directions_run' },
         { id: 'shoulders', name: 'Schouders', icon: 'accessibility_new' },
-        { id: 'arms', name: 'Armen', icon: 'sports_gymnastics' },
-        { id: 'glutes', name: 'Billen', icon: 'sports_kabaddi' },
+        { id: 'arms', name: 'Armen', icon: 'sports_handball' },
+        { id: 'glutes', name: 'Billen', icon: 'airline_seat_recline_extra' },
         { id: 'core', name: 'Core', icon: 'grid_view' },
         { id: 'other', name: 'Overig', icon: 'more_horiz' }
     ],
@@ -8356,7 +8351,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             html += `
                 <div class="muscle-group-section">
                     <div class="muscle-group-header">
-                        <span class="material-icons-round text-accent" style="font-size:1.2rem;">${group.icon}</span>
+                        <span class="muscle-icon-wrap" style="width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; color:var(--accent-color);">${this.getMuscleIconHtml(group.id, 18)}</span>
                         ${group.name}
                         <span class="text-sm text-muted" style="font-weight:400;">(${group.exercises.length} oefening${group.exercises.length !== 1 ? 'en' : ''})</span>
                     </div>
