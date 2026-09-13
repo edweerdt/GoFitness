@@ -873,6 +873,7 @@ const app = {
         }
 
         this.applyTheme();
+        this.historyViewMode = this.getSavedHistoryViewMode();
 
         // Wake lock vervalt zodra de app naar de achtergrond gaat; vraag opnieuw aan
         document.addEventListener('visibilitychange', () => {
@@ -3218,9 +3219,95 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         return `${formatTime(startD)} - ${formatTime(endD)}`;
     },
 
-    // --- LOGBOEK ---
+    // --- LOGBOEK & KALENDER (GOF-44) ---
     historyPageSize: 20,
     historyVisibleCount: 20,
+    historyViewMode: 'list',
+    calendarYear: new Date().getFullYear(),
+    calendarMonth: new Date().getMonth(),
+    calendarSelectedDate: null,
+
+    getSavedHistoryViewMode() {
+        try {
+            if (typeof localStorage !== 'undefined') {
+                const saved = localStorage.getItem('gofitness_history_view_mode');
+                if (saved === 'calendar' || saved === 'list') return saved;
+            }
+        } catch (e) {}
+        return 'list';
+    },
+
+    setHistoryViewMode(mode) {
+        this.historyViewMode = mode === 'calendar' ? 'calendar' : 'list';
+        try {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('gofitness_history_view_mode', this.historyViewMode);
+            }
+        } catch (e) {}
+        this.updateHistoryViewToggleUI();
+        if (this.historyViewMode === 'calendar') {
+            this.renderHistoryCalendar();
+        } else {
+            this.renderHistory();
+        }
+    },
+
+    updateHistoryViewToggleUI() {
+        if (typeof document === 'undefined') return;
+        const btnList = document.getElementById('btn-history-view-list');
+        const btnCal = document.getElementById('btn-history-view-calendar');
+        const hList = document.getElementById('history-list');
+        const hCal = document.getElementById('history-calendar');
+
+        const isCal = this.historyViewMode === 'calendar';
+        if (btnList) {
+            btnList.classList.toggle('active', !isCal);
+            btnList.setAttribute('aria-pressed', (!isCal).toString());
+        }
+        if (btnCal) {
+            btnCal.classList.toggle('active', isCal);
+            btnCal.setAttribute('aria-pressed', isCal.toString());
+        }
+        if (hList) {
+            hList.classList.toggle('hidden', isCal);
+        }
+        if (hCal) {
+            hCal.classList.toggle('hidden', !isCal);
+        }
+    },
+
+    getLocalDateKey(d) {
+        if (!d) return '';
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    },
+
+    changeCalendarMonth(delta) {
+        this.calendarMonth += delta;
+        if (this.calendarMonth < 0) {
+            this.calendarMonth = 11;
+            this.calendarYear--;
+        } else if (this.calendarMonth > 11) {
+            this.calendarMonth = 0;
+            this.calendarYear++;
+        }
+        this.renderHistoryCalendar();
+    },
+
+    goToCalendarToday() {
+        const now = new Date();
+        this.calendarYear = now.getFullYear();
+        this.calendarMonth = now.getMonth();
+        this.calendarSelectedDate = this.getLocalDateKey(now);
+        this.renderHistoryCalendar();
+    },
+
+    selectCalendarDate(dateKey) {
+        this.calendarSelectedDate = dateKey;
+        this.renderHistoryCalendar();
+    },
 
     loadMoreHistory() {
         this.historyVisibleCount += this.historyPageSize;
@@ -3561,7 +3648,121 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.showToast(`Sessie '${log.sessionName || 'Sessie'}' gestart met de gewichten van de vorige keer.`, 'success');
     },
 
+    createHistoryCardElement(log, ann = null) {
+        if (!ann) {
+            const annotations = this.buildHistoryAnnotations();
+            ann = annotations.get(log.id) || { volume: 0, prCount: 0, volumeDelta: null, volumePct: null, prevVolume: null, exercises: [] };
+        }
+        const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
+        const fmt = v => (isNonEmpty(v) ? String(v).replace('.', ',') : '');
+        const dateStr = new Date(log.date).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
+        const timeRange = this.formatLogTimeRange(log);
+        const planName = log.planName || 'Overige Sessies';
+        const exercises = log.exercises || [];
+
+        const metaParts = [];
+        if (log.duration != null) metaParts.push(`${log.duration} min`);
+        metaParts.push(`${exercises.length || log.exercisesCompleted || 0} oefening${(exercises.length || log.exercisesCompleted || 0) === 1 ? '' : 'en'}`);
+        const doneSets = exercises.reduce((n, ex) => n + ((ex.details || []).length || ex.setsCompleted || 0), 0);
+        const totalSets = exercises.reduce((n, ex) => n + Math.max(ex.totalSets || 0, (ex.details || []).length || ex.setsCompleted || 0), 0);
+        if (totalSets > 0) metaParts.push(`${doneSets}/${totalSets} sets`);
+
+        // Set-strip: per oefening een stipje per set. Gedaan = neutraal grijs,
+        // gemist = open rondje, PR = accentkleur van het palet met een ring, zodat
+        // het onderscheid in elk kleurpalet door vorm én kleur zichtbaar is.
+        const strip = exercises.map((ex, exIdx) => {
+            const done = (ex.details || []).length || ex.setsCompleted || 0;
+            const total = Math.max(ex.totalSets || 0, done);
+            const exAnn = ann.exercises[exIdx] || { prSets: new Set() };
+            const dots = [];
+            for (let i = 0; i < total; i++) {
+                const cls = i < done ? (exAnn.prSets.has(i) ? 'set-dot done pr' : 'set-dot done') : 'set-dot missed';
+                dots.push(html`<span class="${cls}"></span>`);
+            }
+            return html`<span class="set-strip-ex" title="${ex.name}: ${done}/${total} sets${exAnn.prSets.size > 0 ? ', PR' : ''}">${dots}</span>`;
+        });
+
+        // Detail: tabel per oefening met PR-markering en verschil met de vorige keer
+        const anyLevel = exercises.some(ex => (ex.details || []).some(d => isNonEmpty(d && d.level)));
+        const detailParts = exercises.length > 0 ? exercises.map((ex, exIdx) => {
+            const exAnn = ann.exercises[exIdx] || { prSets: new Set(), deltas: [] };
+            const details = ex.details || [];
+            const rows = details.map((d, i) => {
+                const delta = exAnn.deltas[i];
+                const deltaHtml = delta
+                    ? html`<span class="set-delta ${delta.value > 0 ? 'up' : 'down'}">${delta.value > 0 ? '+' : ''}${fmt(delta.value)}${delta.kind === 'reps' ? ' r' : ''}</span>`
+                    : '';
+                const prHtml = exAnn.prSets.has(i) ? html`<span class="pr-crown-badge" title="Persoonlijk Record (PR)"><span class="pr-crown-text">PR</span></span>` : '';
+                const isBare = !isNonEmpty(d.weight) && !isNonEmpty(d.reps) && !isNonEmpty(d.level);
+                return html`
+                    <tr class="${exAnn.prSets.has(i) ? 'is-pr' : ''}">
+                        <td class="set-col">${d.setNumber || i + 1} ${prHtml}</td>
+                        <td class="num">${isBare ? rawHtml('<span class="text-muted">afgevinkt</span>') : fmt(d.weight)} ${!isBare ? deltaHtml : ''}</td>
+                        <td class="num">${fmt(d.reps)}</td>
+                        ${anyLevel ? html`<td class="num">${fmt(d.level)}</td>` : ''}
+                    </tr>`;
+            });
+            return html`
+                <div class="history-exercise">
+                    <div class="history-exercise-title">${ex.name} <span class="text-muted">(${ex.setsCompleted != null ? ex.setsCompleted : details.length}/${ex.totalSets != null ? ex.totalSets : details.length} sets)</span>
+                        ${exAnn.trend ? html`<span class="ex-trend ${exAnn.trend.value > 0 ? 'up' : (exAnn.trend.value < 0 ? 'down' : 'flat')}" title="Verschil met de vorige keer"><span class="material-icons-round" aria-hidden="true">${exAnn.trend.value > 0 ? 'trending_up' : (exAnn.trend.value < 0 ? 'trending_down' : 'trending_flat')}</span>${exAnn.trend.value > 0 ? '+' : ''}${exAnn.trend.value === 0 ? 'gelijk' : (exAnn.trend.kind === 'kg' ? this.formatVolume(exAnn.trend.value) + ' kg' : exAnn.trend.value + ' reps')}</span>` : ''}
+                    </div>
+                    ${rows.length > 0 ? html`
+                        <table class="history-set-table">
+                            <thead><tr><th>Set</th><th class="num">kg</th><th class="num">reps</th>${anyLevel ? html`<th class="num">stand</th>` : ''}</tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>` : html`<div class="text-sm text-muted">Afgevinkt, geen details</div>`}
+                </div>`;
+        }) : [html`<div class="text-sm text-muted mt-2">Afgevinkt, geen details (oude sessie).</div>`];
+
+        const idArg = rawHtml(this.jsArg(log.id));
+        const menu = html`
+            <div class="history-menu-wrap">
+                <button type="button" class="icon-btn history-menu-btn" aria-label="Acties voor deze sessie" aria-haspopup="menu" aria-expanded="false" onclick="event.stopPropagation(); app.toggleHistoryMenu(this)"><span class="material-icons-round" aria-hidden="true">more_vert</span></button>
+                <div class="history-menu hidden" role="menu">
+                    ${exercises.length > 0 ? html`<button type="button" role="menuitem" class="history-menu-item" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.showEditLogModal(${idArg})"><span class="material-icons-round" aria-hidden="true">edit_note</span><span class="history-menu-label">Bewerken</span></button>` : ''}
+                    ${exercises.length > 0 ? html`<button type="button" role="menuitem" class="history-menu-item" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.repeatLoggedSession(${idArg})"><span class="material-icons-round" aria-hidden="true">replay</span><span class="history-menu-label">Herhalen</span></button>` : ''}
+                    <button type="button" role="menuitem" class="history-menu-item danger" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.deleteLogWithUndo(${idArg})"><span class="material-icons-round" aria-hidden="true">delete_outline</span><span class="history-menu-label">Verwijderen</span></button>
+                </div>
+            </div>`;
+
+        const el = document.createElement('div');
+        el.className = 'glass-panel history-card';
+        el.innerHTML = html`
+            <div class="history-card-head" role="button" tabindex="0" aria-expanded="false"
+                 onclick="const d=this.nextElementSibling; d.classList.toggle('hidden'); this.setAttribute('aria-expanded', d.classList.contains('hidden') ? 'false' : 'true');"
+                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                <div class="history-card-main">
+                    <div class="history-title-row">
+                        <span class="history-session-name">${log.sessionName || 'Sessie'}</span>
+                        <span class="plan-chip" style="--chip-h:${this.planChipHue(planName)}">${planName}</span>
+                    </div>
+                    <div class="history-meta text-sm text-muted">
+                        <span>${dateStr}${timeRange ? ` · ${timeRange}` : ''}</span>
+                        <span>${metaParts.join(' · ')}</span>
+                        ${ann.volumePct !== null && ann.volumePct !== undefined ? html`<span class="volume-delta ${ann.volumePct > 0 ? 'up' : (ann.volumePct < 0 ? 'down' : 'flat')}" title="Trainingsvolume (gewicht x herhalingen) ten opzichte van de vorige keer dat je deze sessie deed">${ann.volumePct > 0 ? '+' : ''}${ann.volumePct === 0 ? 'gelijk' : ann.volumePct + '%'}</span>` : ''}
+                        ${ann.prCount > 0 ? html`<span class="pr-crown-badge" title="${ann.prCount} persoonlijke record${ann.prCount === 1 ? '' : 's'}"><span class="pr-crown-text">${ann.prCount} PR</span></span>` : ''}
+                    </div>
+                    ${strip.length > 0 ? html`<div class="set-strip" aria-hidden="true">${strip}</div>` : ''}
+                </div>
+                ${menu}
+                <span class="material-icons-round text-muted history-chevron" aria-hidden="true">expand_more</span>
+            </div>
+            <div class="hidden history-details">
+                ${ann.volume > 0 ? html`<div class="history-volume text-sm text-muted">Volume <strong>${this.formatVolume(ann.volume)} kg</strong> (gewicht x herhalingen, opgeteld)${ann.prevVolume ? ` · vorige keer ${this.formatVolume(ann.prevVolume)} kg` : ''}</div>` : ''}
+                ${detailParts}
+            </div>
+        `;
+        return el;
+    },
+
     renderHistory() {
+        this.updateHistoryViewToggleUI();
+        if (this.historyViewMode === 'calendar') {
+            this.renderHistoryCalendar();
+            return;
+        }
+
         const hList = document.getElementById('history-list');
         if (!hList) return;
         hList.innerHTML = '';
@@ -3583,9 +3784,6 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const topNav = document.querySelector('#view-progress .top-nav');
         const stickyTop = topNav && topNav.offsetHeight ? topNav.offsetHeight : 0;
 
-        const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
-        const fmt = v => (isNonEmpty(v) ? String(v).replace('.', ',') : '');
-
         groups.forEach(group => {
             const header = document.createElement('div');
             header.className = 'history-group-header';
@@ -3595,104 +3793,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
             group.logs.forEach(log => {
                 const ann = annotations.get(log.id) || { volume: 0, prCount: 0, volumeDelta: null, volumePct: null, prevVolume: null, exercises: [] };
-                const dateStr = new Date(log.date).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
-                const timeRange = this.formatLogTimeRange(log);
-                const planName = log.planName || 'Overige Sessies';
-                const exercises = log.exercises || [];
-
-                const metaParts = [];
-                if (log.duration != null) metaParts.push(`${log.duration} min`);
-                metaParts.push(`${exercises.length || log.exercisesCompleted || 0} oefening${(exercises.length || log.exercisesCompleted || 0) === 1 ? '' : 'en'}`);
-                const doneSets = exercises.reduce((n, ex) => n + ((ex.details || []).length || ex.setsCompleted || 0), 0);
-                const totalSets = exercises.reduce((n, ex) => n + Math.max(ex.totalSets || 0, (ex.details || []).length || ex.setsCompleted || 0), 0);
-                if (totalSets > 0) metaParts.push(`${doneSets}/${totalSets} sets`);
-
-                // Set-strip: per oefening een stipje per set. Gedaan = neutraal grijs,
-                // gemist = open rondje, PR = accentkleur van het palet met een ring, zodat
-                // het onderscheid in elk kleurpalet door vorm én kleur zichtbaar is.
-                const strip = exercises.map((ex, exIdx) => {
-                    const done = (ex.details || []).length || ex.setsCompleted || 0;
-                    const total = Math.max(ex.totalSets || 0, done);
-                    const exAnn = ann.exercises[exIdx] || { prSets: new Set() };
-                    const dots = [];
-                    for (let i = 0; i < total; i++) {
-                        const cls = i < done ? (exAnn.prSets.has(i) ? 'set-dot done pr' : 'set-dot done') : 'set-dot missed';
-                        dots.push(html`<span class="${cls}"></span>`);
-                    }
-                    return html`<span class="set-strip-ex" title="${ex.name}: ${done}/${total} sets${exAnn.prSets.size > 0 ? ', PR' : ''}">${dots}</span>`;
-                });
-
-                // Detail: tabel per oefening met PR-markering en verschil met de vorige keer
-                const anyLevel = exercises.some(ex => (ex.details || []).some(d => isNonEmpty(d && d.level)));
-                const detailParts = exercises.length > 0 ? exercises.map((ex, exIdx) => {
-                    const exAnn = ann.exercises[exIdx] || { prSets: new Set(), deltas: [] };
-                    const details = ex.details || [];
-                    const rows = details.map((d, i) => {
-                        const delta = exAnn.deltas[i];
-                        const deltaHtml = delta
-                            ? html`<span class="set-delta ${delta.value > 0 ? 'up' : 'down'}">${delta.value > 0 ? '+' : ''}${fmt(delta.value)}${delta.kind === 'reps' ? ' r' : ''}</span>`
-                            : '';
-                        const prHtml = exAnn.prSets.has(i) ? html`<span class="pr-crown-badge" title="Persoonlijk Record (PR)"><span class="pr-crown-text">PR</span></span>` : '';
-                        const isBare = !isNonEmpty(d.weight) && !isNonEmpty(d.reps) && !isNonEmpty(d.level);
-                        return html`
-                            <tr class="${exAnn.prSets.has(i) ? 'is-pr' : ''}">
-                                <td class="set-col">${d.setNumber || i + 1} ${prHtml}</td>
-                                <td class="num">${isBare ? rawHtml('<span class="text-muted">afgevinkt</span>') : fmt(d.weight)} ${!isBare ? deltaHtml : ''}</td>
-                                <td class="num">${fmt(d.reps)}</td>
-                                ${anyLevel ? html`<td class="num">${fmt(d.level)}</td>` : ''}
-                            </tr>`;
-                    });
-                    return html`
-                        <div class="history-exercise">
-                            <div class="history-exercise-title">${ex.name} <span class="text-muted">(${ex.setsCompleted != null ? ex.setsCompleted : details.length}/${ex.totalSets != null ? ex.totalSets : details.length} sets)</span>
-                                ${exAnn.trend ? html`<span class="ex-trend ${exAnn.trend.value > 0 ? 'up' : (exAnn.trend.value < 0 ? 'down' : 'flat')}" title="Verschil met de vorige keer"><span class="material-icons-round" aria-hidden="true">${exAnn.trend.value > 0 ? 'trending_up' : (exAnn.trend.value < 0 ? 'trending_down' : 'trending_flat')}</span>${exAnn.trend.value > 0 ? '+' : ''}${exAnn.trend.value === 0 ? 'gelijk' : (exAnn.trend.kind === 'kg' ? this.formatVolume(exAnn.trend.value) + ' kg' : exAnn.trend.value + ' reps')}</span>` : ''}
-                            </div>
-                            ${rows.length > 0 ? html`
-                                <table class="history-set-table">
-                                    <thead><tr><th>Set</th><th class="num">kg</th><th class="num">reps</th>${anyLevel ? html`<th class="num">stand</th>` : ''}</tr></thead>
-                                    <tbody>${rows}</tbody>
-                                </table>` : html`<div class="text-sm text-muted">Afgevinkt, geen details</div>`}
-                        </div>`;
-                }) : [html`<div class="text-sm text-muted mt-2">Afgevinkt, geen details (oude sessie).</div>`];
-
-                const idArg = rawHtml(this.jsArg(log.id));
-                const menu = html`
-                    <div class="history-menu-wrap">
-                        <button type="button" class="icon-btn history-menu-btn" aria-label="Acties voor deze sessie" aria-haspopup="menu" aria-expanded="false" onclick="event.stopPropagation(); app.toggleHistoryMenu(this)"><span class="material-icons-round" aria-hidden="true">more_vert</span></button>
-                        <div class="history-menu hidden" role="menu">
-                            ${exercises.length > 0 ? html`<button type="button" role="menuitem" class="history-menu-item" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.showEditLogModal(${idArg})"><span class="material-icons-round" aria-hidden="true">edit_note</span><span class="history-menu-label">Bewerken</span></button>` : ''}
-                            ${exercises.length > 0 ? html`<button type="button" role="menuitem" class="history-menu-item" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.repeatLoggedSession(${idArg})"><span class="material-icons-round" aria-hidden="true">replay</span><span class="history-menu-label">Herhalen</span></button>` : ''}
-                            <button type="button" role="menuitem" class="history-menu-item danger" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.deleteLogWithUndo(${idArg})"><span class="material-icons-round" aria-hidden="true">delete_outline</span><span class="history-menu-label">Verwijderen</span></button>
-                        </div>
-                    </div>`;
-
-                const el = document.createElement('div');
-                el.className = 'glass-panel history-card';
-                el.innerHTML = html`
-                    <div class="history-card-head" role="button" tabindex="0" aria-expanded="false"
-                         onclick="const d=this.nextElementSibling; d.classList.toggle('hidden'); this.setAttribute('aria-expanded', d.classList.contains('hidden') ? 'false' : 'true');"
-                         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                        <div class="history-card-main">
-                            <div class="history-title-row">
-                                <span class="history-session-name">${log.sessionName || 'Sessie'}</span>
-                                <span class="plan-chip" style="--chip-h:${this.planChipHue(planName)}">${planName}</span>
-                            </div>
-                            <div class="history-meta text-sm text-muted">
-                                <span>${dateStr}${timeRange ? ` · ${timeRange}` : ''}</span>
-                                <span>${metaParts.join(' · ')}</span>
-                                ${ann.volumePct !== null && ann.volumePct !== undefined ? html`<span class="volume-delta ${ann.volumePct > 0 ? 'up' : (ann.volumePct < 0 ? 'down' : 'flat')}" title="Trainingsvolume (gewicht x herhalingen) ten opzichte van de vorige keer dat je deze sessie deed">${ann.volumePct > 0 ? '+' : ''}${ann.volumePct === 0 ? 'gelijk' : ann.volumePct + '%'}</span>` : ''}
-                                ${ann.prCount > 0 ? html`<span class="pr-crown-badge" title="${ann.prCount} persoonlijke record${ann.prCount === 1 ? '' : 's'}"><span class="pr-crown-text">${ann.prCount} PR</span></span>` : ''}
-                            </div>
-                            ${strip.length > 0 ? html`<div class="set-strip" aria-hidden="true">${strip}</div>` : ''}
-                        </div>
-                        ${menu}
-                        <span class="material-icons-round text-muted history-chevron" aria-hidden="true">expand_more</span>
-                    </div>
-                    <div class="hidden history-details">
-                        ${ann.volume > 0 ? html`<div class="history-volume text-sm text-muted">Volume <strong>${this.formatVolume(ann.volume)} kg</strong> (gewicht x herhalingen, opgeteld)${ann.prevVolume ? ` · vorige keer ${this.formatVolume(ann.prevVolume)} kg` : ''}</div>` : ''}
-                        ${detailParts}
-                    </div>
-                `;
+                const el = this.createHistoryCardElement(log, ann);
                 hList.appendChild(el);
             });
         });
@@ -3704,6 +3805,223 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             more.textContent = `Eerdere sessies laden (${remaining} resterend)`;
             more.onclick = () => this.loadMoreHistory();
             hList.appendChild(more);
+        }
+    },
+
+    renderHistoryCalendar() {
+        this.updateHistoryViewToggleUI();
+        const hCal = document.getElementById('history-calendar');
+        if (!hCal) return;
+        hCal.innerHTML = '';
+
+        if (!store.logs || store.logs.length === 0) {
+            hCal.innerHTML = '<p class="text-muted">Nog geen sessies afgerond.</p>';
+            return;
+        }
+
+        this.ensureHistoryMenuListener();
+        const annotations = this.buildHistoryAnnotations();
+        const activeLogs = store.logs.filter(l => l && !this.pendingLogDeletes.has(l.id));
+
+        const logsByDate = new Map();
+        let monthSessionCount = 0;
+        let monthVolume = 0;
+        let monthPrCount = 0;
+
+        activeLogs.forEach(log => {
+            const t = this.parseLogDate(log.date);
+            if (!t) return;
+            const d = new Date(t);
+            const dateKey = this.getLocalDateKey(d);
+
+            if (!logsByDate.has(dateKey)) {
+                logsByDate.set(dateKey, []);
+            }
+            logsByDate.get(dateKey).push(log);
+
+            if (d.getFullYear() === this.calendarYear && d.getMonth() === this.calendarMonth) {
+                monthSessionCount++;
+                const ann = annotations.get(log.id);
+                if (ann) {
+                    if (ann.volume) monthVolume += ann.volume;
+                    if (ann.prCount) monthPrCount += ann.prCount;
+                }
+            }
+        });
+
+        logsByDate.forEach(list => {
+            list.sort((a, b) => this.parseLogDate(b.date) - this.parseLogDate(a.date));
+        });
+
+        const now = new Date();
+        const todayKey = this.getLocalDateKey(now);
+
+        // Bepaal de geselecteerde datum
+        if (!this.calendarSelectedDate || !this.calendarSelectedDate.startsWith(`${this.calendarYear}-${String(this.calendarMonth + 1).padStart(2, '0')}`)) {
+            if (now.getFullYear() === this.calendarYear && now.getMonth() === this.calendarMonth) {
+                this.calendarSelectedDate = todayKey;
+            } else {
+                // Zoek de meest recente datum met een log in deze maand
+                const datesInMonth = Array.from(logsByDate.keys())
+                    .filter(k => k.startsWith(`${this.calendarYear}-${String(this.calendarMonth + 1).padStart(2, '0')}`))
+                    .sort();
+                if (datesInMonth.length > 0) {
+                    this.calendarSelectedDate = datesInMonth[datesInMonth.length - 1];
+                } else {
+                    this.calendarSelectedDate = `${this.calendarYear}-${String(this.calendarMonth + 1).padStart(2, '0')}-01`;
+                }
+            }
+        }
+
+        const monthNames = [
+            'Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni',
+            'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December'
+        ];
+
+        // Berekening dagen en offsets (Maandag = start)
+        const firstDay = new Date(this.calendarYear, this.calendarMonth, 1);
+        let startDay = firstDay.getDay() - 1;
+        if (startDay === -1) startDay = 6;
+
+        const totalDays = new Date(this.calendarYear, this.calendarMonth + 1, 0).getDate();
+        const prevMonthDays = new Date(this.calendarYear, this.calendarMonth, 0).getDate();
+
+        const dayCells = [];
+
+        // Vorige maand opvulling
+        for (let i = startDay - 1; i >= 0; i--) {
+            const dayNum = prevMonthDays - i;
+            dayCells.push(html`<div class="calendar-day-cell other-month" aria-hidden="true"><span class="day-num">${dayNum}</span></div>`);
+        }
+
+        // Huidige maand dagen
+        for (let d = 1; d <= totalDays; d++) {
+            const dateObj = new Date(this.calendarYear, this.calendarMonth, d);
+            const dateKey = this.getLocalDateKey(dateObj);
+            const dayLogs = logsByDate.get(dateKey) || [];
+            const hasLog = dayLogs.length > 0;
+            const isToday = (dateKey === todayKey);
+            const isSelected = (dateKey === this.calendarSelectedDate);
+            const hasPr = dayLogs.some(l => {
+                const a = annotations.get(l.id);
+                return a && a.prCount > 0;
+            });
+
+            let cellClass = 'calendar-day-cell';
+            if (isSelected) cellClass += ' selected';
+            if (hasLog) cellClass += ' has-log';
+            if (isToday) cellClass += ' today';
+
+            const indicators = [];
+            if (hasLog) {
+                indicators.push(html`<span class="calendar-workout-dot" title="${dayLogs.length} sessie(s)"></span>`);
+                if (hasPr) {
+                    indicators.push(html`<span class="calendar-pr-crown-icon" title="PR behaald">👑</span>`);
+                }
+            }
+
+            const safeKey = rawHtml(this.jsArg(dateKey));
+            dayCells.push(html`
+                <div class="${cellClass}" role="button" tabindex="0"
+                     aria-label="${d} ${monthNames[this.calendarMonth]}${hasLog ? `, ${dayLogs.length} sessie(s)` : ''}"
+                     onclick="app.selectCalendarDate(${safeKey})"
+                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                    <span class="day-num">${d}</span>
+                    <div class="day-indicators">${indicators}</div>
+                </div>
+            `);
+        }
+
+        // Volgende maand opvulling
+        const totalRendered = startDay + totalDays;
+        const padRemaining = (7 - (totalRendered % 7)) % 7;
+        for (let i = 1; i <= padRemaining; i++) {
+            dayCells.push(html`<div class="calendar-day-cell other-month" aria-hidden="true"><span class="day-num">${i}</span></div>`);
+        }
+
+        // Selected date formatting
+        let selectedDateFormatted = 'Geselecteerde dag';
+        const selParts = (this.calendarSelectedDate || '').split('-');
+        if (selParts.length === 3) {
+            const selD = new Date(parseInt(selParts[0], 10), parseInt(selParts[1], 10) - 1, parseInt(selParts[2], 10));
+            const formatted = selD.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' });
+            selectedDateFormatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+        }
+
+        const selectedLogs = logsByDate.get(this.calendarSelectedDate) || [];
+
+        const calWrapper = document.createElement('div');
+        calWrapper.className = 'calendar-wrapper';
+        calWrapper.innerHTML = html`
+            <div class="calendar-card glass-panel">
+                <div class="calendar-nav-bar">
+                    <button type="button" class="icon-btn calendar-nav-btn" onclick="app.changeCalendarMonth(-1)" aria-label="Vorige maand" title="Vorige maand">
+                        <span class="material-icons-round" aria-hidden="true">chevron_left</span>
+                    </button>
+                    <div class="calendar-month-title-wrap">
+                        <h4 class="calendar-month-title">${monthNames[this.calendarMonth]} ${this.calendarYear}</h4>
+                        <button type="button" class="calendar-today-btn" onclick="app.goToCalendarToday()" title="Ga naar vandaag">Vandaag</button>
+                    </div>
+                    <button type="button" class="icon-btn calendar-nav-btn" onclick="app.changeCalendarMonth(1)" aria-label="Volgende maand" title="Volgende maand">
+                        <span class="material-icons-round" aria-hidden="true">chevron_right</span>
+                    </button>
+                </div>
+
+                <div class="calendar-stats-bar">
+                    <div class="calendar-stat-pill">
+                        <span class="material-icons-round text-accent" aria-hidden="true">fitness_center</span>
+                        <span><strong>${monthSessionCount}</strong> ${monthSessionCount === 1 ? 'sessie' : 'sessies'}</span>
+                    </div>
+                    ${monthVolume > 0 ? html`
+                    <div class="calendar-stat-pill">
+                        <span class="material-icons-round text-accent" aria-hidden="true">scale</span>
+                        <span><strong>${this.formatVolume(monthVolume)}</strong> kg</span>
+                    </div>` : ''}
+                    ${monthPrCount > 0 ? html`
+                    <div class="calendar-stat-pill pr">
+                        <span class="calendar-pr-crown-icon" aria-hidden="true">👑</span>
+                        <span><strong>${monthPrCount}</strong> PR${monthPrCount === 1 ? '' : "'s"}</span>
+                    </div>` : ''}
+                </div>
+
+                <div class="calendar-weekdays" aria-hidden="true">
+                    <span>Ma</span><span>Di</span><span>Wo</span><span>Do</span><span>Vr</span><span>Za</span><span>Zo</span>
+                </div>
+
+                <div class="calendar-grid">
+                    ${dayCells}
+                </div>
+            </div>
+
+            <div class="calendar-day-section mt-4">
+                <div class="calendar-day-section-header">
+                    <h4 class="calendar-day-title">${selectedDateFormatted}</h4>
+                    <span class="calendar-day-badge ${selectedLogs.length > 0 ? 'completed' : 'rest'}">
+                        ${selectedLogs.length > 0 ? `${selectedLogs.length} ${selectedLogs.length === 1 ? 'sessie' : 'sessies'}` : 'Rustdag'}
+                    </span>
+                </div>
+                <div id="calendar-day-cards" class="flex-col gap-3 mt-2"></div>
+            </div>
+        `;
+
+        hCal.appendChild(calWrapper);
+
+        const dayCardsContainer = calWrapper.querySelector('#calendar-day-cards');
+        if (selectedLogs.length > 0) {
+            selectedLogs.forEach(log => {
+                const ann = annotations.get(log.id) || { volume: 0, prCount: 0, volumeDelta: null, volumePct: null, prevVolume: null, exercises: [] };
+                const el = this.createHistoryCardElement(log, ann);
+                dayCardsContainer.appendChild(el);
+            });
+        } else {
+            const restEl = document.createElement('div');
+            restEl.className = 'glass-panel calendar-rest-card';
+            restEl.innerHTML = html`
+                <div class="calendar-rest-icon"><span class="material-icons-round" aria-hidden="true">bedtime</span></div>
+                <div class="calendar-rest-title">Rustdag</div>
+                <div class="text-sm text-muted mt-1">Geen trainingssessie gelogd op deze dag.</div>
+            `;
+            dayCardsContainer.appendChild(restEl);
         }
     },
 

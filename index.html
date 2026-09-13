@@ -200,9 +200,24 @@
                         <!-- Muscle stats injected here -->
                     </div>
 
-                    <h3 class="mt-6">Logboek</h3>
+                    <div class="history-header-row mt-6">
+                        <h3 style="margin:0;">Logboek</h3>
+                        <div class="history-view-toggle" role="group" aria-label="Weergave van logboek kiezen">
+                            <button type="button" id="btn-history-view-list" class="history-toggle-btn active" onclick="app.setHistoryViewMode('list')" aria-pressed="true" title="Lijstweergave">
+                                <span class="material-icons-round" aria-hidden="true">format_list_bulleted</span>
+                                <span>Lijst</span>
+                            </button>
+                            <button type="button" id="btn-history-view-calendar" class="history-toggle-btn" onclick="app.setHistoryViewMode('calendar')" aria-pressed="false" title="Kalenderweergave">
+                                <span class="material-icons-round" aria-hidden="true">calendar_month</span>
+                                <span>Kalender</span>
+                            </button>
+                        </div>
+                    </div>
                     <div id="history-list" class="mt-2 flex-col gap-3">
                         <!-- History injected here -->
+                    </div>
+                    <div id="history-calendar" class="mt-2 hidden">
+                        <!-- Calendar view injected here -->
                     </div>
                 </div>
             </section>
