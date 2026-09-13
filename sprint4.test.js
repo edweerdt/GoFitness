@@ -129,6 +129,16 @@ describe('renderHistory', () => {
         expect(cards[0].querySelector('.history-details').classList.contains('hidden')).toBe(true);
     });
 
+    it('behoudt kolom-uitlijning voor gewichten met en zonder deltas via CSS regels', () => {
+        const fs = require('fs');
+        const css = fs.readFileSync(__dirname + '/style.css', 'utf8');
+        expect(css).toContain('.history-set-table th:nth-child(2)');
+        expect(css).toContain('.history-set-table td:nth-child(2)');
+        expect(css).toContain('padding-right: 38px');
+        expect(css).toContain('.history-set-table td:nth-child(2) .set-delta');
+        expect(css).toContain('position: absolute');
+    });
+
     it('klapt details uit met Enter en zet aria-expanded', () => {
         store.logs = [log('l1', daysAgo(1), 'Push', 'P', [ex('Bench Press', [set(1, 40, 10)])])];
         app.renderHistory();
