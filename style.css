@@ -559,6 +559,29 @@ button:disabled {
     }
 }
 
+/* Warm-up badge alignment (GOF-34) */
+.status-badge.warmup-badge {
+    width: 78px !important;
+    min-width: 78px !important;
+    max-width: 78px !important;
+    justify-content: center !important;
+    text-align: center;
+    box-sizing: border-box;
+    padding: 2px 6px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+}
+
+.warmup-badge-placeholder {
+    width: 78px;
+    min-width: 78px;
+    max-width: 78px;
+    flex-shrink: 0;
+    display: inline-block;
+}
+
 /* Standalone 16px search icon button without background */
 .icon-search-btn {
     background: none !important;
