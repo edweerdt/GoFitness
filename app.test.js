@@ -1301,6 +1301,30 @@ describe('exercise progress', () => {
         expect(html).toContain('>30</text>'); // idx 12
     });
 
+    it('should always render value labels above their data points (GOF-43)', () => {
+        const points = [
+            { weight: 40 },
+            { weight: 60 },
+            { weight: 80 }
+        ];
+        const svg = app.buildSparklineSVG(points, 'kg');
+
+        // Circles have cy and text elements have y
+        const circleMatches = [...svg.matchAll(/<circle[^>]*cy="([^"]+)"/g)].map(m => parseFloat(m[1]));
+        const textMatches = [...svg.matchAll(/<text[^>]*y="([^"]+)"[^>]*>([^<]+)<\/text>/g)].map(m => ({
+            y: parseFloat(m[1]),
+            text: m[2]
+        }));
+
+        expect(textMatches.length).toBe(3);
+        // Each text label y coordinate must be less than the circle's cy (i.e. physically above it)
+        textMatches.forEach((tm, i) => {
+            const circleCy = circleMatches[i];
+            expect(tm.y).toBeLessThan(circleCy);
+            expect(tm.y).toBeCloseTo(circleCy - 7, 1);
+        });
+    });
+
     it('should show a hint when there is not enough data', () => {
         app.renderExerciseProgress();
         expect(document.getElementById('exercise-progress-list').innerHTML).toContain('Geen trainingen met gewichten');
