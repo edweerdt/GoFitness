@@ -1,12 +1,20 @@
-# Mandatory Git Workflow Rule
+# Mandatory Project & Git Workflow Rules
 
-Voor ELKE taak, bugfix of feature in dit project moet de AI assistent ALTIJD automatisch de volledige Git workflow doorlopen zonder dat de gebruiker hierom hoeft te vragen:
+## 1. Ticket Herkenning & Header (Linear Integratie)
+Wanneer de gebruiker een ticketnummer noemt of typt (bijvoorbeeld `GOF-40`):
+1. **Ophalen via Linear**: Haal direct via `linear-mcp-server` de officiële details van het ticket op (titel, status, omschrijving, URL).
+2. **Prominente Header**: Start het antwoord in de chat ALTIJD direct met een duidelijke H1 header inclusief link:
+   `# [GOF-XX: <Titel>](<Linear URL>)`
+3. Geef een beknopte toelichting van de ticketvraag en ga direct aan de slag met de implementatie.
+
+## 2. Volledige Ontwikkelworkflow
+Voor ELKE taak, bugfix of feature in dit project doorloopt de AI assistent automatisch de volledige workflow:
 
 1. **Pull & Sync**:
    - Voer `git checkout main` en `git pull origin main` uit om up-to-date te starten.
 
 2. **Branch**:
-   - Maak een passende feature/fix branch aan: `git checkout -b <type>/<korte-beschrijving>` (of `edweerdt/<taak-beschrijving>`).
+   - Maak een passende feature/fix branch aan met het Linear branch format: `git checkout -b <branchName>` (bijv. `edweerdt/gof-XX-<slug>`).
 
 3. **Implementatie & Tests**:
    - Voer de codewijzigingen door.
@@ -14,9 +22,12 @@ Voor ELKE taak, bugfix of feature in dit project moet de AI assistent ALTIJD aut
 
 4. **Commit & Push**:
    - Voeg gewijzigde bestanden toe (`git add`).
-   - Maak een duidelijke commit (`git commit -m "<type>(<scope>): <beschrijving>"`).
+   - Maak een duidelijke commit (`git commit -m "<type>(<scope>): <beschrijving> (GOF-XX)"`).
    - Push direct naar remote (`git push -u origin <branch>`).
 
-5. **Pull Request Link**:
-   - Geef aan het einde van het antwoord direct de GitHub PR link naar de gebruiker:
-     `https://github.com/edweerdt/GoFitness/compare/main...<branch>?expand=1`
+5. **Pull Request Link & Ticket Update**:
+   - Deel direct de GitHub PR link in de chat (`https://github.com/edweerdt/GoFitness/compare/main...<branch>?expand=1`).
+   - Plaats een samenvattend comment met de PR-link op het Linear ticket.
+
+6. **Acceptatie & Done**:
+   - **BELANGRIJK:** Het ticket op Linear mag **PAS op 'Done' gezet worden nadat de gebruiker de wijzigingen/PR expliciet heeft beoordeeld en geaccepteerd**.
