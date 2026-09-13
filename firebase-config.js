@@ -14,7 +14,13 @@ const firebaseConfig = {
 // Initialiseer Firebase (alleen als firebase geladen is)
 if (typeof firebase !== 'undefined') {
   firebase.initializeApp(firebaseConfig);
+  try {
+    if (firebase.firestore) {
+      firebase.firestore().settings({ ignoreUndefinedProperties: true });
+    }
+  } catch (e) {}
 }
 
 const getDb = () => (typeof firebase !== 'undefined' && firebase.firestore) ? firebase.firestore() : null;
 const getAuth = () => (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth() : null;
+

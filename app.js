@@ -6889,16 +6889,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
     cleanPlanForSharing(plan) {
         if (!plan) return null;
-        return {
+        const clean = {
             schemaVersion: plan.schemaVersion || '2.0',
             name: plan.name || 'Schema',
-            description: plan.description || undefined,
-            level: plan.level || undefined,
-            goal: plan.goal || undefined,
-            targetAudience: plan.targetAudience || undefined,
-            schedule: plan.schedule || undefined,
-            progressionGlobalRules: plan.progressionGlobalRules || undefined,
-            recoveryRules: plan.recoveryRules || undefined,
             sessions: (plan.sessions || []).map(s => {
                 const sess = {
                     name: s.name || 'Sessie'
@@ -6925,6 +6918,14 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 return sess;
             })
         };
+        if (plan.description) clean.description = plan.description;
+        if (plan.level) clean.level = plan.level;
+        if (plan.goal) clean.goal = plan.goal;
+        if (plan.targetAudience) clean.targetAudience = plan.targetAudience;
+        if (plan.schedule) clean.schedule = plan.schedule;
+        if (plan.progressionGlobalRules) clean.progressionGlobalRules = plan.progressionGlobalRules;
+        if (plan.recoveryRules) clean.recoveryRules = plan.recoveryRules;
+        return JSON.parse(JSON.stringify(clean));
     },
 
     encodePlanForUrl(plan) {
@@ -7059,7 +7060,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             if (!hasOwnCode) {
                 // Nooit een bestaande deelcode van iemand anders overschrijven
                 for (let attempt = 0; attempt < 5; attempt++) {
-                    const snap = (typeof docRef.get === 'function') ? await docRef.get() : null;
+                    const snap = (typeof docRef.get === 'function') ? await docRef.get().catch(() => null) : null;
                     if (!snap || !snap.exists) break;
                     code = this.generateShortShareCode();
                     docRef = db.collection('shared_plans').doc(code);
@@ -7072,7 +7073,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             const payload = {
                 plan: cleaned,
                 name: (plan.name || 'Schema').slice(0, 100),
-                ownerUid: ownerUid,
+                ownerUid: ownerUid || null,
                 createdAt: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue)
                     ? firebase.firestore.FieldValue.serverTimestamp()
                     : now.toISOString(),
@@ -7087,7 +7088,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             store.save();
             return code;
         } catch (e) {
-            console.warn('Kon schema niet publiceren naar Firestore cloud:', e);
+            console.error('Kon schema niet publiceren naar Firestore cloud:', e);
             return null;
         }
     },
@@ -7100,7 +7101,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         try {
             const cleanCode = code.trim().toUpperCase();
             const docRef = db.collection('shared_plans').doc(cleanCode);
-            const snap = await docRef.get();
+            const snap = await docRef.get().catch(() => null);
             if (snap && snap.exists) {
                 const data = snap.data();
                 if (data && data.plan) {
@@ -7109,7 +7110,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 }
             }
         } catch (e) {
-            console.warn('Kon schema niet ophalen uit Firestore cloud:', e);
+            console.error('Kon schema niet ophalen uit Firestore cloud:', e);
         }
         return null;
     },
@@ -7177,7 +7178,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 if (canvas) canvas.style.display = 'none';
                 if (qrContainer) qrContainer.style.display = 'none';
                 if (qrNotice) {
-                    qrNotice.innerHTML = '<strong>Offline modus:</strong> Dit schema is te uitgebreid voor een scanbare QR-code zonder internetverbinding. Verbind kort met internet voor een compacte scanbare QR-code, of gebruik de knoppen hieronder om de link direct te delen of het JSON-bestand te downloaden.';
+                    const isTrulyOffline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+                    if (isTrulyOffline) {
+                        qrNotice.innerHTML = '<strong>Offline modus:</strong> Dit schema is te uitgebreid voor een scanbare QR-code zonder internetverbinding. Verbind kort met internet voor een compacte scanbare QR-code, of gebruik de knoppen hieronder om de link direct te delen of het JSON-bestand te downloaden.';
+                    } else {
+                        qrNotice.innerHTML = '<strong>Cloud publicatie mislukt:</strong> Het schema kon niet naar de cloud worden gepubliceerd (controleer Firebase console regels of internet). Gebruik de knoppen hieronder om de link direct te delen of het JSON-bestand te downloaden.';
+                    }
                     qrNotice.classList.remove('hidden');
                 }
                 return;
