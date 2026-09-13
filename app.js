@@ -1795,7 +1795,7 @@ const app = {
             const iconEl = badge.querySelector('.material-icons-round');
             if (iconEl) {
                 let icon = 'battery_charging_full';
-                if (recStatus.status === 'orange') icon = 'battery_50';
+                if (recStatus.status === 'orange') icon = 'battery_3_bar';
                 if (recStatus.status === 'red') icon = 'battery_alert';
                 iconEl.textContent = icon;
             }

@@ -872,6 +872,47 @@ describe('workout flow', () => {
         expect(recHoursEl.textContent).toBe('• 12u geleden');
     });
 
+    it('should set appropriate battery icons and classes for green, orange and red recovery statuses', () => {
+        document.body.innerHTML = `
+            <div id="recovery-status" class="status-badge"><span class="material-icons-round"></span></div>
+            <div id="recovery-text"></div>
+            <div id="recovery-hours"></div>
+            <div id="recommended-card-title"></div>
+            <div id="recommended-session-name"></div>
+            <div id="recommended-reason"></div>
+            <div id="session-picker-wrapper" class="hidden"><select id="home-session-select"></select></div>
+            <button id="btn-start-session"></button>
+            <div id="home-date"></div>
+            <div id="stat-completed"></div>
+            <div id="stat-streak"></div>
+            <div class="stats-mini"></div>
+        `;
+
+        const badge = document.getElementById('recovery-status');
+        const iconEl = badge.querySelector('.material-icons-round');
+
+        // Test Green (no logs or fully recovered)
+        jest.spyOn(app, 'getRecoveryStatus').mockReturnValueOnce({ status: 'green', text: 'Klaar om te trainen', hoursSinceLast: null });
+        app.renderHome();
+        expect(badge.className).toBe('status-badge green');
+        expect(iconEl.textContent).toBe('battery_charging_full');
+
+        // Test Orange (partially recovered - must be valid single glyph battery_3_bar, never battery_50)
+        jest.spyOn(app, 'getRecoveryStatus').mockReturnValueOnce({ status: 'orange', text: 'Rustig aan', hoursSinceLast: 45 });
+        app.renderHome();
+        expect(badge.className).toBe('status-badge orange');
+        expect(iconEl.textContent).toBe('battery_3_bar');
+        expect(iconEl.textContent).not.toBe('battery_50');
+
+        // Test Red (resting)
+        jest.spyOn(app, 'getRecoveryStatus').mockReturnValueOnce({ status: 'red', text: 'Beter rusten', hoursSinceLast: 4 });
+        app.renderHome();
+        expect(badge.className).toBe('status-badge red');
+        expect(iconEl.textContent).toBe('battery_alert');
+
+        app.getRecoveryStatus.mockRestore();
+    });
+
     it('should format and render the day and date properly in home-date', () => {
         document.body.innerHTML = `
             <div id="recovery-status" class="status-badge"><span class="material-icons-round"></span></div>
