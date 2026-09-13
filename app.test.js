@@ -4908,6 +4908,58 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(css).toContain('var(--accent-text, #ffffff)');
         });
     });
+
+    describe('GOF-41: Spiergroep Iconen & Metadata', () => {
+        it('bevat geldige metadata en SVG vector iconen voor alle spiergroepen', () => {
+            const groups = ['chest', 'back', 'legs', 'glutes', 'shoulders', 'biceps', 'triceps', 'arms', 'core', 'overig'];
+            groups.forEach(g => {
+                const meta = app.getMuscleMeta(g);
+                expect(meta).toBeDefined();
+                expect(meta.name).toBeTruthy();
+                expect(meta.color).toMatch(/^#[0-9a-fA-F]{6}$/);
+                expect(meta.svg).toContain('<svg');
+                expect(meta.svg).toContain('polygon');
+                expect(meta.svg).toContain('currentColor');
+
+                const html = app.getMuscleIconHtml(g);
+                expect(html).toContain('<svg');
+                expect(html).toContain('viewBox=');
+            });
+        });
+
+        it('geeft een veilige fallback terug voor onbekende spiergroepen', () => {
+            const fallbackMeta = app.getMuscleMeta('onbekende_spier');
+            expect(fallbackMeta).toBeDefined();
+            expect(fallbackMeta.name).toBe('Onbekende spier');
+            expect(fallbackMeta.color).toBeTruthy();
+
+            const html = app.getMuscleIconHtml('onbekende_spier');
+            expect(html).toBeTruthy();
+        });
+
+        it('rendert de SVG iconen in de spiergroep-statistieken kaarten', () => {
+            document.body.innerHTML = `
+                <div id="muscle-stats-grid"></div>
+            `;
+            store.plans = [];
+            store.logs = [
+                {
+                    date: '2026-09-01T10:00:00.000Z',
+                    exercises: [
+                        { name: 'Bench Press', muscleGroups: ['chest'], details: [{ weight: 100, reps: 5 }] },
+                        { name: 'Barbell Row', muscleGroups: ['back'], details: [{ weight: 80, reps: 8 }] }
+                    ]
+                }
+            ];
+
+            app.renderMuscleStats();
+            const grid = document.getElementById('muscle-stats-grid');
+            expect(grid.innerHTML).toContain('Borst');
+            expect(grid.innerHTML).toContain('Rug');
+            expect(grid.innerHTML).toContain('<svg viewBox=');
+            expect(grid.innerHTML).toContain('stat-icon-wrapper');
+        });
+    });
 });
 
 
