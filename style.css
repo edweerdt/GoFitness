@@ -2471,7 +2471,19 @@ textarea:focus-visible,
 .history-set-table .num { text-align: right; white-space: nowrap; }
 .history-set-table .set-col { width: 30%; }
 .history-set-table tr.is-pr td { color: #f59e0b; font-weight: 600; }
+.history-set-table th:nth-child(2),
+.history-set-table td:nth-child(2) {
+    position: relative;
+    padding-right: 38px;
+}
 .set-delta { font-size: 0.7rem; font-weight: 600; margin-left: 4px; }
+.history-set-table td:nth-child(2) .set-delta {
+    position: absolute;
+    left: calc(100% - 34px);
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 0;
+}
 .set-delta.up { color: var(--status-green); }
 .set-delta.down { color: var(--status-red); }
 .history-actions {
