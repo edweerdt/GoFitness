@@ -7034,6 +7034,25 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (!db) return null;
 
         try {
+            const auth = (typeof getAuth === 'function') ? getAuth() : ((typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth() : null);
+            let currentUser = (auth && auth.currentUser) ? auth.currentUser : null;
+            if (!currentUser && auth && typeof auth.signInAnonymously === 'function') {
+                try {
+                    const cred = await auth.signInAnonymously();
+                    currentUser = (cred && cred.user) ? cred.user : (auth.currentUser || null);
+                } catch (authErr) {
+                    console.warn('Kon niet anoniem inloggen voor schema-publicatie:', authErr);
+                }
+            }
+            const ownerUid = (currentUser && currentUser.uid) ? currentUser.uid : null;
+
+            const cleaned = this.cleanPlanForSharing(plan);
+            const jsonStr = JSON.stringify(cleaned);
+            if (jsonStr.length > 25 * 1024) {
+                console.warn('Schema overschrijdt maximale deelgrootte van 25KB:', jsonStr.length);
+                return null;
+            }
+
             const hasOwnCode = plan.shareCode && typeof plan.shareCode === 'string' && plan.shareCode.startsWith('GF-');
             let code = hasOwnCode ? plan.shareCode : this.generateShortShareCode();
             let docRef = db.collection('shared_plans').doc(code);
@@ -7046,17 +7065,23 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     docRef = db.collection('shared_plans').doc(code);
                 }
             }
-            const cleaned = this.cleanPlanForSharing(plan);
-            const auth = (typeof getAuth === 'function') ? getAuth() : null;
-            const ownerUid = (auth && auth.currentUser && auth.currentUser.uid) ? auth.currentUser.uid : null;
-            await docRef.set({
+
+            const now = new Date();
+            const expiresDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 dagen TTL
+
+            const payload = {
                 plan: cleaned,
-                name: plan.name || 'Schema',
-                ownerUid,
+                name: (plan.name || 'Schema').slice(0, 100),
+                ownerUid: ownerUid,
                 createdAt: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue)
                     ? firebase.firestore.FieldValue.serverTimestamp()
-                    : new Date().toISOString()
-            });
+                    : now.toISOString(),
+                expiresAt: (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.Timestamp)
+                    ? firebase.firestore.Timestamp.fromDate(expiresDate)
+                    : expiresDate.toISOString()
+            };
+
+            await docRef.set(payload);
             plan.shareCode = code;
             store.touchPlan(plan);
             store.save();
@@ -7120,42 +7145,90 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const subtitleEl = document.getElementById('share-plan-modal-subtitle');
         const canvas = document.getElementById('share-plan-qr-canvas');
         const qrContainer = document.getElementById('share-plan-qr-container');
+        const qrLoading = document.getElementById('share-plan-qr-loading');
+        const qrCodeLabel = document.getElementById('share-plan-qr-code-label');
         const qrNotice = document.getElementById('share-plan-qr-notice');
 
         if (titleEl) titleEl.textContent = `Schema Delen: ${plan.name}`;
         if (subtitleEl) subtitleEl.textContent = `Scan met de camera van een andere telefoon of deel de directe link:`;
 
-        // Direct de modal tonen zodat de gebruiker instant respons heeft
+        // Direct de modal tonen en laadindicator aanzetten
         if (modal) modal.classList.remove('hidden');
+        if (qrContainer) qrContainer.style.display = 'inline-flex';
+        if (qrLoading) qrLoading.classList.remove('hidden');
+        if (canvas) canvas.style.display = 'none';
+        if (qrCodeLabel) {
+            qrCodeLabel.classList.add('hidden');
+            qrCodeLabel.textContent = '';
+        }
+        if (qrNotice) qrNotice.classList.add('hidden');
 
         try {
             const shareUrl = await this.getPlanShareUrl(plan.id);
 
-            if (canvas) {
+            // Verberg laadstatus
+            if (qrLoading) qrLoading.classList.add('hidden');
+
+            const isCloudCode = shareUrl && shareUrl.includes('#p=');
+            const shortCode = isCloudCode ? shareUrl.split('#p=')[1].split('&')[0] : null;
+
+            // Als we offline zijn (#plan=) en de URL is te lang voor een scanbare QR-code (>250 tekens)
+            if (!isCloudCode && shareUrl && shareUrl.length > 250) {
+                if (canvas) canvas.style.display = 'none';
+                if (qrContainer) qrContainer.style.display = 'none';
+                if (qrNotice) {
+                    qrNotice.innerHTML = '<strong>Offline modus:</strong> Dit schema is te uitgebreid voor een scanbare QR-code zonder internetverbinding. Verbind kort met internet voor een compacte scanbare QR-code, of gebruik de knoppen hieronder om de link direct te delen of het JSON-bestand te downloaden.';
+                    qrNotice.classList.remove('hidden');
+                }
+                return;
+            }
+
+            if (canvas && shareUrl) {
                 const qrGen = (typeof QRGenerator !== 'undefined') ? QRGenerator : (typeof global !== 'undefined' ? global.QRGenerator : null);
                 if (qrGen && typeof qrGen.drawToCanvas === 'function') {
                     try {
-                        qrGen.drawToCanvas(canvas, shareUrl, { size: 240, margin: 12 });
+                        qrGen.drawToCanvas(canvas, shareUrl, { size: 240, margin: 12, errorCorrectLevel: 'M' });
                         if (qrContainer) qrContainer.style.display = 'inline-flex';
+                        canvas.style.display = 'block';
+                        if (isCloudCode && shortCode && qrCodeLabel) {
+                            qrCodeLabel.textContent = `Code: ${shortCode}`;
+                            qrCodeLabel.classList.remove('hidden');
+                        }
                         if (qrNotice) qrNotice.classList.add('hidden');
                     } catch (qrErr) {
                         console.warn('QR code kon niet worden getekend:', qrErr);
+                        if (canvas) canvas.style.display = 'none';
                         if (qrContainer) qrContainer.style.display = 'none';
                         if (qrNotice) {
-                            qrNotice.textContent = 'Dit schema is te groot voor een QR-code. Gebruik de knoppen hieronder om direct de link te delen of het schema te downloaden.';
+                            qrNotice.innerHTML = 'Dit schema is te groot voor een QR-code. Gebruik de knoppen hieronder om direct de link te delen of het schema te downloaden.';
                             qrNotice.classList.remove('hidden');
                         }
                     }
+                } else {
+                    if (qrContainer) qrContainer.style.display = 'inline-flex';
+                    canvas.style.display = 'block';
+                    if (isCloudCode && shortCode && qrCodeLabel) {
+                        qrCodeLabel.textContent = `Code: ${shortCode}`;
+                        qrCodeLabel.classList.remove('hidden');
+                    }
+                    if (qrNotice) qrNotice.classList.add('hidden');
                 }
             }
         } catch (err) {
             console.error('Fout bij voorbereiden van schema share URL:', err);
+            if (qrLoading) qrLoading.classList.add('hidden');
         }
     },
 
     hideSharePlanModal() {
         this.activeSharePlanId = null;
         const modal = document.getElementById('modal-share-plan');
+        const qrLoading = document.getElementById('share-plan-qr-loading');
+        const qrCodeLabel = document.getElementById('share-plan-qr-code-label');
+        const qrNotice = document.getElementById('share-plan-qr-notice');
+        if (qrLoading) qrLoading.classList.add('hidden');
+        if (qrCodeLabel) qrCodeLabel.classList.add('hidden');
+        if (qrNotice) qrNotice.classList.add('hidden');
         if (modal) modal.classList.add('hidden');
     },
 

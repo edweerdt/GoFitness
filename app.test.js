@@ -1517,7 +1517,12 @@ describe('sharePlan & 1-Click Deep Links / QR Code', () => {
             <div id="modal-share-plan" class="modal-overlay hidden">
                 <h3 id="share-plan-modal-title"></h3>
                 <p id="share-plan-modal-subtitle"></p>
-                <canvas id="share-plan-qr-canvas"></canvas>
+                <div id="share-plan-qr-container">
+                    <div id="share-plan-qr-loading" class="hidden"></div>
+                    <canvas id="share-plan-qr-canvas"></canvas>
+                    <div id="share-plan-qr-code-label" class="hidden"></div>
+                </div>
+                <div id="share-plan-qr-notice" class="hidden"></div>
             </div>
             <div id="modal-qr-scanner" class="modal-overlay hidden">
                 <video id="qr-scanner-video"></video>
@@ -1702,6 +1707,112 @@ describe('sharePlan & 1-Click Deep Links / QR Code', () => {
         expect(app.planToImportFromLink).toEqual(cloudPlan);
 
         delete global.getDb;
+    });
+
+    it('should sign in anonymously if currentUser is null and store plan with TTL and ownerUid', async () => {
+        const mockSet = jest.fn().mockResolvedValue();
+        const mockDoc = jest.fn().mockReturnValue({ set: mockSet });
+        const mockCollection = jest.fn().mockReturnValue({ doc: mockDoc });
+        const mockDb = { collection: mockCollection };
+
+        const mockSignInAnonymously = jest.fn().mockResolvedValue({ user: { uid: 'anon-123' } });
+        const mockAuth = {
+            currentUser: null,
+            signInAnonymously: mockSignInAnonymously
+        };
+
+        global.getDb = jest.fn().mockReturnValue(mockDb);
+        global.getAuth = jest.fn().mockReturnValue(mockAuth);
+
+        const plan = { id: 'test-p', name: 'Anoniem Schema', sessions: [{ name: 'S1', exercises: [{ name: 'Pushups', sets: 3 }] }] };
+        const code = await app.publishPlanToCloud(plan);
+
+        expect(mockSignInAnonymously).toHaveBeenCalledTimes(1);
+        expect(code).toMatch(/^GF-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+        expect(mockSet).toHaveBeenCalledTimes(1);
+        const payload = mockSet.mock.calls[0][0];
+        expect(payload.ownerUid).toBe('anon-123');
+        expect(payload.name).toBe('Anoniem Schema');
+        expect(payload.expiresAt).toBeDefined();
+
+        delete global.getDb;
+        delete global.getAuth;
+    });
+
+    it('should reject publishPlanToCloud if plan exceeds 25KB limit', async () => {
+        const mockDb = { collection: jest.fn() };
+        global.getDb = jest.fn().mockReturnValue(mockDb);
+
+        const hugePlan = {
+            id: 'huge',
+            name: 'Gigantisch Schema',
+            sessions: [{
+                name: 'Zware Sessie',
+                exercises: [{
+                    name: 'Squat',
+                    sets: 5,
+                    notes: 'A'.repeat(30 * 1024)
+                }]
+            }]
+        };
+
+        const result = await app.publishPlanToCloud(hugePlan);
+        expect(result).toBeNull();
+        expect(mockDb.collection).not.toHaveBeenCalled();
+
+        delete global.getDb;
+    });
+
+    it('should suppress canvas and show offline notice when offline and share URL is too long for QR', async () => {
+        const modal = document.getElementById('modal-share-plan');
+        const canvas = document.getElementById('share-plan-qr-canvas');
+        const qrContainer = document.getElementById('share-plan-qr-container');
+        const qrNotice = document.getElementById('share-plan-qr-notice');
+
+        const bigPlan = {
+            id: 'p-large',
+            name: 'Uitgebreid Schema Voor Gevorderden',
+            sessions: [
+                {
+                    name: 'Borst en Triceps Focus',
+                    exercises: [
+                        { name: 'Incline Dumbbell Bench Press', sets: 4, repsMin: 8, repsMax: 12, restSeconds: 90, notes: 'Gecontroleerde daling' },
+                        { name: 'Flat Barbell Bench Press', sets: 4, repsMin: 6, repsMax: 8, restSeconds: 120 },
+                        { name: 'Cable Flyes High to Low', sets: 3, repsMin: 12, repsMax: 15, restSeconds: 60 }
+                    ]
+                }
+            ]
+        };
+        store.plans.push(bigPlan);
+
+        await app.openSharePlanModal('p-large');
+
+        expect(modal.classList.contains('hidden')).toBe(false);
+        expect(canvas.style.display).toBe('none');
+        expect(qrContainer.style.display).toBe('none');
+        expect(qrNotice.classList.contains('hidden')).toBe(false);
+        expect(qrNotice.innerHTML).toContain('Offline modus');
+
+        store.plans = store.plans.filter(p => p.id !== 'p-large');
+    });
+
+    it('should show code badge and canvas when cloud code is generated', async () => {
+        const canvas = document.getElementById('share-plan-qr-canvas');
+        const qrCodeLabel = document.getElementById('share-plan-qr-code-label');
+        const qrNotice = document.getElementById('share-plan-qr-notice');
+
+        global.QRGenerator = { drawToCanvas: jest.fn() };
+        jest.spyOn(app, 'getPlanShareUrl').mockResolvedValue('https://gofitness.app/#p=GF-AB12-CD34');
+
+        await app.openSharePlanModal('p1');
+
+        expect(canvas.style.display).toBe('block');
+        expect(qrCodeLabel.classList.contains('hidden')).toBe(false);
+        expect(qrCodeLabel.textContent).toBe('Code: GF-AB12-CD34');
+        expect(qrNotice.classList.contains('hidden')).toBe(true);
+
+        app.getPlanShareUrl.mockRestore();
+        delete global.QRGenerator;
     });
 });
 

@@ -549,8 +549,13 @@
                 </div>
                 <p id="share-plan-modal-subtitle" class="text-sm text-muted" style="margin-bottom:16px;">Scan met een andere telefoon of deel de directe link:</p>
                 
-                <div id="share-plan-qr-container" style="background: #ffffff; padding: 14px; border-radius: 16px; display: inline-flex; justify-content: center; align-items: center; margin: 0 auto 16px auto; box-shadow: 0 8px 24px rgba(0,0,0,0.35);">
+                <div id="share-plan-qr-container" style="background: #ffffff; padding: 14px; border-radius: 16px; display: inline-flex; flex-direction: column; justify-content: center; align-items: center; margin: 0 auto 16px auto; box-shadow: 0 8px 24px rgba(0,0,0,0.35); min-width: 240px; min-height: 240px;">
+                    <div id="share-plan-qr-loading" class="hidden" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#333; font-size:0.85rem; font-weight:500; height:212px;">
+                        <span class="material-icons-round spinning" style="font-size:2rem; color:var(--accent-primary, #6366f1);">sync</span>
+                        <span>Compacte QR-code genereren...</span>
+                    </div>
                     <canvas id="share-plan-qr-canvas" style="display:block; max-width:100%; height:auto; border-radius: 8px;"></canvas>
+                    <div id="share-plan-qr-code-label" class="hidden" style="margin-top:8px; font-size:0.85rem; font-weight:700; color:#111; letter-spacing:1px; font-family:monospace; background:rgba(0,0,0,0.06); padding:3px 8px; border-radius:6px;"></div>
                 </div>
                 <div id="share-plan-qr-notice" class="text-sm text-muted hidden" style="background: rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; margin-bottom: 16px; line-height: 1.4;"></div>
 

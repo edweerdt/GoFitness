@@ -61,14 +61,19 @@ service cloud.firestore {
     }
 
     // Gedeelde schema's: iedereen met de code mag lezen (deeplinks werken ook
-    // zonder login). Schrijven alleen ingelogd, en een bestaande code mag alleen
-    // door de eigenaar overschreven worden. publishPlanToCloud stuurt ownerUid mee.
+    // zonder login). Schrijven vereist een Firebase Auth token (Google of Anoniem).
+    // Een bestaande code mag NOOIT door iemand anders overschreven worden (!exists).
+    // Beperkt tot max geldige velden, geldige plan map en optionele TTL (expiresAt).
     match /shared_plans/{code} {
       allow read: if true;
       allow create: if signedIn()
+        && !exists(/databases/$(database)/documents/shared_plans/$(code))
         && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['plan', 'name', 'ownerUid', 'createdAt', 'expiresAt'])
         && request.resource.data.plan is map
-        && request.resource.data.plan.size() > 0;
+        && request.resource.data.plan.size() > 0
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 120;
       allow update: if signedIn()
         && resource.data.ownerUid == request.auth.uid
         && request.resource.data.ownerUid == request.auth.uid;
