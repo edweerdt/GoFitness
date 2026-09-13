@@ -1,11 +1,12 @@
 # Mandatory Project & Git Workflow Rules
 
-## 1. Ticket Herkenning & Header (Linear Integratie)
+## 1. Ticket Herkenning, Chat Hernoemen & Header (Linear Integratie)
 Wanneer de gebruiker een ticketnummer noemt of typt (bijvoorbeeld `GOF-40`):
 1. **Ophalen via Linear**: Haal direct via `linear-mcp-server` de officiële details van het ticket op (titel, status, omschrijving, URL).
-2. **Prominente Header**: Start het antwoord in de chat ALTIJD direct met een duidelijke H1 header inclusief link:
+2. **Chat Hernoemen**: Hernoem de chat/sessie direct naar `[Ticketnummer] + [Ticket titel]` (bijvoorbeeld `GOF-40: Home | Training readiness wordt niet goed getoond op mobiel`).
+3. **Prominente Header**: Start het antwoord in de chat ALTIJD direct met een duidelijke H1 header inclusief link:
    `# [GOF-XX: <Titel>](<Linear URL>)`
-3. Geef een beknopte toelichting van de ticketvraag en ga direct aan de slag met de implementatie.
+4. Geef een beknopte toelichting van de ticketvraag en ga direct aan de slag met de implementatie.
 
 ## 2. Volledige Ontwikkelworkflow
 Voor ELKE taak, bugfix of feature in dit project doorloopt de AI assistent automatisch de volledige workflow:
