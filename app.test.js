@@ -1785,6 +1785,8 @@ describe('sharePlan & 1-Click Deep Links / QR Code', () => {
         };
         store.plans.push(bigPlan);
 
+        const onLineSpy = jest.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
         await app.openSharePlanModal('p-large');
 
         expect(modal.classList.contains('hidden')).toBe(false);
@@ -1793,6 +1795,7 @@ describe('sharePlan & 1-Click Deep Links / QR Code', () => {
         expect(qrNotice.classList.contains('hidden')).toBe(false);
         expect(qrNotice.innerHTML).toContain('Offline modus');
 
+        onLineSpy.mockRestore();
         store.plans = store.plans.filter(p => p.id !== 'p-large');
     });
 
