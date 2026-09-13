@@ -30,5 +30,6 @@ Voor ELKE taak, bugfix of feature in dit project doorloopt de AI assistent autom
    - Deel direct de GitHub PR link in de chat (`https://github.com/edweerdt/GoFitness/compare/main...<branch>?expand=1`).
    - Plaats een samenvattend comment met de PR-link op het Linear ticket.
 
-6. **Acceptatie & Done**:
+6. **Acceptatie, Done & Chat Titel Update**:
    - **BELANGRIJK:** Het ticket op Linear mag **PAS op 'Done' gezet worden nadat de gebruiker de wijzigingen/PR expliciet heeft beoordeeld en geaccepteerd**.
+   - Nadat het ticket op 'Done' is gezet, wordt de titel van de chat/sessie direct bijgewerkt en voorzien van `- Done` aan het einde (bijvoorbeeld: `GOF-40: Home | Training readiness wordt niet goed getoond op mobiel - Done`).
