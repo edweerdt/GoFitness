@@ -4984,6 +4984,50 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(grid.innerHTML).toContain('stat-icon-wrapper');
         });
     });
+
+    describe('GOF-45: Thema Selector Horizontale Scrollbar Preventie', () => {
+        it('bevat minmax(0, 1fr) en min-width: 0 stijlen in style.css om overflow te voorkomen', () => {
+            const fs = require('fs');
+            const css = fs.readFileSync('style.css', 'utf8');
+
+            expect(css).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
+            expect(css).toContain('grid-template-columns: repeat(3, minmax(0, 1fr));');
+            
+            // theme-palette-item en palette-name moeten min-width: 0 hebben om flex-krimping en ellipsis toe te staan
+            expect(css).toMatch(/\.theme-palette-item\s*\{[^}]*min-width:\s*0/s);
+            expect(css).toMatch(/\.palette-name\s*\{[^}]*min-width:\s*0/s);
+            expect(css).toMatch(/\.palette-name\s*\{[^}]*flex:\s*1/s);
+            expect(css).toMatch(/\.palette-name\s*\{[^}]*text-overflow:\s*ellipsis/s);
+        });
+
+        it('bevat overflow-x: hidden op de thema modal container in index.html', () => {
+            const fs = require('fs');
+            const html = fs.readFileSync('index.html', 'utf8');
+
+            expect(html).toMatch(/<div id="modal-theme"[\s\S]*?overflow-x:\s*hidden/);
+        });
+
+        it('rendert alle kleurenpaletten correct binnen theme-palette-grid', () => {
+            document.body.innerHTML = `
+                <div id="modal-theme">
+                    <div id="theme-mode-selector"></div>
+                    <div id="theme-palette-grid"></div>
+                </div>
+            `;
+            store.palette = 'monochroom';
+            app.renderThemeModalContent();
+
+            const grid = document.getElementById('theme-palette-grid');
+            const items = grid.querySelectorAll('.theme-palette-item');
+            expect(items.length).toBe(10);
+
+            const monochroomBtn = Array.from(items).find(el => el.textContent.includes('Monochroom'));
+            expect(monochroomBtn).toBeDefined();
+            expect(monochroomBtn.classList.contains('active')).toBe(true);
+            expect(monochroomBtn.querySelector('.palette-name')).not.toBeNull();
+            expect(monochroomBtn.querySelector('.palette-swatch-circle')).not.toBeNull();
+        });
+    });
 });
 
 

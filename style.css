@@ -1222,7 +1222,7 @@ button:disabled {
 /* Thema & Kleuren Modal */
 .theme-mode-selector {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
     background: var(--surface-light);
     padding: 4px;
@@ -1244,6 +1244,7 @@ button:disabled {
     font-weight: 500;
     cursor: pointer;
     transition: var(--transition);
+    min-width: 0;
 }
 
 .theme-mode-btn:hover {
@@ -1259,15 +1260,15 @@ button:disabled {
 
 .theme-palette-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
 }
 
 .theme-palette-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
+    gap: 8px;
+    padding: 9px 10px;
     border-radius: var(--border-radius-sm);
     background: var(--surface-light);
     border: 2px solid transparent;
@@ -1276,6 +1277,7 @@ button:disabled {
     text-align: left;
     transition: var(--transition);
     width: 100%;
+    min-width: 0;
     box-sizing: border-box;
 }
 
@@ -1311,11 +1313,13 @@ button:disabled {
 }
 
 .palette-name {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1;
 }
 
 /* Rusttimer tussen sets (bovenaan onder de sessieheader) */
