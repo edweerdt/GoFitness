@@ -3037,4 +3037,21 @@ textarea:focus-visible,
     animation: spin 1s linear infinite;
 }
 
+/* Onboarding / New User Journey */
+.onboarding-card {
+    border-radius: var(--border-radius);
+    transition: all 0.3s ease;
+}
 
+.onboarding-step {
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.onboarding-step.done {
+    background: rgba(16, 185, 129, 0.05);
+    border-color: rgba(16, 185, 129, 0.25);
+}
+
+.theme-light .onboarding-step.done {
+    background: rgba(16, 185, 129, 0.08);
+}
