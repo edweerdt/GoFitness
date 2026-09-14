@@ -250,6 +250,45 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
 }
 
 /* Smart Recovery Modal styling */
+.smart-recovery-modal-content {
+    max-width: 560px;
+    width: 100%;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+    .smart-recovery-modal-content {
+        padding: 16px 14px;
+        max-height: 90vh;
+    }
+}
+
+.smart-recovery-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    gap: 10px;
+}
+
+.smart-recovery-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    background: rgba(0, 0, 0, 0.18);
+    padding: 4px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+[data-theme="light"] .smart-recovery-tabs {
+    background: rgba(0, 0, 0, 0.05);
+}
+
 .smart-recovery-tab-btn {
     flex: 1;
     padding: 8px 10px;
@@ -263,6 +302,7 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
     cursor: pointer;
     transition: all 0.15s ease;
     text-align: center;
+    min-width: 0;
 }
 
 .smart-recovery-tab-btn:hover {
@@ -275,38 +315,174 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
+.smart-recovery-modal-body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-right: 2px;
+}
+
 .smart-recovery-info-card {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid var(--border-color);
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 14px;
+    box-sizing: border-box;
 }
 
 [data-theme="light"] .smart-recovery-info-card {
     background: rgba(0, 0, 0, 0.02);
 }
 
-.smart-recovery-table {
-    width: 100%;
-    border-collapse: collapse;
+.smart-recovery-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.smart-recovery-tag.recommended {
+    background: var(--status-green-bg, rgba(34, 197, 94, 0.15));
+    color: var(--status-green, #22c55e);
+}
+
+/* Fysiologische impact items */
+.smart-recovery-bio-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.smart-recovery-bio-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.smart-recovery-bio-icon {
+    font-size: 1.15rem;
+    color: var(--color-accent, #6366f1);
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.smart-recovery-bio-content {
     font-size: 0.82rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.smart-recovery-bio-content strong {
+    color: var(--text-primary);
+    font-weight: 600;
+    margin-right: 4px;
+}
+
+/* Responsive cyclusoverzicht lijst in plaats van starre HTML-tabel */
+.smart-recovery-cycle-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     margin-top: 6px;
 }
 
-.smart-recovery-table th,
-.smart-recovery-table td {
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--border-color);
+.smart-recovery-cycle-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
     text-align: left;
-    vertical-align: top;
+    font-family: inherit;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-.smart-recovery-table th {
-    color: var(--text-muted);
+[data-theme="light"] .smart-recovery-cycle-item {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.smart-recovery-cycle-item:hover,
+.smart-recovery-cycle-item:focus-visible {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.2);
+    outline: none;
+}
+
+.smart-recovery-cycle-item.active {
+    background: rgba(99, 102, 241, 0.12);
+    border-color: var(--color-accent, #6366f1);
+}
+
+[data-theme="light"] .smart-recovery-cycle-item.active {
+    background: rgba(99, 102, 241, 0.08);
+}
+
+.smart-recovery-cycle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.smart-recovery-cycle-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
     font-weight: 600;
+    color: var(--text-primary);
+}
+
+.smart-recovery-cycle-icon {
+    font-size: 1.05rem;
+    color: var(--color-accent, #6366f1);
+    flex-shrink: 0;
+}
+
+.smart-recovery-cycle-freq {
     font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.smart-recovery-cycle-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.35;
+}
+
+.smart-recovery-actions {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+.smart-recovery-actions .btn-primary {
+    flex: 1.2;
+    min-width: 0;
+    justify-content: center;
+}
+
+.smart-recovery-actions .btn-secondary {
+    flex: 0.8;
+    min-width: 0;
+    justify-content: center;
 }
 
 /* Headers */

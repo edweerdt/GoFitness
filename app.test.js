@@ -5319,6 +5319,18 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(document.getElementById('smart-recovery-modal-title').textContent).toContain('Volledige Diet Break');
             expect(body.innerHTML).toContain('7 tot 10 dagen aaneengesloten eten');
         });
+
+        it('toont knoptekst "✓ Check" op de markeerknop in elk tabblad (GOF-49)', () => {
+            app.showSmartRecoveryModal('refeed');
+            const markBtn = document.getElementById('btn-mark-recovery-applied');
+            expect(markBtn.textContent).toBe('✓ Check');
+
+            app.switchSmartRecoveryTab('deload');
+            expect(markBtn.textContent).toBe('✓ Check');
+
+            app.switchSmartRecoveryTab('diet_break');
+            expect(markBtn.textContent).toBe('✓ Check');
+        });
     });
 
     describe('Home Onboarding & New User Journey (GOF-48)', () => {
