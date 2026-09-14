@@ -1130,7 +1130,25 @@ const app = {
                 frequency: 'Eens per 10 tot 14 dagen',
                 duration: '1–2 dagen',
                 guideline: 'Calorieën opvoeren tot onderhoud of licht surplus. Koolhydraten fors omhoog, eiwit gelijk, vetten zo laag mogelijk houden (onder de 40–50 g).',
-                keyAdvice: 'Benut de komende dagen je maximale spierglycogeen door direct weer zwaar en progressief te trainen binnen je geplande calorietekort.'
+                keyAdvice: 'Benut de komende dagen je maximale spierglycogeen door direct weer zwaar en progressief te trainen binnen je geplande calorietekort.',
+                shortSummary: 'Calorieën opvoeren tot onderhoud; koolhydraten fors omhoog, vetten laag houden.',
+                bioBenefits: [
+                    {
+                        icon: 'bolt',
+                        title: 'Maximale glycogeensupercompensatie',
+                        desc: 'Koolhydraten vullen de lege glycogeenvoorraden in spieren en lever maximaal aan, waardoor je spieren voller ogen en direct meer hydratatie vasthouden.'
+                    },
+                    {
+                        icon: 'fitness_center',
+                        title: 'Acute prestatiepiek in training',
+                        desc: 'Je centrale zenuwstelsel herstelt en de komende 2 tot 4 trainingen kun je aanzienlijk zwaarder tillen, meer herhalingen produceren en een krachtigere pomp verwachten.'
+                    },
+                    {
+                        icon: 'trending_up',
+                        title: 'Tijdelijke leptine- & stofwisselingsimpuls',
+                        desc: 'Een kortstondige energiepiek geeft leptine en schildklierhormoon een positieve prikkel zonder vetopslag (mits vetten strikt laag blijven).'
+                    }
+                ]
             },
             deload: {
                 id: 'deload',
@@ -1141,7 +1159,25 @@ const app = {
                 frequency: 'Eens per 6 tot 8 weken',
                 duration: '3 tot 5 dagen rust of 50% minder sets',
                 guideline: '3 tot 5 dagen volledige rust of een week trainen met 50% minder sets.',
-                keyAdvice: 'Vier dagen rust geeft pezen en aanhechtingen de kans microtrauma te herstellen die bij continu doortrainen chronisch kunnen worden.'
+                keyAdvice: 'Vier dagen rust geeft pezen en aanhechtingen de kans microtrauma te herstellen die bij continu doortrainen chronisch kunnen worden.',
+                shortSummary: '3 tot 5 dagen volledige rust of een week trainen met 50% minder sets.',
+                bioBenefits: [
+                    {
+                        icon: 'healing',
+                        title: 'Volledig herstel van bindweefsel',
+                        desc: 'Pezen, ligamenten en gewrichtskapsels herstellen trager dan spierweefsel. Vier dagen rust geeft microtrauma de kans te helen voordat het chronisch wordt.'
+                    },
+                    {
+                        icon: 'battery_charging_full',
+                        title: 'Ontlading van het centrale zenuwstelsel (CNS)',
+                        desc: 'Wekenlang zwaar trainen cumuleert systemische vermoeidheid. Neurale ontlasting herstelt je slaapkwaliteit, hormonale balans en trainingslust.'
+                    },
+                    {
+                        icon: 'auto_graph',
+                        title: 'Supercompensatie voor nieuw trainingsblok',
+                        desc: 'Spieradaptatie en krachtgroei manifesteren zich tijdens herstel. Na een deload start je je nieuwe trainingscyclus met maximale responsiviteit.'
+                    }
+                ]
             },
             diet_break: {
                 id: 'diet_break',
@@ -1152,7 +1188,25 @@ const app = {
                 frequency: 'Eens per 8 tot 12 weken',
                 duration: '7 tot 10 dagen',
                 guideline: '7 tot 10 dagen aaneengesloten eten op exact onderhoud met een normale macroverdeling.',
-                keyAdvice: 'Zorgt voor een acute energiepiek waardoor stresshormonen verlagen en het lichaam weer bereid is vet los te laten in de daaropvolgende dagen.'
+                keyAdvice: 'Zorgt voor een acute energiepiek waardoor stresshormonen verlagen en het lichaam weer bereid is vet los te laten in de daaropvolgende dagen.',
+                shortSummary: '7 tot 10 dagen aaneengesloten eten op exact onderhoud met normale macroverdeling.',
+                bioBenefits: [
+                    {
+                        icon: 'sync_alt',
+                        title: 'Hormonale en metabole reset',
+                        desc: 'Een langdurig calorietekort verlaagt leptine en schildklierhormoon (T₃) en drijft cortisol op. Eten op onderhoud brengt deze hormonen weer in ruststand.'
+                    },
+                    {
+                        icon: 'water_drop',
+                        title: 'Doorbreken van gewichtsplateaus',
+                        desc: 'Door lagere cortisolspiegels verdwijnt stress-gerelateerde vochtretentie en is het lichaam na de break weer bereid vet efficiënt los te laten.'
+                    },
+                    {
+                        icon: 'psychology',
+                        title: 'Psychologische ontlasting & therapietrouw',
+                        desc: 'Even op adem komen en ontspannen eten voorkomt dieetmoeheid, herstelt je discipline en maakt langetermijnresultaat haalbaar.'
+                    }
+                ]
             }
         };
 
@@ -1165,7 +1219,10 @@ const app = {
         if (modalIcon) modalIcon.textContent = info.icon;
 
         const markBtn = document.getElementById('btn-mark-recovery-applied');
-        if (markBtn) markBtn.textContent = `✓ Markeer ${info.pillTitle} als toegepast`;
+        if (markBtn) {
+            markBtn.textContent = '✓ Check';
+            markBtn.setAttribute('aria-label', `Markeer ${info.pillTitle} als toegepast`);
+        }
 
         // Bepaal status
         const nowTime = new Date().getTime();
@@ -1194,6 +1251,34 @@ const app = {
         const suggestion = (typeof this.getSmartRecoverySuggestion === 'function') ? this.getSmartRecoverySuggestion() : null;
         const isCurrentSuggestion = suggestion && suggestion.id === type;
 
+        const bioItemsHtml = (info.bioBenefits || []).map(b => `
+            <div class="smart-recovery-bio-item">
+                <span class="material-icons-round smart-recovery-bio-icon">${b.icon}</span>
+                <div class="smart-recovery-bio-content">
+                    <strong>${b.title}:</strong>${b.desc}
+                </div>
+            </div>
+        `).join('');
+
+        const cycleItemsHtml = ['refeed', 'deload', 'diet_break'].map(k => {
+            const item = SMART_INFO[k];
+            const isActive = (k === type);
+            return `
+                <button type="button" class="smart-recovery-cycle-item ${isActive ? 'active' : ''}" onclick="app.switchSmartRecoveryTab('${item.id}')" aria-label="Bekijk ${item.pillTitle}">
+                    <div class="smart-recovery-cycle-header">
+                        <div class="smart-recovery-cycle-title">
+                            <span class="material-icons-round smart-recovery-cycle-icon">${item.icon}</span>
+                            <span>${item.pillTitle}</span>
+                        </div>
+                        <span class="smart-recovery-cycle-freq">${item.frequency}</span>
+                    </div>
+                    <div class="smart-recovery-cycle-desc">
+                        ${item.shortSummary}
+                    </div>
+                </button>
+            `;
+        }).join('');
+
         bodyEl.innerHTML = `
             <div class="smart-recovery-info-card" style="display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap;">
@@ -1201,7 +1286,7 @@ const app = {
                         <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;">Frequentie &amp; Duur</div>
                         <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-top: 2px;">${info.frequency} • ${info.duration}</div>
                     </div>
-                    ${isCurrentSuggestion ? '<span style="background: var(--status-green-bg); color: var(--status-green); padding: 4px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><span class="material-icons-round" style="font-size: 0.9rem;">bolt</span> Nu aanbevolen</span>' : ''}
+                    ${isCurrentSuggestion ? '<span class="smart-recovery-tag recommended"><span class="material-icons-round" style="font-size: 0.85rem;">bolt</span> Nu aanbevolen</span>' : ''}
                 </div>
                 ${statusHtml}
             </div>
@@ -1224,57 +1309,18 @@ const app = {
                     <span class="material-icons-round text-accent" style="font-size: 1.1rem;">psychology</span>
                     <span>Wat je hier fysiologisch uithaalt (en waarom het werkt)</span>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <div style="display: flex; gap: 8px; align-items: flex-start;">
-                        <span class="material-icons-round text-accent" style="font-size: 1.05rem; flex-shrink: 0; margin-top: 2px;">bolt</span>
-                        <div class="text-xs" style="line-height: 1.4;">
-                            <strong style="color: var(--text-primary);">Directe prestatiepiek (de komende dagen):</strong> Je centrale zenuwstelsel is volledig hersteld, ontstekingsvocht rond pezen en spieren is weg en je glycogeenvoorraden zitten tot de nok vol. De komende 2 tot 4 trainingen kun je aanzienlijk zwaarder tillen, meer herhalingen maken en een betere pomp verwachten.
-                        </div>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: flex-start;">
-                        <span class="material-icons-round text-accent" style="font-size: 1.05rem; flex-shrink: 0; margin-top: 2px;">sync_alt</span>
-                        <div class="text-xs" style="line-height: 1.4;">
-                            <strong style="color: var(--text-primary);">Hormonale en metabole reset:</strong> Een periode van structureel te weinig eten verlaagt leptine en schildklierhormoon (T₃) en drijft cortisol op. Een acute energiepiek verlaagt stresshormonen, waardoor het lichaam weer bereid is vet los te laten in de daaropvolgende dagen.
-                        </div>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: flex-start;">
-                        <span class="material-icons-round text-accent" style="font-size: 1.05rem; flex-shrink: 0; margin-top: 2px;">healing</span>
-                        <div class="text-xs" style="line-height: 1.4;">
-                            <strong style="color: var(--text-primary);">Volledig herstel van bindweefsel:</strong> Vier dagen rust geeft pezen en aanhechtingen de kans microtrauma te herstellen die bij continu doortrainen chronisch kunnen worden.
-                        </div>
-                    </div>
+                <div class="smart-recovery-bio-list">
+                    ${bioItemsHtml}
                 </div>
             </div>
 
             <div class="smart-recovery-info-card">
-                <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); margin-bottom: 6px;">Aanbevolen richtlijn en frequentie overzicht</div>
-                <div style="overflow-x: auto;">
-                    <table class="smart-recovery-table">
-                        <thead>
-                            <tr>
-                                <th>Onderdeel</th>
-                                <th>Frequentie</th>
-                                <th>Invulling</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr style="${type === 'refeed' ? 'background: rgba(99, 102, 241, 0.15); font-weight: 500;' : ''}">
-                                <td><strong>Koolhydraat-Refeed (1–2 dagen)</strong></td>
-                                <td>Eens per 10 tot 14 dagen</td>
-                                <td>Calorieën opvoeren tot onderhoud of licht surplus. Koolhydraten fors omhoog, eiwit gelijk, vetten zo laag mogelijk houden (onder de 40–50 g).</td>
-                            </tr>
-                            <tr style="${type === 'deload' ? 'background: rgba(99, 102, 241, 0.15); font-weight: 500;' : ''}">
-                                <td><strong>Deload / Rustperiode</strong></td>
-                                <td>Eens per 6 tot 8 weken</td>
-                                <td>3 tot 5 dagen volledige rust of een week trainen met 50% minder sets.</td>
-                            </tr>
-                            <tr style="${type === 'diet_break' ? 'background: rgba(99, 102, 241, 0.15); font-weight: 500;' : ''}">
-                                <td><strong>Volledige Diet Break</strong></td>
-                                <td>Eens per 8 tot 12 weken</td>
-                                <td>7 tot 10 dagen aaneengesloten eten op exact onderhoud met een normale macroverdeling.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                    <span class="material-icons-round text-accent" style="font-size: 1.1rem;">format_list_bulleted</span>
+                    <span>Cyclusoverzicht trainingsleer</span>
+                </div>
+                <div class="smart-recovery-cycle-list">
+                    ${cycleItemsHtml}
                 </div>
             </div>
         `;
