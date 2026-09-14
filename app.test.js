@@ -4217,11 +4217,13 @@ describe('add and remove sets during workout', () => {
 
             const titleEl = document.getElementById('recommended-card-title');
             const nameEl = document.getElementById('recommended-session-name');
+            const reasonEl = document.getElementById('recommended-reason');
             const btnStart = document.getElementById('btn-start-session');
             const choosePresetsBtn = document.getElementById('btn-home-presets');
 
             expect(titleEl.textContent).toBe('⚡ Direct Starten');
             expect(nameEl.textContent).toBe('Beginner Gym + Lichaamsgewicht Mix');
+            expect(reasonEl.textContent).toBe('Start direct met een 3-daagse Full Body beginnersschema (Full Body A & B) of kies een ander schema uit de preset bibliotheek.');
             expect(btnStart.textContent).toBe('⚡ Start Beginnersschema');
             expect(btnStart.disabled).toBe(false);
             expect(choosePresetsBtn).toBeTruthy();
