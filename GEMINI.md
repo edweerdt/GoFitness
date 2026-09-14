@@ -4,6 +4,7 @@
 Wanneer de gebruiker een ticketnummer noemt of typt (bijvoorbeeld `GOF-40`):
 1. **Ophalen via Linear**: Haal direct via `linear-mcp-server` de officiële details van het ticket op (titel, status, omschrijving, URL).
 2. **Chat Hernoemen**: Hernoem de chat/sessie direct naar `[Ticketnummer] + [Ticket titel]` (bijvoorbeeld `GOF-40: Home | Training readiness wordt niet goed getoond op mobiel`).
+   - Dit gebeurt technisch door het `title:"..."` veld direct bij te werken in `<appDataDir>\annotations\<conversation-id>.pbtxt` (bijvoorbeeld `C:\Users\edwee\.gemini\antigravity\annotations\<conversation-id>.pbtxt`).
 3. **Prominente Header**: Start het antwoord in de chat ALTIJD direct met een duidelijke H1 header inclusief link:
    `# [GOF-XX: <Titel>](<Linear URL>)`
 4. Geef een beknopte toelichting van de ticketvraag en ga direct aan de slag met de implementatie.
@@ -31,5 +32,7 @@ Voor ELKE taak, bugfix of feature in dit project doorloopt de AI assistent autom
    - Plaats een samenvattend comment met de PR-link op het Linear ticket.
 
 6. **Acceptatie, Done & Chat Titel Update**:
-   - **BELANGRIJK:** Het ticket op Linear mag **PAS op 'Done' gezet worden nadat de gebruiker de wijzigingen/PR expliciet heeft beoordeeld en geaccepteerd**.
-   - Nadat het ticket op 'Done' is gezet, wordt de titel van de chat/sessie direct bijgewerkt en voorzien van `- Done` aan het einde (bijvoorbeeld: `GOF-40: Home | Training readiness wordt niet goed getoond op mobiel - Done`).
+   - **BELANGRIJK:** Het ticket op Linear mag **PAS op 'Done' gezet worden nadat de gebruiker de wijzigingen/PR expliciet heeft beoordeeld en geaccepteerd** (bijv. na merge of expliciet akkoord in de chat).
+   - Werk het ticket op Linear direct bij naar status 'Done' (via `update_issue` met het state UUID van Done) en plaats een afrondend comment op Linear.
+   - **Chat Titel Direct Bijwerken**: Werk ALTIJD direct het bestand `<appDataDir>\annotations\<conversation-id>.pbtxt` bij zodat de titel van de sessie in de UI wordt voorzien van `- Done` aan het einde (bijvoorbeeld: `title:"GOF-40: Home | Training readiness wordt niet goed getoond op mobiel - Done"`).
+   - Start het chatbericht waarin 'Done' wordt gemeld met de bijgewerkte H1 header inclusief `- Done`.
