@@ -2343,7 +2343,7 @@ const app = {
                 setCardText(
                     "⚡ Direct Starten",
                     "Beginner Gym + Lichaamsgewicht Mix",
-                    "Start direct met ons 3-daagse Full Body beginnersschema (Full Body A & B) of kies een ander schema uit de preset bibliotheek."
+                    "Start direct met een 3-daagse Full Body beginnersschema (Full Body A & B) of kies een ander schema uit de preset bibliotheek."
                 );
                 if (btnStart) {
                     btnStart.textContent = "⚡ Start Beginnersschema";
