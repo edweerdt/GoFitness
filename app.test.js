@@ -5318,6 +5318,103 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(body.innerHTML).toContain('7 tot 10 dagen aaneengesloten eten');
         });
     });
+
+    describe('Home Onboarding & New User Journey (GOF-48)', () => {
+        beforeEach(() => {
+            localStorage.clear();
+            store.plans = [];
+            store.logs = [];
+            store.activePlanId = null;
+            document.body.innerHTML = `
+                <div id="view-home" class="view active">
+                    <div id="home-date"></div>
+                    <div id="recovery-status" class="status-badge green"><span class="material-icons-round"></span><span id="recovery-text"></span></div>
+                    <div id="home-onboarding-container" class="hidden"></div>
+                    <div class="recommended-card">
+                        <div id="recommended-card-title"></div>
+                        <div id="recommended-session-name"></div>
+                        <div id="recommended-reason"></div>
+                        <button id="btn-start-session"></button>
+                    </div>
+                    <div class="stats-mini">
+                        <span id="stat-completed"></span>
+                        <span id="stat-streak"></span>
+                    </div>
+                </div>
+                <div id="view-plans" class="view">
+                    <div id="plans-list"></div>
+                    <div id="preset-plans-container"></div>
+                    <div id="ai-generator-panel"></div>
+                    <div id="exercise-library-list"></div>
+                    <div id="sync-panel"></div>
+                </div>
+                <input type="file" id="restore-file" class="hidden" />
+            `;
+        });
+
+        it('toont de onboarding-kaart met de juiste tekst en 3 stappen voor nieuwe gebruikers zonder logs', () => {
+            app.renderHome();
+
+            const container = document.getElementById('home-onboarding-container');
+            expect(container.classList.contains('hidden')).toBe(false);
+            expect(container.innerHTML).toContain('Kies een schema, log eenvoudig je gewichten en herhalingen, en train op basis van slim spierherstel. Go');
+            expect(container.innerHTML).not.toContain('🚀 Welkom bij GoFitness');
+            expect(container.innerHTML).toContain('Kies je schema');
+            expect(container.innerHTML).toContain('Doe je eerste training');
+            expect(container.innerHTML).toContain('Volg je herstel &amp; progressie');
+            expect(container.innerHTML).toContain('Al eerder GoFitness gebruikt?');
+            expect(container.innerHTML).toContain('Log in met Google Drive');
+        });
+
+        it('verbergt de onboarding-kaart wanneer dismissOnboarding wordt aangeroepen', () => {
+            app.renderHome();
+            expect(document.getElementById('home-onboarding-container').classList.contains('hidden')).toBe(false);
+
+            app.dismissOnboarding();
+            expect(localStorage.getItem('gof_onboarding_dismissed')).toBe('1');
+            expect(document.getElementById('home-onboarding-container').classList.contains('hidden')).toBe(true);
+        });
+
+        it('toont geen onboarding als de gebruiker al trainingen heeft gelogd', () => {
+            store.logs = [{ id: 'log_1', date: new Date().toISOString() }];
+            app.renderHome();
+
+            const container = document.getElementById('home-onboarding-container');
+            expect(container.classList.contains('hidden')).toBe(true);
+        });
+
+        it('werkt stap 1 bij naar gereed zodra een schema is toegevoegd', () => {
+            store.plans = [{ id: 'plan_1', name: 'Test Schema', sessions: [] }];
+            store.activePlanId = 'plan_1';
+            app.renderHome();
+
+            const container = document.getElementById('home-onboarding-container');
+            expect(container.classList.contains('hidden')).toBe(false);
+            expect(container.innerHTML).toContain('Gekozen: <strong>Test Schema</strong>');
+            // Escape hatch is verborgen zodra er plannen zijn
+            expect(container.innerHTML).not.toContain('Al eerder GoFitness gebruikt?');
+        });
+
+        it('toont welkomst-terug melding bij terugkerende sync-gebruiker zonder lokale plannen', () => {
+            localStorage.setItem('sync_enabled', '1');
+            app.renderHome();
+
+            const container = document.getElementById('home-onboarding-container');
+            expect(container.classList.contains('hidden')).toBe(false);
+            expect(container.innerHTML).toContain('Welkom terug!');
+            expect(container.innerHTML).toContain('Log in met Google om je schema\'s en trainingen te synchroniseren.');
+        });
+
+        it('toont juiste verwijzing in renderPlans en aanbevolen badge in renderPresets', () => {
+            app.renderPlans();
+
+            const list = document.getElementById('plans-list');
+            expect(list.innerHTML).toContain('Preset Bibliotheek hieronder');
+
+            const presets = document.getElementById('preset-plans-container');
+            expect(presets.innerHTML).toContain('⭐ Aanbevolen start');
+        });
+    });
 });
 
 

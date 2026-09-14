@@ -2117,12 +2117,154 @@ const app = {
         return '';
     },
 
+    dismissOnboarding() {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('gof_onboarding_dismissed', '1');
+        }
+        this.renderHome();
+    },
+
+    renderHomeOnboarding() {
+        const container = document.getElementById('home-onboarding-container');
+        if (!container) return;
+
+        const isDismissed = (typeof localStorage !== 'undefined' && localStorage.getItem('gof_onboarding_dismissed') === '1');
+        const hasLogs = store.logs && store.logs.length > 0;
+        const isSyncUser = (typeof localStorage !== 'undefined' && localStorage.getItem('sync_enabled') === '1');
+        const hasPlans = store.plans && store.plans.length > 0;
+
+        // Bestaande actieve gebruikers of gebruikers die de gids gesloten hebben zien niets
+        if (isDismissed || hasLogs) {
+            container.innerHTML = '';
+            container.classList.add('hidden');
+            return;
+        }
+
+        // Terugkerende cloud-sync gebruiker wiens sessie verlopen is of nog moet syncen
+        if (isSyncUser && !hasPlans) {
+            container.classList.remove('hidden');
+            container.innerHTML = `
+                <div class="glass-panel mb-4" style="border: 1px solid var(--accent-color); padding: 14px 16px; background: rgba(37, 99, 235, 0.08);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span class="material-icons-round text-accent" style="font-size:1.5rem;">cloud_sync</span>
+                            <div>
+                                <div style="font-weight:600; font-size:0.95rem; color:var(--text-primary);">Welkom terug!</div>
+                                <div class="text-sm text-muted">Log in met Google om je schema's en trainingen te synchroniseren.</div>
+                            </div>
+                        </div>
+                        <button class="btn-primary" style="padding:6px 12px; font-size:0.85rem; white-space:nowrap;" onclick="if(typeof CloudSync !== 'undefined') CloudSync.signIn();">
+                            Inloggen
+                        </button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // Nieuwe gebruiker: toon de 3-stappen New User Journey
+        const activePlan = store.getActivePlan();
+        const step1Done = hasPlans;
+        const step2Done = hasLogs;
+        const step3Done = hasLogs;
+
+        container.classList.remove('hidden');
+        container.innerHTML = `
+            <div class="glass-panel mb-4 onboarding-card" style="border: 1px solid var(--border-color); padding: 16px; position: relative;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom: 14px;">
+                    <p style="margin: 0; font-size: 0.95rem; line-height: 1.45; color: var(--text-primary); font-weight: 500; flex: 1;">
+                        Kies een schema, log eenvoudig je gewichten en herhalingen, en train op basis van slim spierherstel. Go
+                    </p>
+                    <button class="icon-btn" onclick="app.dismissOnboarding()" title="Verberg introductie" aria-label="Verberg introductie" style="width: 28px; height: 28px; min-width: 28px; padding: 0; color: var(--text-muted);">
+                        <span class="material-icons-round" style="font-size: 1.15rem;">close</span>
+                    </button>
+                </div>
+
+                <div class="onboarding-steps flex-col gap-3">
+                    <!-- Stap 1 -->
+                    <div class="onboarding-step ${step1Done ? 'done' : 'active'}" style="display: flex; align-items: flex-start; gap: 10px; background: rgba(0,0,0,0.02); padding: 10px 12px; border-radius: 10px; border: 1px solid ${step1Done ? 'rgba(52, 211, 153, 0.2)' : 'var(--border-color)'};">
+                        <span class="material-icons-round" style="font-size: 1.25rem; color: ${step1Done ? 'var(--status-green)' : 'var(--accent-color)'}; flex-shrink: 0; margin-top: 1px;">
+                            ${step1Done ? 'check_circle' : 'looks_one'}
+                        </span>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                                <span>Kies je schema</span>
+                                ${step1Done ? '<span class="status-badge green" style="padding: 1px 6px; font-size: 0.65rem;">Actief</span>' : ''}
+                            </div>
+                            <div class="text-sm text-muted" style="font-size: 0.8rem; margin-top: 2px;">
+                                ${step1Done ? `Gekozen: <strong>${this.escapeHTML(activePlan ? activePlan.name : store.plans[0].name)}</strong>` : 'Selecteer een startschema uit de bibliotheek of start direct met de beginnersmix.'}
+                            </div>
+                            ${!step1Done ? `
+                                <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn-primary" style="padding: 5px 12px; font-size: 0.8rem;" onclick="app.loadPresetPlan('preset_beginner_gym_mix', false);">
+                                        ⚡ Kies Beginnersmix
+                                    </button>
+                                    <button class="btn-secondary" style="padding: 5px 12px; font-size: 0.8rem;" onclick="app.navigate('plans');">
+                                        Bekijk alle schema's
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Stap 2 -->
+                    <div class="onboarding-step ${step2Done ? 'done' : (step1Done ? 'active' : 'pending')}" style="display: flex; align-items: flex-start; gap: 10px; background: rgba(0,0,0,0.02); padding: 10px 12px; border-radius: 10px; border: 1px solid ${step2Done ? 'rgba(52, 211, 153, 0.2)' : 'var(--border-color)'}; ${!step1Done ? 'opacity: 0.6;' : ''}">
+                        <span class="material-icons-round" style="font-size: 1.25rem; color: ${step2Done ? 'var(--status-green)' : (step1Done ? 'var(--accent-color)' : 'var(--text-muted)')}; flex-shrink: 0; margin-top: 1px;">
+                            ${step2Done ? 'check_circle' : 'looks_two'}
+                        </span>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">
+                                Doe je eerste training
+                            </div>
+                            <div class="text-sm text-muted" style="font-size: 0.8rem; margin-top: 2px;">
+                                ${step2Done ? 'Eerste sessie succesvol afgerond! 🎉' : 'Tik hieronder op Start Nu en vul na elke set je gewicht en herhalingen in.'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stap 3 -->
+                    <div class="onboarding-step ${step3Done ? 'done' : 'pending'}" style="display: flex; align-items: flex-start; gap: 10px; background: rgba(0,0,0,0.02); padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-color); ${!step2Done ? 'opacity: 0.6;' : ''}">
+                        <span class="material-icons-round" style="font-size: 1.25rem; color: ${step3Done ? 'var(--status-green)' : 'var(--text-muted)'}; flex-shrink: 0; margin-top: 1px;">
+                            ${step3Done ? 'check_circle' : 'looks_3'}
+                        </span>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">
+                                Volg je herstel & progressie
+                            </div>
+                            <div class="text-sm text-muted" style="font-size: 0.8rem; margin-top: 2px;">
+                                ${step3Done ? 'Bekijk het stoplicht bovenaan voor je hersteltijd of check het tabblad Statistieken.' : 'Het stoplicht berekent na je training automatisch wanneer je spieren klaar zijn voor de volgende sessie.'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Terugkerende gebruiker escape-hatch -->
+                ${(!hasPlans && !hasLogs) ? `
+                    <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 0.78rem;" class="text-muted">
+                        <span>Al eerder GoFitness gebruikt?</span>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="button" style="background: none; border: none; padding: 0; color: var(--accent-color); font-size: inherit; cursor: pointer; text-decoration: underline;" onclick="if(typeof CloudSync !== 'undefined') CloudSync.signIn();">
+                                Log in met Google Drive
+                            </button>
+                            <span>•</span>
+                            <button type="button" style="background: none; border: none; padding: 0; color: var(--accent-color); font-size: inherit; cursor: pointer; text-decoration: underline;" onclick="document.getElementById('restore-file').click();">
+                                Herstel backup
+                            </button>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    },
+
     renderHome() {
         const homeDateEl = document.getElementById('home-date');
         if (homeDateEl) {
             const dateOpt = { weekday: 'long', day: 'numeric', month: 'long' };
             homeDateEl.textContent = new Date().toLocaleDateString('nl-NL', dateOpt);
         }
+
+        this.renderHomeOnboarding();
 
         const recStatus = this.getRecoveryStatus();
         const suggestion = this.getSmartRecoverySuggestion ? this.getSmartRecoverySuggestion() : null;
@@ -2364,7 +2506,7 @@ const app = {
         if(store.plans.length === 0) {
             const emptyNote = document.createElement('p');
             emptyNote.className = 'text-muted mt-2';
-            emptyNote.textContent = 'Nog geen eigen schema\'s geïmporteerd. Kies een schema uit de Preset Bibliotheek hierboven of importeer een bestand!';
+            emptyNote.textContent = 'Nog geen eigen schema\'s geïmporteerd. Kies een schema uit de Preset Bibliotheek hieronder of importeer een bestand!';
             list.appendChild(emptyNote);
         } else {
             const sortedPlans = [...store.plans].sort((a, b) => {
@@ -2505,7 +2647,10 @@ const app = {
             <div class="glass-panel">
                 <div class="preset-section-header" onclick="app.togglePresetsExpanded()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
                     <div>
-                        <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Preset Bibliotheek</h3>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Preset Bibliotheek</h3>
+                            ${store.plans.length === 0 ? '<span class="status-badge green" style="padding:2px 8px; font-size:0.7rem;">⭐ Aanbevolen start</span>' : ''}
+                        </div>
                         <p class="text-sm text-muted mt-1">Kant-en-klare, beproefde startschema's</p>
                     </div>
                     <span class="material-icons-round text-muted" style="font-size:1.3rem;">${isExpanded ? 'expand_less' : 'expand_more'}</span>
