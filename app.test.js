@@ -5142,6 +5142,182 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(monochroomBtn.querySelector('.palette-swatch-circle')).not.toBeNull();
         });
     });
+
+    describe('Smart Training Readiness (GOF-47)', () => {
+        beforeEach(() => {
+            window.app = app;
+            global.app = app;
+            store.logs = [];
+            store.smartRecovery = { lastRefeedDate: null, lastDeloadDate: null, lastDietBreakDate: null };
+            document.body.innerHTML = `
+                <div id="recovery-status" class="status-badge green">
+                    <div class="status-badge-primary">
+                        <span class="material-icons-round">battery_charging_full</span>
+                        <span id="recovery-text">Klaar om te trainen</span>
+                        <span id="recovery-hours" class="recovery-hours-text"></span>
+                    </div>
+                    <button type="button" id="recovery-suggestion" class="status-badge-secondary hidden" onclick="app.showSmartRecoveryModal()">
+                        <span id="recovery-suggestion-text" class="suggestion-text"></span>
+                    </button>
+                </div>
+                <div id="home-date"></div>
+                <div id="recommended-card-title"></div>
+                <div id="recommended-session-name"></div>
+                <div id="recommended-reason"></div>
+                <div id="btn-start-session"></div>
+                <div id="modal-smart-recovery" class="modal-overlay hidden">
+                    <span id="smart-recovery-modal-icon"></span>
+                    <h3 id="smart-recovery-modal-title"></h3>
+                    <div id="tab-btn-refeed"></div>
+                    <div id="tab-btn-deload"></div>
+                    <div id="tab-btn-diet_break"></div>
+                    <div id="smart-recovery-modal-body"></div>
+                    <button id="btn-mark-recovery-applied"></button>
+                </div>
+            `;
+        });
+
+        it('geeft null terug als er geen logs zijn of cyclus korter is dan 10 dagen', () => {
+            expect(app.getSmartRecoverySuggestion()).toBeNull();
+
+            const fourDaysAgo = new Date();
+            fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
+            store.logs = [{ date: fourDaysAgo.toISOString() }];
+
+            expect(app.getSmartRecoverySuggestion()).toBeNull();
+        });
+
+        it('suggereert Koolhydraat-Refeed na 10 tot 14 dagen aaneengesloten training', () => {
+            const twelveDaysAgo = new Date();
+            twelveDaysAgo.setDate(twelveDaysAgo.getDate() - 12);
+            store.logs = [
+                { date: twelveDaysAgo.toISOString() },
+                { date: new Date().toISOString() }
+            ];
+
+            const suggestion = app.getSmartRecoverySuggestion();
+            expect(suggestion).not.toBeNull();
+            expect(suggestion.id).toBe('refeed');
+            expect(suggestion.title).toBe('Koolhydraat-Refeed');
+            expect(suggestion.frequency).toBe('Eens per 10 tot 14 dagen');
+        });
+
+        it('suggereert Deload / Rustperiode na 6 tot 8 weken continue training', () => {
+            const fortyFiveDaysAgo = new Date();
+            fortyFiveDaysAgo.setDate(fortyFiveDaysAgo.getDate() - 45); // ~6.5 weken
+            store.logs = [
+                { date: fortyFiveDaysAgo.toISOString() },
+                { date: new Date(Date.now() - 30 * 86400000).toISOString() },
+                { date: new Date(Date.now() - 15 * 86400000).toISOString() },
+                { date: new Date().toISOString() }
+            ];
+
+            const suggestion = app.getSmartRecoverySuggestion();
+            expect(suggestion).not.toBeNull();
+            expect(suggestion.id).toBe('deload');
+            expect(suggestion.title).toBe('Deload / Rustperiode');
+            expect(suggestion.frequency).toBe('Eens per 6 tot 8 weken');
+        });
+
+        it('suggereert Diet Break na 8 tot 12 weken continue training', () => {
+            const sixtyDaysAgo = new Date();
+            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60); // ~8.5 weken
+            store.logs = [
+                { date: sixtyDaysAgo.toISOString() },
+                { date: new Date(Date.now() - 45 * 86400000).toISOString() },
+                { date: new Date(Date.now() - 30 * 86400000).toISOString() },
+                { date: new Date(Date.now() - 15 * 86400000).toISOString() },
+                { date: new Date().toISOString() }
+            ];
+
+            const suggestion = app.getSmartRecoverySuggestion();
+            expect(suggestion).not.toBeNull();
+            expect(suggestion.id).toBe('diet_break');
+            expect(suggestion.title).toBe('Diet Break');
+            expect(suggestion.frequency).toBe('Eens per 8 tot 12 weken');
+        });
+
+        it('reset suggestie zodra markSmartRecoveryApplied wordt aangeroepen en herhaalt na frequentie-interval', () => {
+            const twelveDaysAgo = new Date();
+            twelveDaysAgo.setDate(twelveDaysAgo.getDate() - 12);
+            store.logs = [
+                { date: twelveDaysAgo.toISOString() },
+                { date: new Date().toISOString() }
+            ];
+
+            expect(app.getSmartRecoverySuggestion().id).toBe('refeed');
+
+            // Markeer refeed als toegepast
+            app.markSmartRecoveryApplied('refeed');
+            expect(store.smartRecovery.lastRefeedDate).not.toBeNull();
+
+            // Nu moet de suggestie verdwenen zijn (0 dagen sinds refeed)
+            expect(app.getSmartRecoverySuggestion()).toBeNull();
+
+            // 11 dagen later moet refeed opnieuw getriggerd worden
+            const elevenDaysLater = new Date();
+            elevenDaysLater.setDate(elevenDaysLater.getDate() + 11);
+            expect(app.getSmartRecoverySuggestion(elevenDaysLater).id).toBe('refeed');
+        });
+
+        it('begint een nieuwe cyclus na een pauze van meer dan 21 dagen tussen logs', () => {
+            const sixtyDaysAgo = new Date();
+            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+            const fiftyDaysAgo = new Date();
+            fiftyDaysAgo.setDate(fiftyDaysAgo.getDate() - 50);
+            // Pauze van 47 dagen tussen dag 50 en 3 dagen geleden (> 21 dagen)
+            const threeDaysAgo = new Date();
+            threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+            store.logs = [
+                { date: sixtyDaysAgo.toISOString() },
+                { date: fiftyDaysAgo.toISOString() },
+                { date: threeDaysAgo.toISOString() }
+            ];
+
+            // Aangezien het actieve blok 3 dagen geleden begon, is het nog geen tijd voor refeed/deload
+            expect(app.getSmartRecoverySuggestion()).toBeNull();
+        });
+
+        it('toont extra regel in pill op home en opent toelichtingsmodal bij klikken', () => {
+            const twelveDaysAgo = new Date();
+            twelveDaysAgo.setDate(twelveDaysAgo.getDate() - 12);
+            store.logs = [
+                { date: twelveDaysAgo.toISOString() },
+                { date: new Date().toISOString() }
+            ];
+
+            app.renderHome();
+
+            const badge = document.getElementById('recovery-status');
+            const suggestionBtn = document.getElementById('recovery-suggestion');
+            const suggestionText = document.getElementById('recovery-suggestion-text');
+
+            expect(badge.classList.contains('has-suggestion')).toBe(true);
+            expect(suggestionBtn.classList.contains('hidden')).toBe(false);
+            expect(suggestionText.textContent).toBe('Tijd voor: Koolhydraat-Refeed');
+
+            // Klik op suggestie opent de modal
+            suggestionBtn.click();
+            const modal = document.getElementById('modal-smart-recovery');
+            expect(modal.classList.contains('hidden')).toBe(false);
+            expect(document.getElementById('smart-recovery-modal-title').textContent).toContain('Koolhydraat-Refeed');
+        });
+
+        it('laat toe om tussen tabbladen (Refeed, Deload, Diet Break) te wisselen in de modal', () => {
+            app.showSmartRecoveryModal('refeed');
+            const body = document.getElementById('smart-recovery-modal-body');
+            expect(body.innerHTML).toContain('Koolhydraat-Refeed');
+
+            app.switchSmartRecoveryTab('deload');
+            expect(document.getElementById('smart-recovery-modal-title').textContent).toContain('Deload / Rustperiode');
+            expect(body.innerHTML).toContain('3 tot 5 dagen volledige rust');
+
+            app.switchSmartRecoveryTab('diet_break');
+            expect(document.getElementById('smart-recovery-modal-title').textContent).toContain('Volledige Diet Break');
+            expect(body.innerHTML).toContain('7 tot 10 dagen aaneengesloten eten');
+        });
+    });
 });
 
 

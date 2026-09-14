@@ -5,7 +5,7 @@
     <!-- Zoomen niet blokkeren (WCAG 1.4.4); viewport-fit voor de iPhone-notch -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Go Fitness</title>
-    <link rel="stylesheet" href="style.css?v=28">
+    <link rel="stylesheet" href="style.css?v=29">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -38,9 +38,16 @@
                         </button>
                     </div>
                     <div id="recovery-status" class="status-badge green">
-                        <span class="material-icons-round">battery_charging_full</span>
-                        <span id="recovery-text">Klaar om te trainen</span>
-                        <span id="recovery-hours" class="recovery-hours-text"></span>
+                        <div class="status-badge-primary">
+                            <span class="material-icons-round">battery_charging_full</span>
+                            <span id="recovery-text">Klaar om te trainen</span>
+                            <span id="recovery-hours" class="recovery-hours-text"></span>
+                        </div>
+                        <button type="button" id="recovery-suggestion" class="status-badge-secondary hidden" onclick="app.showSmartRecoveryModal()" aria-label="Bekijk hersteladvies">
+                            <span class="material-icons-round suggestion-icon" aria-hidden="true">lightbulb</span>
+                            <span id="recovery-suggestion-text" class="suggestion-text"></span>
+                            <span class="material-icons-round suggestion-arrow" aria-hidden="true">info_outline</span>
+                        </button>
                     </div>
                 </header>
                 <div class="content-padded pb-32">
@@ -701,6 +708,46 @@
 
                 <div class="modal-actions" style="margin-top: 18px;">
                     <button class="btn-primary w-full" onclick="app.hideThemeModal()">Klaar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Slimme Training Readiness (Koolhydraat-Refeed, Deload, Diet Break) -->
+        <div id="modal-smart-recovery" class="modal-overlay hidden" onclick="if(event.target===this) app.hideSmartRecoveryModal();">
+            <div class="modal-content glass-panel" style="max-width: 560px; width: 100%; max-height: 88vh; display: flex; flex-direction: column; padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="material-icons-round text-accent" style="font-size: 1.5rem;" id="smart-recovery-modal-icon">insights</span>
+                        <div>
+                            <h3 id="smart-recovery-modal-title" style="margin: 0; text-transform: none; color: var(--text-primary); font-size: 1.15rem; font-weight: 600;">Training Readiness Advies</h3>
+                            <div class="text-xs text-muted" id="smart-recovery-modal-badge">Geplande Deload &amp; Refeed Principes</div>
+                        </div>
+                    </div>
+                    <button class="icon-btn" onclick="app.hideSmartRecoveryModal()" aria-label="Sluiten" data-modal-close>
+                        <span class="material-icons-round" aria-hidden="true">close</span>
+                    </button>
+                </div>
+
+                <!-- Tabs voor de drie onderdelen -->
+                <div class="smart-recovery-tabs" role="tablist" style="display: flex; gap: 6px; margin-bottom: 14px; background: rgba(0,0,0,0.15); padding: 4px; border-radius: 10px;">
+                    <button type="button" class="smart-recovery-tab-btn active" id="tab-btn-refeed" onclick="app.switchSmartRecoveryTab('refeed')" role="tab" aria-selected="true">
+                        Refeed
+                    </button>
+                    <button type="button" class="smart-recovery-tab-btn" id="tab-btn-deload" onclick="app.switchSmartRecoveryTab('deload')" role="tab" aria-selected="false">
+                        Deload
+                    </button>
+                    <button type="button" class="smart-recovery-tab-btn" id="tab-btn-diet_break" onclick="app.switchSmartRecoveryTab('diet_break')" role="tab" aria-selected="false">
+                        Diet Break
+                    </button>
+                </div>
+
+                <div id="smart-recovery-modal-body" style="overflow-y: auto; overflow-x: hidden; flex: 1; display: flex; flex-direction: column; gap: 14px; padding-right: 2px;">
+                    <!-- Wordt dynamisch gerenderd door app.renderSmartRecoveryContent() -->
+                </div>
+
+                <div class="modal-actions" style="margin-top: 16px; display: flex; gap: 10px;">
+                    <button id="btn-mark-recovery-applied" class="btn-primary" style="flex: 1;" onclick="app.markSmartRecoveryApplied()">✓ Markeer als toegepast</button>
+                    <button class="btn-secondary" onclick="app.hideSmartRecoveryModal()">Sluiten</button>
                 </div>
             </div>
         </div>
