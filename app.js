@@ -353,6 +353,7 @@ class DataStore {
             this.holdTimerDelaySeconds = 3;
             this.deleted = { plans: [], logs: [] };
             this.customExercises = [];
+            this.smartRecovery = { lastRefeedDate: null, lastDeloadDate: null, lastDietBreakDate: null };
         }
     }
     invalidateCache() {
@@ -428,6 +429,7 @@ class DataStore {
         this.palette = localStorage.getItem('palette') || 'blauw';
         this.holdTimerDelaySeconds = (typeof localStorage !== 'undefined' && localStorage.getItem('holdTimerDelaySeconds')) ? (parseInt(localStorage.getItem('holdTimerDelaySeconds'), 10) || 3) : 3;
         this.customExercises = this.safeParse('customExercises', []);
+        this.smartRecovery = this.safeParse('smartRecovery', { lastRefeedDate: null, lastDeloadDate: null, lastDietBreakDate: null });
         // Tombstones: ids van verwijderde items, zodat cloud-sync ze niet terugbrengt
         this.deleted = this.safeParse('deleted', { plans: [], logs: [] });
         this.sortLogs();
@@ -511,6 +513,7 @@ class DataStore {
             localStorage.setItem('palette', this.palette || 'blauw');
             localStorage.setItem('holdTimerDelaySeconds', String(this.holdTimerDelaySeconds || 3));
             localStorage.setItem('customExercises', JSON.stringify(this.customExercises || []));
+            localStorage.setItem('smartRecovery', JSON.stringify(this.smartRecovery || {}));
             localStorage.setItem('deleted', JSON.stringify(this.deleted));
             this.invalidateCache();
             return true;
@@ -1052,6 +1055,231 @@ const app = {
         this.renderThemeModalContent();
     },
 
+    showSmartRecoveryModal(type = null) {
+        const modal = document.getElementById('modal-smart-recovery');
+        if (!modal) return;
+        
+        const suggestion = (typeof this.getSmartRecoverySuggestion === 'function') ? this.getSmartRecoverySuggestion() : null;
+        const initialType = type || (suggestion ? suggestion.id : 'refeed');
+        this.currentSmartRecoveryTab = initialType;
+
+        this.renderSmartRecoveryContent(initialType);
+        modal.classList.remove('hidden');
+    },
+
+    hideSmartRecoveryModal() {
+        const modal = document.getElementById('modal-smart-recovery');
+        if (!modal) return;
+        modal.classList.add('hidden');
+    },
+
+    switchSmartRecoveryTab(type) {
+        this.currentSmartRecoveryTab = type;
+        this.renderSmartRecoveryContent(type);
+    },
+
+    markSmartRecoveryApplied(type = null) {
+        const targetType = type || this.currentSmartRecoveryTab || 'refeed';
+        store.smartRecovery = store.smartRecovery || {};
+        const nowIso = new Date().toISOString();
+        
+        let label = 'Refeed';
+        if (targetType === 'refeed') {
+            store.smartRecovery.lastRefeedDate = nowIso;
+            label = 'Koolhydraat-Refeed';
+        } else if (targetType === 'deload') {
+            store.smartRecovery.lastDeloadDate = nowIso;
+            label = 'Deload / Rustperiode';
+        } else if (targetType === 'diet_break') {
+            store.smartRecovery.lastDietBreakDate = nowIso;
+            label = 'Volledige Diet Break';
+        }
+        
+        store.save();
+        if (typeof this.showToast === 'function') {
+            this.showToast(`${label} gemarkeerd als toegepast!`, 'success');
+        }
+        this.hideSmartRecoveryModal();
+        if (typeof this.renderHome === 'function') {
+            this.renderHome();
+        }
+    },
+
+    renderSmartRecoveryContent(activeType = 'refeed') {
+        const type = activeType || 'refeed';
+        const bodyEl = document.getElementById('smart-recovery-modal-body');
+        if (!bodyEl) return;
+
+        // Active state op tab-knoppen
+        ['refeed', 'deload', 'diet_break'].forEach(t => {
+            const btn = document.getElementById(`tab-btn-${t}`);
+            if (btn) {
+                const isActive = (t === type);
+                btn.className = `smart-recovery-tab-btn ${isActive ? 'active' : ''}`;
+                btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            }
+        });
+
+        const SMART_INFO = {
+            refeed: {
+                id: 'refeed',
+                title: 'Koolhydraat-Refeed (1–2 dagen)',
+                pillTitle: 'Koolhydraat-Refeed',
+                badgeText: 'Koolhydraat-Refeed',
+                icon: 'restaurant',
+                frequency: 'Eens per 10 tot 14 dagen',
+                duration: '1–2 dagen',
+                guideline: 'Calorieën opvoeren tot onderhoud of licht surplus. Koolhydraten fors omhoog, eiwit gelijk, vetten zo laag mogelijk houden (onder de 40–50 g).',
+                keyAdvice: 'Benut de komende dagen je maximale spierglycogeen door direct weer zwaar en progressief te trainen binnen je geplande calorietekort.'
+            },
+            deload: {
+                id: 'deload',
+                title: 'Deload / Rustperiode',
+                pillTitle: 'Deload / Rustperiode',
+                badgeText: 'Deload / Rustperiode',
+                icon: 'spa',
+                frequency: 'Eens per 6 tot 8 weken',
+                duration: '3 tot 5 dagen rust of 50% minder sets',
+                guideline: '3 tot 5 dagen volledige rust of een week trainen met 50% minder sets.',
+                keyAdvice: 'Vier dagen rust geeft pezen en aanhechtingen de kans microtrauma te herstellen die bij continu doortrainen chronisch kunnen worden.'
+            },
+            diet_break: {
+                id: 'diet_break',
+                title: 'Volledige Diet Break',
+                pillTitle: 'Diet Break',
+                badgeText: 'Diet Break',
+                icon: 'lunch_dining',
+                frequency: 'Eens per 8 tot 12 weken',
+                duration: '7 tot 10 dagen',
+                guideline: '7 tot 10 dagen aaneengesloten eten op exact onderhoud met een normale macroverdeling.',
+                keyAdvice: 'Zorgt voor een acute energiepiek waardoor stresshormonen verlagen en het lichaam weer bereid is vet los te laten in de daaropvolgende dagen.'
+            }
+        };
+
+        const info = SMART_INFO[type] || SMART_INFO.refeed;
+
+        const modalTitle = document.getElementById('smart-recovery-modal-title');
+        if (modalTitle) modalTitle.textContent = info.title;
+
+        const modalIcon = document.getElementById('smart-recovery-modal-icon');
+        if (modalIcon) modalIcon.textContent = info.icon;
+
+        const markBtn = document.getElementById('btn-mark-recovery-applied');
+        if (markBtn) markBtn.textContent = `✓ Markeer ${info.pillTitle} als toegepast`;
+
+        // Bepaal status
+        const nowTime = new Date().getTime();
+        const smartRec = (store && store.smartRecovery) ? store.smartRecovery : {};
+        let lastDate = null;
+        if (type === 'refeed') lastDate = smartRec.lastRefeedDate;
+        else if (type === 'deload') lastDate = smartRec.lastDeloadDate;
+        else if (type === 'diet_break') lastDate = smartRec.lastDietBreakDate;
+
+        let statusHtml = '';
+        if (lastDate) {
+            const daysAgo = Math.max(0, Math.floor((nowTime - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24)));
+            const daysAgoText = daysAgo === 0 ? 'vandaag' : `${daysAgo} dagen geleden`;
+            const dateFmt = new Date(lastDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
+            statusHtml = `<div class="text-xs text-muted" style="display: flex; align-items: center; gap: 6px;">
+                <span class="material-icons-round" style="font-size: 1rem; color: var(--status-green);">check_circle</span>
+                <span>Laatst toegepast: <strong>${dateFmt}</strong> (${daysAgoText})</span>
+            </div>`;
+        } else {
+            statusHtml = `<div class="text-xs text-muted" style="display: flex; align-items: center; gap: 6px;">
+                <span class="material-icons-round" style="font-size: 1rem;">schedule</span>
+                <span>Nog niet eerder gemarkeerd in deze trainingscyclus.</span>
+            </div>`;
+        }
+
+        const suggestion = (typeof this.getSmartRecoverySuggestion === 'function') ? this.getSmartRecoverySuggestion() : null;
+        const isCurrentSuggestion = suggestion && suggestion.id === type;
+
+        bodyEl.innerHTML = `
+            <div class="smart-recovery-info-card" style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap;">
+                    <div>
+                        <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;">Frequentie &amp; Duur</div>
+                        <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-top: 2px;">${info.frequency} • ${info.duration}</div>
+                    </div>
+                    ${isCurrentSuggestion ? '<span style="background: var(--status-green-bg); color: var(--status-green); padding: 4px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><span class="material-icons-round" style="font-size: 0.9rem;">bolt</span> Nu aanbevolen</span>' : ''}
+                </div>
+                ${statusHtml}
+            </div>
+
+            <div class="smart-recovery-info-card">
+                <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                    <span class="material-icons-round text-accent" style="font-size: 1.1rem;">tune</span>
+                    <span>Invulling van deze periode</span>
+                </div>
+                <div class="text-sm" style="color: var(--text-primary); line-height: 1.45;">
+                    ${info.guideline}
+                </div>
+                <div class="text-xs text-muted mt-2" style="font-style: italic; line-height: 1.4;">
+                    💡 ${info.keyAdvice}
+                </div>
+            </div>
+
+            <div class="smart-recovery-info-card">
+                <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-primary); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    <span class="material-icons-round text-accent" style="font-size: 1.1rem;">psychology</span>
+                    <span>Wat je hier fysiologisch uithaalt (en waarom het werkt)</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; gap: 8px; align-items: flex-start;">
+                        <span class="material-icons-round text-accent" style="font-size: 1.05rem; flex-shrink: 0; margin-top: 2px;">bolt</span>
+                        <div class="text-xs" style="line-height: 1.4;">
+                            <strong style="color: var(--text-primary);">Directe prestatiepiek (de komende dagen):</strong> Je centrale zenuwstelsel is volledig hersteld, ontstekingsvocht rond pezen en spieren is weg en je glycogeenvoorraden zitten tot de nok vol. De komende 2 tot 4 trainingen kun je aanzienlijk zwaarder tillen, meer herhalingen maken en een betere pomp verwachten.
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: flex-start;">
+                        <span class="material-icons-round text-accent" style="font-size: 1.05rem; flex-shrink: 0; margin-top: 2px;">sync_alt</span>
+                        <div class="text-xs" style="line-height: 1.4;">
+                            <strong style="color: var(--text-primary);">Hormonale en metabole reset:</strong> Een periode van structureel te weinig eten verlaagt leptine en schildklierhormoon (T₃) en drijft cortisol op. Een acute energiepiek verlaagt stresshormonen, waardoor het lichaam weer bereid is vet los te laten in de daaropvolgende dagen.
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: flex-start;">
+                        <span class="material-icons-round text-accent" style="font-size: 1.05rem; flex-shrink: 0; margin-top: 2px;">healing</span>
+                        <div class="text-xs" style="line-height: 1.4;">
+                            <strong style="color: var(--text-primary);">Volledig herstel van bindweefsel:</strong> Vier dagen rust geeft pezen en aanhechtingen de kans microtrauma te herstellen die bij continu doortrainen chronisch kunnen worden.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="smart-recovery-info-card">
+                <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); margin-bottom: 6px;">Aanbevolen richtlijn en frequentie overzicht</div>
+                <div style="overflow-x: auto;">
+                    <table class="smart-recovery-table">
+                        <thead>
+                            <tr>
+                                <th>Onderdeel</th>
+                                <th>Frequentie</th>
+                                <th>Invulling</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="${type === 'refeed' ? 'background: rgba(99, 102, 241, 0.15); font-weight: 500;' : ''}">
+                                <td><strong>Koolhydraat-Refeed (1–2 dagen)</strong></td>
+                                <td>Eens per 10 tot 14 dagen</td>
+                                <td>Calorieën opvoeren tot onderhoud of licht surplus. Koolhydraten fors omhoog, eiwit gelijk, vetten zo laag mogelijk houden (onder de 40–50 g).</td>
+                            </tr>
+                            <tr style="${type === 'deload' ? 'background: rgba(99, 102, 241, 0.15); font-weight: 500;' : ''}">
+                                <td><strong>Deload / Rustperiode</strong></td>
+                                <td>Eens per 6 tot 8 weken</td>
+                                <td>3 tot 5 dagen volledige rust of een week trainen met 50% minder sets.</td>
+                            </tr>
+                            <tr style="${type === 'diet_break' ? 'background: rgba(99, 102, 241, 0.15); font-weight: 500;' : ''}">
+                                <td><strong>Volledige Diet Break</strong></td>
+                                <td>Eens per 8 tot 12 weken</td>
+                                <td>7 tot 10 dagen aaneengesloten eten op exact onderhoud met een normale macroverdeling.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    },
+
     navigate(viewId) {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -1305,6 +1533,91 @@ const app = {
         if(hoursSinceLastPlanLog < (minHours * 0.5)) return { status: 'red', text: 'Beter rusten', hoursSinceLast };
         if(hoursSinceLastPlanLog < minHours) return { status: 'orange', text: 'Rustig aan', hoursSinceLast };
         return { status: 'green', text: 'Volledig hersteld', hoursSinceLast };
+    },
+
+    getSmartRecoverySuggestion(now = new Date()) {
+        if (!store || !store.logs || store.logs.length === 0) return null;
+        const validLogs = store.logs.filter(l => l && l.date);
+        if (validLogs.length === 0) return null;
+
+        // Sorteer logs chronologisch oplopend
+        const sortedLogs = [...validLogs].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        // Bepaal het begin van het actieve trainingsblok (aaneengesloten trainingsperiode)
+        // Als er tussen twee opeenvolgende logs een gat van > 14 dagen zit, begon het huidige blok na het gat.
+        let blockStart = new Date(sortedLogs[sortedLogs.length - 1].date);
+        for (let i = sortedLogs.length - 1; i >= 0; i--) {
+            const currentDate = new Date(sortedLogs[i].date);
+            if (i < sortedLogs.length - 1) {
+                const nextDate = new Date(sortedLogs[i + 1].date);
+                const gapDays = (nextDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24);
+                if (gapDays > 21) {
+                    break;
+                }
+            }
+            blockStart = currentDate;
+        }
+
+        const nowTime = now.getTime();
+        // Aantal dagen actief in deze trainingscyclus (minimaal 1)
+        const cycleDays = Math.max(1, Math.floor((nowTime - blockStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+        const smartRec = (store && store.smartRecovery) ? store.smartRecovery : {};
+
+        // Bepaal het aantal dagen sinds de laatste markering (of sinds start cyclus)
+        const daysSinceDietBreak = smartRec.lastDietBreakDate
+            ? Math.max(0, Math.floor((nowTime - new Date(smartRec.lastDietBreakDate).getTime()) / (1000 * 60 * 60 * 24)))
+            : cycleDays;
+
+        const daysSinceDeload = smartRec.lastDeloadDate
+            ? Math.max(0, Math.floor((nowTime - new Date(smartRec.lastDeloadDate).getTime()) / (1000 * 60 * 60 * 24)))
+            : cycleDays;
+
+        const daysSinceRefeed = smartRec.lastRefeedDate
+            ? Math.max(0, Math.floor((nowTime - new Date(smartRec.lastRefeedDate).getTime()) / (1000 * 60 * 60 * 24)))
+            : cycleDays;
+
+        // Fysiologische richtlijnen volgens GOF-47:
+        // 1. Volledige Diet Break: eens per 8 tot 12 weken (vanaf 56 dagen)
+        if (daysSinceDietBreak >= 56) {
+            return {
+                id: 'diet_break',
+                title: 'Diet Break',
+                fullTitle: 'Volledige Diet Break',
+                frequency: 'Eens per 8 tot 12 weken',
+                duration: '7 tot 10 dagen',
+                daysSince: daysSinceDietBreak,
+                cycleDays
+            };
+        }
+
+        // 2. Deload / Rustperiode: eens per 6 tot 8 weken (vanaf 42 dagen)
+        if (daysSinceDeload >= 42) {
+            return {
+                id: 'deload',
+                title: 'Deload / Rustperiode',
+                fullTitle: 'Deload / Rustperiode',
+                frequency: 'Eens per 6 tot 8 weken',
+                duration: '3 tot 5 dagen rust of 50% minder sets',
+                daysSince: daysSinceDeload,
+                cycleDays
+            };
+        }
+
+        // 3. Koolhydraat-Refeed: eens per 10 tot 14 dagen (vanaf 10 dagen)
+        if (daysSinceRefeed >= 10) {
+            return {
+                id: 'refeed',
+                title: 'Koolhydraat-Refeed',
+                fullTitle: 'Koolhydraat-Refeed (1–2 dagen)',
+                frequency: 'Eens per 10 tot 14 dagen',
+                duration: '1–2 dagen',
+                daysSince: daysSinceRefeed,
+                cycleDays
+            };
+        }
+
+        return null;
     },
 
     getRecommendedSession() {
@@ -1812,10 +2125,12 @@ const app = {
         }
 
         const recStatus = this.getRecoveryStatus();
+        const suggestion = this.getSmartRecoverySuggestion ? this.getSmartRecoverySuggestion() : null;
         const badge = document.getElementById('recovery-status');
         if (badge) {
-            badge.className = `status-badge ${recStatus.status}`;
-            const iconEl = badge.querySelector('.material-icons-round');
+            const suggestionClass = suggestion ? ' has-suggestion' : '';
+            badge.className = `status-badge ${recStatus.status}${suggestionClass}`;
+            const iconEl = badge.querySelector('.status-badge-primary .material-icons-round') || badge.querySelector('.material-icons-round');
             if (iconEl) {
                 let icon = 'battery_charging_full';
                 if (recStatus.status === 'orange') icon = 'battery_3_bar';
@@ -1837,6 +2152,20 @@ const app = {
             } else {
                 recHoursEl.textContent = '';
                 recHoursEl.style.display = 'none';
+            }
+        }
+
+        const suggestionEl = document.getElementById('recovery-suggestion');
+        const suggestionTextEl = document.getElementById('recovery-suggestion-text');
+        if (suggestionEl) {
+            if (suggestion) {
+                suggestionEl.classList.remove('hidden');
+                if (suggestionTextEl) {
+                    suggestionTextEl.textContent = `Tijd voor: ${suggestion.title}`;
+                }
+                suggestionEl.setAttribute('aria-label', `Tijd voor: ${suggestion.title}. Klik voor toelichting.`);
+            } else {
+                suggestionEl.classList.add('hidden');
             }
         }
 
@@ -9372,6 +9701,9 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !(typeof
         app.init();
     }
 }
+
+if (typeof window !== 'undefined') window.app = app;
+if (typeof global !== 'undefined') global.app = app;
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {

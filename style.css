@@ -150,6 +150,165 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
     min-width: 0;
 }
 
+/* Training Readiness Pill & Smart Suggestions (GOF-47) */
+.status-badge.has-suggestion {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 14px;
+    white-space: normal;
+    overflow: visible;
+}
+
+@media (max-width: 600px) {
+    .status-badge.has-suggestion {
+        width: 100% !important;
+        align-self: stretch !important;
+        align-items: stretch !important;
+    }
+}
+
+@media (min-width: 601px) {
+    .status-badge.has-suggestion {
+        width: auto !important;
+        max-width: 100%;
+        flex-wrap: wrap;
+    }
+}
+
+.status-badge-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.status-badge-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255, 255, 255, 0.12);
+    color: inherit;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.15s ease, transform 0.1s ease;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    text-decoration: none;
+}
+
+.status-badge-secondary:hover,
+.status-badge-secondary:focus-visible {
+    background: rgba(255, 255, 255, 0.22);
+    outline: none;
+}
+
+.status-badge-secondary:active {
+    transform: scale(0.99);
+}
+
+[data-theme="light"] .status-badge-secondary {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .status-badge-secondary:hover,
+[data-theme="light"] .status-badge-secondary:focus-visible {
+    background: rgba(0, 0, 0, 0.12);
+}
+
+.status-badge-secondary .suggestion-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+
+.status-badge-secondary .suggestion-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.status-badge-secondary .suggestion-arrow {
+    font-size: 1.05rem;
+    width: 1.05rem;
+    height: 1.05rem;
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+/* Smart Recovery Modal styling */
+.smart-recovery-tab-btn {
+    flex: 1;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+}
+
+.smart-recovery-tab-btn:hover {
+    color: var(--text-primary);
+}
+
+.smart-recovery-tab-btn.active {
+    background: var(--bg-card, rgba(255, 255, 255, 0.1));
+    color: var(--color-accent, #6366f1);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.smart-recovery-info-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 14px;
+}
+
+[data-theme="light"] .smart-recovery-info-card {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.smart-recovery-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin-top: 6px;
+}
+
+.smart-recovery-table th,
+.smart-recovery-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    vertical-align: top;
+}
+
+.smart-recovery-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 /* Headers */
 .home-header {
     padding: 32px 20px 16px;

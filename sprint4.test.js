@@ -86,7 +86,7 @@ describe('renderHistory', () => {
     it('toont groepskoppen, schema-chip, meta en set-strip op de kaart', () => {
         store.logs = [
             log('l1', daysAgo(10), 'Push', 'Kracht A', [ex('Bench Press', [set(1, 40, 10), set(2, 40, 10)], 3)]),
-            log('l2', daysAgo(1), 'Push', 'Kracht A', [ex('Bench Press', [set(1, 45, 10), set(2, 45, 9)], 3)])
+            log('l2', new Date().toISOString(), 'Push', 'Kracht A', [ex('Bench Press', [set(1, 45, 10), set(2, 45, 9)], 3)])
         ];
         app.renderHistory();
         const list = document.getElementById('history-list');
