@@ -1,37 +1,37 @@
 // app.js
 
 const DEFAULT_EXERCISES = [
-    { id: 'def_bench_press', name: 'Barbell Bench Press', muscleGroups: ['chest', 'triceps', 'shoulders'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Bench Press', 'Barbell Bench Press', 'Flat Bench Press', 'Flat Barbell Bench Press', 'Barbell of Dumbbell Flat Bench Press', 'Bench Press of Dumbbell Bench Press'] },
+    { id: 'def_bench_press', name: 'Barbell Bench Press', muscleGroups: ['chest', 'triceps', 'shoulders'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Bench Press', 'Barbell Bench Press', 'Flat Bench Press', 'Flat Barbell Bench Press'] },
     { id: 'def_incline_bench_press', name: 'Incline Bench Press', muscleGroups: ['chest', 'shoulders', 'triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Incline Bench Press', 'Incline Barbell Bench Press'] },
-    { id: 'def_incline_db_press', name: 'Incline Dumbbell Press', muscleGroups: ['chest', 'shoulders', 'triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Incline Dumbbell Press', 'Incline DB Press', 'Incline Dumbbell Press of Chest Press Machine', 'Incline Dumbbell Press of Incline Machine Press'] },
+    { id: 'def_incline_db_press', name: 'Incline Dumbbell Press', muscleGroups: ['chest', 'shoulders', 'triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Incline Dumbbell Press', 'Incline DB Press'] },
     { id: 'def_chest_fly', name: 'Dumbbell Chest Fly', muscleGroups: ['chest'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Dumbbell Chest Fly', 'Dumbbell Fly', 'DB Fly'] },
-    { id: 'def_pushup', name: 'Push-Up', muscleGroups: ['chest', 'triceps', 'core'], exerciseType: 'bodyweight_reps', trackMetrics: ['reps'], category: 'bodyweight', alternatives: ['Pushup', 'Push-ups', 'Pushups', 'Push up', 'Push ups', 'Incline Push-ups of Push-ups', 'Incline Push-up of Push-up'] },
-    { id: 'def_dip', name: 'Chest / Tricep Dips', muscleGroups: ['chest', 'triceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight', alternatives: ['Chest Dips', 'Tricep Dips', 'Dip', 'Dips', 'Chest Dip', 'Tricep Dip', 'Assisted Dips', 'Chest / Tricep Dips of Triceps Rope Pushdown'] },
+    { id: 'def_pushup', name: 'Push-Up', muscleGroups: ['chest', 'triceps', 'core'], exerciseType: 'bodyweight_reps', trackMetrics: ['reps'], category: 'bodyweight', alternatives: ['Pushup', 'Push-ups', 'Pushups', 'Push up', 'Push ups', 'Incline Push-ups', 'Incline Push-up'] },
+    { id: 'def_dip', name: 'Chest / Tricep Dips', muscleGroups: ['chest', 'triceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight', alternatives: ['Chest Dips', 'Tricep Dips', 'Dip', 'Dips', 'Chest Dip', 'Tricep Dip', 'Assisted Dips'] },
     { id: 'def_overhead_press', name: 'Overhead Press (OHP)', muscleGroups: ['shoulders', 'triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Overhead Press', 'OHP', 'Military Press', 'Barbell Overhead Press'] },
     { id: 'def_db_shoulder_press', name: 'Dumbbell Shoulder Press', muscleGroups: ['shoulders', 'triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Dumbbell Shoulder Press', 'DB Shoulder Press', 'Seated DB Shoulder Press', 'Seated Dumbbell Shoulder Press'] },
-    { id: 'def_lateral_raise', name: 'Dumbbell Lateral Raise', muscleGroups: ['shoulders'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Dumbbell Lateral Raise', 'Lateral Raise', 'Side Lateral Raise', 'Cable of Dumbbell Lateral Raise', 'Dumbbell Lateral Raises of Cable Lateral Raises', 'Dumbbell Lateral Raise of Cable Lateral Raise'] },
-    { id: 'def_barbell_squat', name: 'Barbell Back Squat', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Barbell Back Squat', 'Barbell Squat', 'Back Squat', 'Squat', 'Barbell Squat of Leg Press', 'Squat of Leg Press', 'Leg Press of Squat'] },
-    { id: 'def_goblet_squat', name: 'Goblet Squat', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Goblet Squat', 'DB Goblet Squat', 'Goblet Squat of Leg Press'] },
+    { id: 'def_lateral_raise', name: 'Dumbbell Lateral Raise', muscleGroups: ['shoulders'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Dumbbell Lateral Raise', 'Lateral Raise', 'Side Lateral Raise'] },
+    { id: 'def_barbell_squat', name: 'Barbell Back Squat', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Barbell Back Squat', 'Barbell Squat', 'Back Squat', 'Squat'] },
+    { id: 'def_goblet_squat', name: 'Goblet Squat', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Goblet Squat', 'DB Goblet Squat'] },
     { id: 'def_leg_press', name: 'Leg Press', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Leg Press', '45 Degree Leg Press', 'Seated Leg Press'] },
-    { id: 'def_walking_lunges', name: 'Walking Lunges', muscleGroups: ['legs', 'glutes', 'core'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Walking Lunges', 'Walking Lunge', 'Walking Lunges of Static Lunges', 'Walking Lunges of Split Squats', 'Walking Lunge of Bulgarian Split Squat', 'Walking Lunge of Static Lunge'] },
-    { id: 'def_romanian_deadlift', name: 'Romanian Deadlift (RDL)', muscleGroups: ['legs', 'glutes', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Romanian Deadlift', 'Romanian Deadlift (RDL)', 'Dumbbell Romanian Deadlift', 'Barbell Romanian Deadlift', 'RDL', 'Barbell RDL', 'Stiff-Leg Deadlift'] },
-    { id: 'def_db_romanian_deadlift', name: 'Dumbbell Romanian Deadlift (DB RDL)', muscleGroups: ['legs', 'glutes', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Dumbbell Romanian Deadlift', 'Dumbbell Romanian Deadlift (DB RDL)', 'DB RDL', 'DB Romanian Deadlift'] },
+    { id: 'def_walking_lunges', name: 'Walking Lunges', muscleGroups: ['legs', 'glutes', 'core'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Walking Lunges', 'Walking Lunge', 'Static Lunges', 'Split Squats'] },
+    { id: 'def_db_romanian_deadlift', name: 'Dumbbell Romanian Deadlift (DB RDL)', muscleGroups: ['legs', 'glutes', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Dumbbell Romanian Deadlift', 'Dumbbell Romanian Deadlift (DB RDL)', 'DB RDL', 'DB Romanian Deadlift', 'Dumbbell RDL'] },
+    { id: 'def_romanian_deadlift', name: 'Romanian Deadlift (RDL)', muscleGroups: ['legs', 'glutes', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Romanian Deadlift', 'Romanian Deadlift (RDL)', 'Barbell Romanian Deadlift', 'RDL', 'Barbell RDL', 'Stiff-Leg Deadlift', 'Dumbbell Romanian Deadlift'] },
     { id: 'def_bulgarian_split_squat', name: 'Bulgarian Split Squat', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Bulgarian Split Squat', 'Split Squat', 'Rear Foot Elevated Split Squat'] },
     { id: 'def_leg_extension', name: 'Leg Extension', muscleGroups: ['legs'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Leg Extension', 'Seated Leg Extension'] },
     { id: 'def_leg_curl', name: 'Lying Leg Curl', muscleGroups: ['legs'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Lying Leg Curl', 'Hamstring Curl'] },
     { id: 'def_seated_leg_curl', name: 'Seated Leg Curl', muscleGroups: ['hamstrings', 'legs'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Seated Leg Curl', 'Seated Hamstring Curl'] },
     { id: 'def_deadlift', name: 'Conventional Deadlift', muscleGroups: ['back', 'legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Conventional Deadlift', 'Deadlift', 'Barbell Deadlift', 'Sumo Deadlift'] },
     { id: 'def_barbell_row', name: 'Barbell Bent Over Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Barbell Bent Over Row', 'Bent Over Row', 'Barbell Row'] },
-    { id: 'def_lat_pulldown', name: 'Lat Pulldown', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Lat Pulldown', 'Wide-Grip Lat Pulldown', 'Lat Pulldown of Assisted Pull-up', 'Lat Pulldown of Pull-up', 'Pull-up of Lat Pulldown'] },
+    { id: 'def_lat_pulldown', name: 'Lat Pulldown', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Lat Pulldown', 'Wide-Grip Lat Pulldown'] },
     { id: 'def_close_grip_lat_pulldown', name: 'Close-Grip Lat Pulldown', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Close-Grip Lat Pulldown', 'V-Bar Lat Pulldown', 'Neutral Grip Lat Pulldown'] },
-    { id: 'def_pullup', name: 'Pull-Up / Chin-Up', muscleGroups: ['back', 'biceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight', alternatives: ['Pull-Up', 'Chin-Up', 'Pullup', 'Chinup', 'Pull-ups', 'Pullups', 'Chinups', 'Assisted Pull-up'] },
+    { id: 'def_pullup', name: 'Pull-Up / Chin-Up', muscleGroups: ['back', 'biceps'], exerciseType: 'bodyweight_reps', trackMetrics: ['weight', 'reps'], category: 'bodyweight', alternatives: ['Pull-Up', 'Chin-Up', 'Pullup', 'Chinup', 'Pull-ups', 'Pullups', 'Chinups', 'Assisted Pull-up', 'Assisted Chin-up'] },
     { id: 'def_bicep_curl', name: 'Dumbbell Bicep Curl', muscleGroups: ['biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Dumbbell Bicep Curl', 'Dumbbell Bicep Curls', 'Biceps Curl', 'Bicep Curls', 'Bicep Curl', 'DB Curl', 'DB Curls'] },
-    { id: 'def_incline_bicep_curl', name: 'Incline Dumbbell Curl', muscleGroups: ['biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Incline Dumbbell Curl', 'Incline Dumbbell Biceps Curl', 'Incline DB Curl', 'Incline Bicep Curl'] },
-    { id: 'def_hammer_curl', name: 'Hammer Curl', muscleGroups: ['biceps', 'forearms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Hammer Curl', 'Dumbbell Hammer Curl', 'DB Hammer Curl', 'Dumbbell Hammer Curl of Cable Rope Curl'] },
+    { id: 'def_incline_bicep_curl', name: 'Incline Dumbbell Curl', muscleGroups: ['biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Incline Dumbbell Curl', 'Incline Dumbbell Biceps Curl', 'Incline DB Curl', 'Incline Bicep Curl', 'Incline Biceps Curl', 'Incline Curl'] },
+    { id: 'def_hammer_curl', name: 'Hammer Curl', muscleGroups: ['biceps', 'forearms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Hammer Curl', 'Dumbbell Hammer Curl', 'DB Hammer Curl', 'Hammer Curls'] },
     { id: 'def_tricep_pushdown', name: 'Tricep Cable Pushdown', muscleGroups: ['triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Tricep Cable Pushdown', 'Tricep Pushdown', 'Cable Tricep Pushdown', 'Triceps Rope Pushdown'] },
-    { id: 'def_seated_cable_row', name: 'Seated Cable Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Cable Row', 'Seated Cable Row', 'Seated Row', 'Seated Row Machine', 'Chest Supported Row of Cable Row'] },
+    { id: 'def_seated_cable_row', name: 'Seated Cable Row', muscleGroups: ['back', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Cable Row', 'Seated Cable Row', 'Seated Row', 'Seated Cable Row Machine'] },
     { id: 'def_chest_supported_row', name: 'Chest Supported Row', muscleGroups: ['back', 'rear_shoulders', 'biceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Chest Supported Row', 'Incline DB Row', 'Incline Dumbbell Row', 'Chest Supported T-Bar Row'] },
-    { id: 'def_cable_fly', name: 'Cable Fly', muscleGroups: ['chest'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Cable Fly', 'Cable Fly of Pec Deck', 'Cable Crossover', 'Standing Cable Fly', 'Cable Chest Fly'] },
+    { id: 'def_cable_fly', name: 'Cable Fly', muscleGroups: ['chest'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation', alternatives: ['Cable Fly', 'Cable Crossover', 'Standing Cable Fly', 'Cable Chest Fly'] },
     { id: 'def_plank', name: 'Plank Hold', muscleGroups: ['core'], exerciseType: 'duration', trackMetrics: ['duration_seconds'], category: 'isometric', alternatives: ['Plank', 'Plank Hold', 'Plank (buikspieren)', 'Plank Buikspieren'] },
     { id: 'def_side_plank', name: 'Side Plank', muscleGroups: ['core', 'obliques'], exerciseType: 'duration', trackMetrics: ['duration_seconds'], category: 'isometric', alternatives: ['Side Plank', 'Side Plank Hold'] },
     { id: 'def_running', name: 'Hardlopen', muscleGroups: ['legs'], exerciseType: 'duration', trackMetrics: ['duration_seconds'], category: 'cardio' },
@@ -42,8 +42,8 @@ const DEFAULT_EXERCISES = [
     { id: 'def_hollow_body_hold', name: 'Hollow Body Hold', muscleGroups: ['core'], exerciseType: 'duration', trackMetrics: ['duration_seconds'], category: 'isometric' },
     { id: 'def_toes_to_bar', name: 'Toes-to-Bar', muscleGroups: ['core'], exerciseType: 'bodyweight_reps', trackMetrics: ['reps'], category: 'bodyweight' },
     { id: 'def_pec_deck_fly', name: 'Pec Deck Fly Machine', muscleGroups: ['chest'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
-    { id: 'def_dumbbell_bench_press', name: 'Dumbbell Bench Press', muscleGroups: ['chest', 'triceps', 'shoulders'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
-    { id: 'def_single_arm_db_press', name: 'Single-Arm Dumbbell Bench Press', muscleGroups: ['chest', 'triceps', 'core'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_dumbbell_bench_press', name: 'Dumbbell Bench Press', muscleGroups: ['chest', 'triceps', 'shoulders'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Dumbbell Bench Press', 'DB Bench Press', 'Flat Dumbbell Press', 'Flat DB Press', 'Flat Dumbbell Bench Press', 'Dumbbell Press', 'DB Press'] },
+    { id: 'def_single_arm_db_press', name: 'Single-Arm Dumbbell Bench Press', muscleGroups: ['chest', 'triceps', 'core'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound', alternatives: ['Single-Arm Dumbbell Bench Press', 'Single-Arm DB Bench Press', 'Single Arm Dumbbell Bench Press', 'One-Arm Dumbbell Bench Press', 'Single-Arm DB Press'] },
     { id: 'def_hip_thrust', name: 'Barbell Hip Thrust', muscleGroups: ['glutes', 'legs'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_single_leg_press', name: 'Single-Leg Press Machine', muscleGroups: ['legs', 'glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
     { id: 'def_hip_abductor', name: 'Hip Abductor Machine', muscleGroups: ['glutes'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
@@ -69,6 +69,51 @@ function normalizeExerciseName(str) {
     s = s.replace(/[^a-z0-9]/gi, ' ').replace(/\s+/g, ' ').trim();
     s = s.split(' ').map(w => (w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w)).join(' ');
     return s;
+}
+
+function getExerciseEquipment(str) {
+    if (!str) return null;
+    const s = ' ' + String(str).toLowerCase().replace(/[^a-z0-9]/g, ' ') + ' ';
+    if (s.includes(' dumbbell ') || s.includes(' db ') || s.includes(' dumbell ')) return 'dumbbell';
+    if (s.includes(' barbell ') || s.includes(' bb ')) return 'barbell';
+    if (s.includes(' cable ') || s.includes(' kabel ')) return 'cable';
+    if (s.includes(' kettlebell ') || s.includes(' kb ')) return 'kettlebell';
+    if (s.includes(' machine ') || s.includes(' apparatus ') || s.includes(' pec deck ') || s.includes(' roeimachine ') || s.includes(' leg press ')) return 'machine';
+    return null;
+}
+
+function getExerciseModality(str) {
+    if (!str) return {};
+    const s = String(str).toLowerCase();
+    return {
+        isSingleArm: s.includes('single arm') || s.includes('single-arm') || s.includes('one arm') || s.includes('one-arm'),
+        isSingleLeg: s.includes('single leg') || s.includes('single-leg') || s.includes('one leg') || s.includes('one-leg'),
+        isIncline: s.includes('incline') || s.includes('schuin'),
+        isDecline: s.includes('decline'),
+        isFlat: s.includes('flat') || s.includes('vlak'),
+        isSeated: s.includes('seated') || s.includes('zittend'),
+        isLying: s.includes('lying') || s.includes('liggend'),
+        isStanding: s.includes('standing') || s.includes('staand')
+    };
+}
+
+function hasConflictingExerciseModality(strA, strB) {
+    if (!strA || !strB) return false;
+    const eqA = getExerciseEquipment(strA);
+    const eqB = getExerciseEquipment(strB);
+    if (eqA && eqB && eqA !== eqB) return true;
+
+    const modA = getExerciseModality(strA);
+    const modB = getExerciseModality(strB);
+
+    if (modA.isSingleArm !== modB.isSingleArm) return true;
+    if (modA.isSingleLeg !== modB.isSingleLeg) return true;
+    if (modA.isIncline && (modB.isDecline || modB.isFlat)) return true;
+    if (modB.isIncline && (modA.isDecline || modA.isFlat)) return true;
+    if (modA.isSeated && modB.isLying) return true;
+    if (modB.isSeated && modA.isLying) return true;
+
+    return false;
 }
 
 const CANONICAL_INDEX = new Map();
@@ -405,7 +450,7 @@ class DataStore {
         const normCore = stripEquipment(norm);
         if (normCore.length > 3) {
             for (const [key, val] of CANONICAL_INDEX.entries()) {
-                if (stripEquipment(key) === normCore) {
+                if (stripEquipment(key) === normCore && !hasConflictingExerciseModality(raw, key) && !hasConflictingExerciseModality(raw, val.name)) {
                     return val;
                 }
             }
@@ -3084,6 +3129,10 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         return kind === 'name' ? this._canonicalNameCache : this._canonicalKeyCache;
     },
 
+    hasConflictingExerciseModality(strA, strB) {
+        return hasConflictingExerciseModality(strA, strB);
+    },
+
     getCanonicalExerciseKey(name) {
         if (!name) return '';
         let raw = String(name).trim();
@@ -5117,27 +5166,21 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             // Split by separators: " of ", "/", " or ", ",", "&", "+", " - "
             // Whitespace eerst lineair samenvouwen; de separator-regex heeft daardoor
             // geen onbegrensde \s+/\s* voor een letterlijke tekst meer (CodeQL ReDoS)
+            const MUSCLE_TERMS = new Set(['chest', 'back', 'legs', 'glutes', 'core', 'arms', 'biceps', 'triceps', 'shoulders', 'hamstrings', 'calves', 'borst', 'rug', 'benen', 'billen']);
             const splitRegex = /( of | ?\/ ?| or | ?, ?| ?& ?| ?\+ ?| - )/i;
             const currentList = Array.from(tokens);
             currentList.forEach(s => {
                 const parts = s.replace(/\s+/g, ' ').split(splitRegex);
                 parts.forEach(p => {
                     const t = p.trim();
-                    if (t && !['of', '/', 'or', ',', '&', '+', '-'].includes(t)) {
+                    if (t && !['of', '/', 'or', ',', '&', '+', '-'].includes(t) && !MUSCLE_TERMS.has(t)) {
                         tokens.add(t);
                     }
                 });
             });
 
-            // Strip equipment/modifier prefixes
-            const modifiers = ['barbell', 'dumbbell', 'dumbell', 'db', 'kb', 'bb', 'kettlebell', 'cable', 'machine', 'seated', 'lying', 'standing', 'single-arm', 'single arm'];
+            // Hyphen normalization
             Array.from(tokens).forEach(s => {
-                modifiers.forEach(mod => {
-                    if (s.startsWith(mod + ' ')) {
-                        const stripped = s.slice(mod.length + 1).trim();
-                        if (stripped.length > 2) tokens.add(stripped);
-                    }
-                });
                 if (s.includes('-')) {
                     tokens.add(s.replace(/-/g, ' ').replace(/\s+/g, ' ').trim());
                     tokens.add(s.replace(/-/g, '').trim());
@@ -5221,6 +5264,11 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     targetExerciseName = exObj.name.trim();
                 }
             }
+        } else if (typeof exerciseName === 'string') {
+            const variations = this.getExerciseVariations(exerciseName);
+            if (variations && variations.length > 0) {
+                targetExerciseName = variations[0].trim();
+            }
         }
 
         const targetTokens = this.extractExerciseNameTokens(targetExerciseName, exObj);
@@ -5240,12 +5288,20 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             for (const e of log.exercises) {
                 if (!e || !e.name) continue;
                 let matches = false;
-                if (targetCanonical && (e.canonicalId === targetCanonical || this.getCanonicalExerciseKey(e.name) === targetCanonical)) {
+                const logCanonical = e.canonicalId || (this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(e.name) : null);
+
+                if (targetCanonical && logCanonical && targetCanonical.startsWith('def_') && logCanonical.startsWith('def_')) {
+                    matches = (targetCanonical === logCanonical);
+                } else if (targetCanonical && logCanonical && targetCanonical === logCanonical) {
                     matches = true;
                 } else {
-                    const logTokens = this.getLogExerciseTokens(e);
-                    for (const t of logTokens) {
-                        if (targetTokens.has(t)) { matches = true; break; }
+                    const targetCheckName = targetExerciseName || (exObj && (exObj.chosenVariation || exObj.name)) || '';
+                    const logCheckName = e.chosenVariation || e.name || '';
+                    if (!hasConflictingExerciseModality(targetCheckName, logCheckName)) {
+                        const logTokens = this.getLogExerciseTokens(e);
+                        for (const t of logTokens) {
+                            if (targetTokens.has(t)) { matches = true; break; }
+                        }
                     }
                 }
                 if (matches) {
@@ -5368,26 +5424,11 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const safeName = this.escapeHTML(exerciseName);
         if (titleEl) titleEl.textContent = `Geschiedenis: ${exerciseName}`;
 
-        const targetCanonical = this.getCanonicalExerciseKey ? this.getCanonicalExerciseKey(exerciseName) : null;
-        const targetTokens = this.extractExerciseNameTokens(exerciseName);
         const entries = [];
+        const { all } = this.findLogExerciseMatches ? this.findLogExerciseMatches(exerciseName) : { all: [] };
 
-        for (let i = store.logs.length - 1; i >= 0; i--) {
-            const log = store.logs[i];
-            if (!log || !log.exercises) continue;
-
-            const matchedEx = log.exercises.find(e => {
-                if (!e || !e.name) return false;
-                if (targetCanonical && this.getCanonicalExerciseKey && (e.canonicalId === targetCanonical || this.getCanonicalExerciseKey(e.name) === targetCanonical)) {
-                    return true;
-                }
-                const logTokens = this.extractExerciseNameTokens(e.name, e);
-                for (const t of logTokens) {
-                    if (targetTokens.has(t)) return true;
-                }
-                return false;
-            });
-
+        for (let i = all.length - 1; i >= 0; i--) {
+            const { log, ex: matchedEx } = all[i];
             if (matchedEx && matchedEx.details && matchedEx.details.length > 0) {
                 const hasData = matchedEx.details.some(d => (d.weight && String(d.weight).trim() !== '') || (d.reps && String(d.reps).trim() !== '') || (d.level && String(d.level).trim() !== ''));
                 if (hasData) {
@@ -9898,5 +9939,5 @@ if (typeof global !== 'undefined') global.app = app;
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { DataStore, app, store, html, rawHtml, PRESET_PLANS, DEFAULT_EXERCISES, COLOR_PALETTES };
+    module.exports = { DataStore, app, store, html, rawHtml, PRESET_PLANS, DEFAULT_EXERCISES, COLOR_PALETTES, hasConflictingExerciseModality, normalizeExerciseName };
 }
