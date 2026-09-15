@@ -5429,6 +5429,171 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(presets.innerHTML).toContain('⭐ Aanbevolen start');
         });
     });
+
+    describe('GOF-50: Oefening geschiedenis wordt door elkaar gehaald', () => {
+        beforeEach(() => {
+            store.logs = [];
+            if (app._logMatchCache) app._logMatchCache.clear();
+            app._logMatchCacheState = null;
+            document.body.innerHTML = `
+                <div id="modal-exercise-history" class="hidden">
+                    <div id="exercise-history-modal-title"></div>
+                    <div id="exercise-history-modal-content"></div>
+                </div>
+            `;
+        });
+
+        it('Barbell Bench Press matcht NOOIT met Dumbbell Bench Press of Single-Arm Dumbbell Bench Press', () => {
+            store.logs = [
+                {
+                    date: '2026-09-01T10:00:00.000Z',
+                    sessionName: 'Borst DB',
+                    exercises: [
+                        { name: 'Dumbbell Bench Press', details: [{ setNumber: 1, weight: '24', reps: '10' }] },
+                        { name: 'Single-Arm Dumbbell Bench Press', details: [{ setNumber: 1, weight: '20', reps: '10' }] }
+                    ]
+                }
+            ];
+
+            expect(app.getPreviousExerciseDetails('Barbell Bench Press')).toBeNull();
+            expect(app.getPreviousExerciseDetails('Bench Press')).toBeNull();
+            expect(app.getPreviousExerciseDetails('Flat Barbell Bench Press')).toBeNull();
+        });
+
+        it('Dumbbell Bench Press matcht NOOIT met Barbell Bench Press', () => {
+            store.logs = [
+                {
+                    date: '2026-09-01T10:00:00.000Z',
+                    sessionName: 'Borst BB',
+                    exercises: [
+                        { name: 'Barbell Bench Press', details: [{ setNumber: 1, weight: '80', reps: '10' }] }
+                    ]
+                }
+            ];
+
+            expect(app.getPreviousExerciseDetails('Dumbbell Bench Press')).toBeNull();
+            expect(app.getPreviousExerciseDetails('DB Bench Press')).toBeNull();
+            expect(app.getPreviousExerciseDetails('Flat Dumbbell Press')).toBeNull();
+        });
+
+        it('Barbell Bench Press matcht wel met zijn eigen synoniemen en eerdere Barbell sessies', () => {
+            store.logs = [
+                {
+                    date: '2026-09-01T10:00:00.000Z',
+                    sessionName: 'Borst BB',
+                    exercises: [
+                        { name: 'Barbell Bench Press', details: [{ setNumber: 1, weight: '85', reps: '8' }] }
+                    ]
+                }
+            ];
+
+            const details1 = app.getPreviousExerciseDetails('Barbell Bench Press');
+            expect(details1).not.toBeNull();
+            expect(details1[0].weight).toBe('85');
+
+            const details2 = app.getPreviousExerciseDetails('Bench Press');
+            expect(details2).not.toBeNull();
+            expect(details2[0].weight).toBe('85');
+
+            const details3 = app.getPreviousExerciseDetails('Flat Bench Press');
+            expect(details3).not.toBeNull();
+            expect(details3[0].weight).toBe('85');
+        });
+
+        it('Dumbbell Bench Press matcht wel met zijn eigen synoniemen en eerdere Dumbbell sessies', () => {
+            store.logs = [
+                {
+                    date: '2026-09-01T10:00:00.000Z',
+                    sessionName: 'Borst DB',
+                    exercises: [
+                        { name: 'Dumbbell Bench Press', details: [{ setNumber: 1, weight: '26', reps: '10' }] }
+                    ]
+                }
+            ];
+
+            const details1 = app.getPreviousExerciseDetails('Dumbbell Bench Press');
+            expect(details1).not.toBeNull();
+            expect(details1[0].weight).toBe('26');
+
+            const details2 = app.getPreviousExerciseDetails('DB Bench Press');
+            expect(details2).not.toBeNull();
+            expect(details2[0].weight).toBe('26');
+
+            const details3 = app.getPreviousExerciseDetails('Flat Dumbbell Press');
+            expect(details3).not.toBeNull();
+            expect(details3[0].weight).toBe('26');
+        });
+
+        it('Romanian Deadlift (RDL) en Dumbbell Romanian Deadlift (DB RDL) blijven strikt gescheiden', () => {
+            store.logs = [
+                {
+                    date: '2026-09-01T10:00:00.000Z',
+                    sessionName: 'Benen DB',
+                    exercises: [
+                        { name: 'Dumbbell Romanian Deadlift (DB RDL)', details: [{ setNumber: 1, weight: '22', reps: '12' }] }
+                    ]
+                },
+                {
+                    date: '2026-09-03T10:00:00.000Z',
+                    sessionName: 'Benen BB',
+                    exercises: [
+                        { name: 'Romanian Deadlift (RDL)', details: [{ setNumber: 1, weight: '90', reps: '8' }] }
+                    ]
+                }
+            ];
+
+            const rdlDetails = app.getPreviousExerciseDetails('Romanian Deadlift (RDL)');
+            expect(rdlDetails).not.toBeNull();
+            expect(rdlDetails[0].weight).toBe('90');
+
+            const dbRdlDetails = app.getPreviousExerciseDetails('Dumbbell Romanian Deadlift (DB RDL)');
+            expect(dbRdlDetails).not.toBeNull();
+            expect(dbRdlDetails[0].weight).toBe('22');
+        });
+
+        it('Lying Leg Curl matcht niet met Seated Leg Curl en Cable Fly matcht niet met Dumbbell Fly', () => {
+            store.logs = [
+                {
+                    date: '2026-09-01T10:00:00.000Z',
+                    exercises: [
+                        { name: 'Seated Leg Curl', details: [{ setNumber: 1, weight: '45', reps: '12' }] },
+                        { name: 'Dumbbell Chest Fly', details: [{ setNumber: 1, weight: '14', reps: '12' }] }
+                    ]
+                }
+            ];
+
+            expect(app.getPreviousExerciseDetails('Lying Leg Curl')).toBeNull();
+            expect(app.getPreviousExerciseDetails('Cable Fly')).toBeNull();
+        });
+
+        it('showExerciseHistoryModal toont uitsluitend historie van de specifieke oefening en geen cross-matches', () => {
+            store.logs = [
+                {
+                    date: '2026-09-01T10:00:00.000Z',
+                    sessionName: 'DB Dag',
+                    exercises: [
+                        { name: 'Dumbbell Bench Press', details: [{ setNumber: 1, weight: '24', reps: '10' }] }
+                    ]
+                },
+                {
+                    date: '2026-09-03T10:00:00.000Z',
+                    sessionName: 'BB Dag',
+                    exercises: [
+                        { name: 'Barbell Bench Press', details: [{ setNumber: 1, weight: '80', reps: '10' }] }
+                    ]
+                }
+            ];
+
+            app.showExerciseHistoryModal('Barbell Bench Press');
+            const content = document.getElementById('exercise-history-modal-content');
+            expect(content.innerHTML).toContain('80 kg');
+            expect(content.innerHTML).not.toContain('24 kg');
+
+            app.showExerciseHistoryModal('Dumbbell Bench Press');
+            expect(content.innerHTML).toContain('24 kg');
+            expect(content.innerHTML).not.toContain('80 kg');
+        });
+    });
 });
 
 
