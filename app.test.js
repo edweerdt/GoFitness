@@ -5663,6 +5663,247 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(content.innerHTML).not.toContain('80 kg');
         });
     });
+
+    describe('GOF-52: Eigen gemaakt schema maken en opslaan, aanpassen en vanuit sessie opslaan', () => {
+        beforeEach(() => {
+            document.body.innerHTML = `
+                <div id="plans-list"></div>
+                <div id="preset-plans-container"></div>
+                <div id="ai-generator-panel"></div>
+                <div id="exercise-library-list"></div>
+                <div id="workout-exercise-list"></div>
+                <div id="workout-title"></div>
+                <div id="workout-session-timer"></div>
+                <div id="toast-container"></div>
+                <div id="view-plans" class="view">
+                    <button id="btn-create-plan" onclick="app.openPlanEditor()">Nieuw Schema</button>
+                </div>
+                <div id="view-workout" class="view">
+                    <div class="sticky-footer"></div>
+                </div>
+
+                <!-- Plan Editor Modal -->
+                <div id="modal-plan-editor" class="modal-overlay hidden">
+                    <h3 id="plan-editor-title"></h3>
+                    <input type="text" id="plan-edit-name">
+                    <textarea id="plan-edit-description"></textarea>
+                    <select id="plan-edit-level">
+                        <option value="Beginner">Beginner</option>
+                        <option value="Gemiddeld">Gemiddeld</option>
+                        <option value="Gevorderd">Gevorderd</option>
+                        <option value="Alle niveaus">Alle niveaus</option>
+                    </select>
+                    <input type="text" id="plan-edit-goal">
+                    <input type="number" id="plan-edit-frequency" value="3">
+                    <input type="number" id="plan-edit-recovery" value="48">
+                    <div id="plan-editor-sessions-list"></div>
+                </div>
+
+                <!-- Select exercise modal -->
+                <div id="modal-select-exercise-for-workout" class="modal-overlay hidden">
+                    <h3></h3>
+                    <input type="text" id="workout-ex-search">
+                    <div id="workout-ex-select-list"></div>
+                    <div id="workout-ex-configure" class="hidden">
+                        <input type="number" id="workout-ex-sets" value="3">
+                        <input type="text" id="workout-ex-reps" value="10">
+                    </div>
+                </div>
+
+                <!-- Finish modal -->
+                <div id="modal-finish-workout" class="modal-overlay hidden"></div>
+            `;
+            store.plans = [];
+            store.activePlanId = null;
+            store.logs = [];
+            app.activeWorkout = null;
+        });
+
+        it('DataStore.saveCustomPlan slaat een volledig leeg schema op met veilige defaults ("Niks is een vereiste voor het opslaan")', () => {
+            const plan = store.saveCustomPlan({});
+            expect(plan).toBeDefined();
+            expect(plan.id).toMatch(/^plan_/);
+            expect(plan.name).toBe('Mijn Schema');
+            expect(plan.level).toBe('Beginner');
+            expect(plan.sessions.length).toBe(1);
+            expect(plan.sessions[0].name).toBe('Sessie 1');
+            expect(plan.sessions[0].exercises).toEqual([]);
+            expect(store.plans.some(p => p.id === plan.id)).toBe(true);
+        });
+
+        it('openPlanEditor opent editor in create modus met 1 lege startsessie', () => {
+            app.openPlanEditor();
+            const modal = document.getElementById('modal-plan-editor');
+            expect(modal.classList.contains('hidden')).toBe(false);
+            expect(document.getElementById('plan-editor-title').textContent).toBe('Nieuw Schema');
+            expect(document.getElementById('plan-edit-name').value).toBe('');
+            expect(app.editingPlan.sessions.length).toBe(1);
+        });
+
+        it('stelt van tevoren een schema samen met sessies en oefeningen en slaat dit op', () => {
+            app.openPlanEditor();
+            document.getElementById('plan-edit-name').value = 'Push Pull Legs';
+            document.getElementById('plan-edit-description').value = '3-daagse split';
+            document.getElementById('plan-edit-level').value = 'Gemiddeld';
+            document.getElementById('plan-edit-goal').value = 'Hypertrofie';
+            document.getElementById('plan-edit-frequency').value = '4';
+            document.getElementById('plan-edit-recovery').value = '48';
+
+            // Voeg oefening toe aan Sessie 1
+            app.addExerciseToPlanSession(0, {
+                name: 'Bench Press',
+                muscleGroups: ['chest', 'triceps'],
+                exerciseType: 'weight_reps',
+                category: 'compound'
+            }, 4, '6-8');
+
+            // Voeg een tweede sessie toe
+            app.addSessionToPlanEditor();
+            expect(app.editingPlan.sessions.length).toBe(2);
+
+            // Voeg oefening toe aan Sessie 2
+            app.addExerciseToPlanSession(1, {
+                name: 'Barbell Squat',
+                muscleGroups: ['legs', 'glutes'],
+                exerciseType: 'weight_reps',
+                category: 'compound'
+            }, 3, '10');
+
+            // Opslaan
+            app.savePlanFromEditor();
+
+            const modal = document.getElementById('modal-plan-editor');
+            expect(modal.classList.contains('hidden')).toBe(true);
+
+            expect(store.plans.length).toBe(1);
+            const saved = store.plans[0];
+            expect(saved.name).toBe('Push Pull Legs');
+            expect(saved.description).toBe('3-daagse split');
+            expect(saved.level).toBe('Gemiddeld');
+            expect(saved.goal).toBe('Hypertrofie');
+            expect(saved.schedule.targetSessionsPerWeek).toBe(4);
+            expect(saved.sessions.length).toBe(2);
+            expect(saved.sessions[0].exercises[0].name).toBe('Bench Press');
+            expect(saved.sessions[0].exercises[0].sets).toBe(4);
+            expect(saved.sessions[0].exercises[0].reps).toBe('6-8');
+            expect(saved.sessions[1].exercises[0].name).toBe('Barbell Squat');
+            expect(store.activePlanId).toBe(saved.id);
+        });
+
+        it('past een bestaand schema aan met behoud van ID en koppelingen', () => {
+            const initialPlan = store.saveCustomPlan({
+                name: 'Origineel Schema',
+                description: 'Oude tekst',
+                level: 'Beginner',
+                sessions: [{
+                    id: 'sess_1',
+                    name: 'Oude Sessie',
+                    exercises: [{ name: 'Push-Up', sets: 2, reps: '10' }]
+                }]
+            });
+            const planId = initialPlan.id;
+
+            // Open editor voor dit schema
+            app.openPlanEditor(planId);
+            expect(document.getElementById('plan-editor-title').textContent).toBe('Schema Bewerken');
+            expect(document.getElementById('plan-edit-name').value).toBe('Origineel Schema');
+
+            // Wijzig naam en voeg oefening toe
+            document.getElementById('plan-edit-name').value = 'Geüpdatet Schema';
+            app.addExerciseToPlanSession(0, {
+                name: 'Dips',
+                muscleGroups: ['triceps'],
+                exerciseType: 'bodyweight_reps'
+            }, 3, '12');
+
+            app.savePlanFromEditor();
+
+            expect(store.plans.length).toBe(1);
+            const updated = store.plans[0];
+            expect(updated.id).toBe(planId); // ID behouden!
+            expect(updated.name).toBe('Geüpdatet Schema');
+            expect(updated.sessions[0].exercises.length).toBe(2);
+            expect(updated.sessions[0].exercises[1].name).toBe('Dips');
+        });
+
+        it('kan oefeningen verplaatsen (omhoog/omlaag) en verwijderen in de plan editor', () => {
+            app.openPlanEditor();
+            app.addExerciseToPlanSession(0, { name: 'Ex A' });
+            app.addExerciseToPlanSession(0, { name: 'Ex B' });
+            app.addExerciseToPlanSession(0, { name: 'Ex C' });
+
+            expect(app.editingPlan.sessions[0].exercises.map(e => e.name)).toEqual(['Ex A', 'Ex B', 'Ex C']);
+
+            // Verplaats Ex B omhoog (-1)
+            app.moveExerciseInPlanSession(0, 1, -1);
+            expect(app.editingPlan.sessions[0].exercises.map(e => e.name)).toEqual(['Ex B', 'Ex A', 'Ex C']);
+
+            // Verwijder Ex A (index 1)
+            app.removeExerciseFromPlanSession(0, 1);
+            expect(app.editingPlan.sessions[0].exercises.map(e => e.name)).toEqual(['Ex B', 'Ex C']);
+        });
+
+        it('slaat een vrij schema gemaakt tijdens een actieve sessie direct op als nieuw schema', () => {
+            // Start een vrije sessie
+            app.startCustomWorkout();
+            expect(app.activeWorkout).toBeDefined();
+
+            // Voeg oefeningen toe aan de actieve workout
+            app.addExerciseToActiveWorkout({
+                name: 'Lat Pulldown',
+                muscleGroups: ['back'],
+                exerciseType: 'weight_reps'
+            }, 3, '10');
+
+            app.addExerciseToActiveWorkout({
+                name: 'Bicep Curl',
+                muscleGroups: ['biceps'],
+                exerciseType: 'weight_reps'
+            }, 3, '12');
+
+            // Klik op opslaan als schema
+            app.openSaveSessionAsPlanModal();
+            expect(app.editingPlan).toBeDefined();
+            expect(app.editingPlan.sessions[0].exercises.length).toBe(2);
+            expect(app.editingPlan.sessions[0].exercises[0].name).toBe('Lat Pulldown');
+            expect(app.editingPlan.sessions[0].exercises[1].name).toBe('Bicep Curl');
+
+            // Pas optioneel naam aan en sla op
+            document.getElementById('plan-edit-name').value = 'Mijn Pull Dag';
+            app.savePlanFromEditor();
+
+            expect(store.plans.length).toBe(1);
+            const saved = store.plans[0];
+            expect(saved.name).toBe('Mijn Pull Dag');
+            expect(saved.sessions[0].exercises.length).toBe(2);
+            // Actieve workout is nu gekoppeld aan het nieuwe schema
+            expect(app.activeWorkout.planId).toBe(saved.id);
+            expect(app.activeWorkout.planName).toBe('Mijn Pull Dag');
+        });
+
+        it('toont bewerkknop op schemakaarten in renderPlans', () => {
+            store.plans = [{
+                id: 'test-plan-card',
+                name: 'Card Test Plan',
+                sessions: [{ id: 's1', name: 'Sessie 1', exercises: [] }]
+            }];
+
+            app.renderPlans();
+            const planList = document.getElementById('plans-list');
+            expect(planList.innerHTML).toContain('Schema bewerken');
+            expect(planList.innerHTML).toContain('Bewerken');
+            expect(planList.innerHTML).toContain('openPlanEditor(');
+        });
+
+        it('toont opslaan als schema knop in renderWorkoutExercises', () => {
+            app.startCustomWorkout();
+            app.renderWorkoutExercises();
+
+            const workoutList = document.getElementById('workout-exercise-list');
+            expect(workoutList.innerHTML).toContain('openSaveSessionAsPlanModal()');
+            expect(workoutList.innerHTML).toContain('Opslaan als schema');
+        });
+    });
 });
 
 

@@ -127,7 +127,12 @@
                     </div>
                     <input type="file" id="restore-file" accept=".json" class="hidden">
 
-                    <h3 class="mt-4" style="margin-bottom: 8px;">Mijn Schema's</h3>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; margin-bottom:8px;">
+                        <h3 style="margin:0;">Mijn Schema's</h3>
+                        <button id="btn-create-plan" class="btn-primary" onclick="app.openPlanEditor()" style="padding:6px 12px; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px;">
+                            <span class="material-icons-round" style="font-size:1.1rem;">add</span> Nieuw Schema
+                        </button>
+                    </div>
                     <div id="plans-list" class="flex-col gap-3">
                         <!-- Plans injected here -->
                     </div>
@@ -308,6 +313,9 @@
                     <button class="btn-secondary flex-1" onclick="app.hideFinishModal()" data-modal-close>Annuleren</button>
                     <button class="btn-primary flex-1" onclick="app.finishWorkout()">Afronden</button>
                 </div>
+                <button type="button" class="btn-secondary w-full mt-3" onclick="app.openSaveSessionAsPlanModal(); app.hideFinishModal();" style="display:flex; align-items:center; justify-content:center; gap:6px; font-size:0.85rem;">
+                    <span class="material-icons-round" style="font-size:1.1rem;">bookmark_add</span> Opslaan als nieuw schema
+                </button>
             </div>
         </div>
         <!-- Cancel Workout Modal -->
@@ -461,6 +469,76 @@
                         </div>
                     </div>
                     <button class="btn-primary w-full mt-3" onclick="app.confirmAddExerciseToWorkout()">Voeg Toe Aan Sessie</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plan Editor Modal (Nieuw schema of schema bewerken) -->
+        <div id="modal-plan-editor" class="modal-overlay hidden">
+            <div class="modal-content glass-panel" style="max-width: 620px; width: 100%; max-height: 90vh; display: flex; flex-direction: column;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h3 id="plan-editor-title" style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.15rem;">Schema Samenstellen</h3>
+                    <button class="icon-btn" onclick="app.hidePlanEditorModal()" aria-label="Sluiten" data-modal-close><span class="material-icons-round" aria-hidden="true">close</span></button>
+                </div>
+                
+                <div id="plan-editor-body" class="flex-col gap-4" style="flex:1; overflow-y:auto; padding-right:4px;">
+                    <!-- Schema Algemene Details -->
+                    <div class="glass-panel" style="padding:14px; background:rgba(0,0,0,0.03);">
+                        <div style="font-weight:600; font-size:0.9rem; margin-bottom:10px; color:var(--accent-color);">ALGEMENE DETAILS</div>
+                        <div class="flex-col gap-3">
+                            <div>
+                                <label for="plan-edit-name" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Naam van het schema</label>
+                                <input type="text" id="plan-edit-name" class="input-field" placeholder="bijv. Upper / Lower Split of Krachtschema">
+                            </div>
+                            <div>
+                                <label for="plan-edit-description" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Beschrijving</label>
+                                <textarea id="plan-edit-description" class="input-field" rows="2" placeholder="Korte toelichting over dit schema..." style="resize:vertical;"></textarea>
+                            </div>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                                <div>
+                                    <label for="plan-edit-level" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Niveau</label>
+                                    <select id="plan-edit-level" class="input-field">
+                                        <option value="Beginner">Beginner</option>
+                                        <option value="Gemiddeld">Gemiddeld</option>
+                                        <option value="Gevorderd">Gevorderd</option>
+                                        <option value="Alle niveaus">Alle niveaus</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="plan-edit-goal" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Doel</label>
+                                    <input type="text" id="plan-edit-goal" class="input-field" placeholder="bijv. Kracht, Spiermassa">
+                                </div>
+                            </div>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                                <div>
+                                    <label for="plan-edit-frequency" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Sessies per week</label>
+                                    <input type="number" id="plan-edit-frequency" class="input-field" min="1" max="7" value="3">
+                                </div>
+                                <div>
+                                    <label for="plan-edit-recovery" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Min. herstel (uur)</label>
+                                    <input type="number" id="plan-edit-recovery" class="input-field" min="0" max="168" value="48">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sessies Sectie -->
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                            <div style="font-weight:600; font-size:0.9rem; color:var(--accent-color);">SESSIES IN DIT SCHEMA</div>
+                            <button type="button" class="btn-secondary" onclick="app.addSessionToPlanEditor()" style="padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:1rem;">add</span> Sessie toevoegen
+                            </button>
+                        </div>
+                        <div id="plan-editor-sessions-list" class="flex-col gap-3">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions mt-4" style="border-top:1px solid var(--border-color); padding-top:12px;">
+                    <button class="btn-secondary flex-1" onclick="app.hidePlanEditorModal()" data-modal-close>Annuleren</button>
+                    <button class="btn-primary flex-1" onclick="app.savePlanFromEditor()">Schema Opslaan</button>
                 </div>
             </div>
         </div>
