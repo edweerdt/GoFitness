@@ -616,6 +616,114 @@ class DataStore {
     getActivePlan() {
         return this.plans.find(p => p.id === this.activePlanId) || null;
     }
+    saveCustomPlan(planData, existingPlanId = null) {
+        if (!planData || typeof planData !== 'object') planData = {};
+        if (!this.plans) this.plans = [];
+
+        // Niks is een vereiste voor het opslaan: veilige vergevingsgezinde fallbacks
+        const name = (planData.name && String(planData.name).trim()) ? String(planData.name).trim() : 'Mijn Schema';
+        const description = planData.description ? String(planData.description).trim() : '';
+        const level = planData.level || 'Beginner';
+        const goal = planData.goal ? String(planData.goal).trim() : '';
+
+        const sched = planData.schedule || {};
+        const targetSessions = Math.max(1, parseInt(sched.targetSessionsPerWeek || planData.targetSessionsPerWeek, 10) || 3);
+        const minRecovery = Math.max(0, parseInt(sched.minRecoveryHours || planData.minRecoveryHours, 10) || 48);
+
+        let inputSessions = Array.isArray(planData.sessions) ? planData.sessions : [];
+        if (inputSessions.length === 0) {
+            inputSessions = [{
+                id: 'session_' + Date.now(),
+                name: 'Sessie 1',
+                exercises: []
+            }];
+        }
+
+        const cleanedSessions = inputSessions.map((s, sIdx) => {
+            const sName = (s && s.name && String(s.name).trim()) ? String(s.name).trim() : `Sessie ${sIdx + 1}`;
+            const sId = (s && (s.id || s.sessionId)) ? (s.id || s.sessionId) : ('session_' + Date.now() + '_' + (sIdx + 1));
+            const rawExs = (s && Array.isArray(s.exercises)) ? s.exercises : [];
+            const cleanedExs = rawExs.map((ex, exIdx) => {
+                const exName = (ex && ex.name && String(ex.name).trim()) ? String(ex.name).trim() : `Oefening ${exIdx + 1}`;
+                const sets = Math.max(1, parseInt(ex.sets, 10) || 3);
+                const reps = (ex && ex.reps !== undefined && ex.reps !== null && String(ex.reps).trim() !== '') ? String(ex.reps).trim() : '8-12';
+                const restSeconds = Math.max(0, parseInt(ex.restSeconds, 10) || 60);
+
+                let trackMetrics = ex.trackMetrics;
+                if (!trackMetrics || !Array.isArray(trackMetrics)) {
+                    if (ex.exerciseType === 'duration') trackMetrics = ['duration_seconds'];
+                    else if (ex.exerciseType === 'bodyweight_reps') trackMetrics = ['reps'];
+                    else trackMetrics = ['weight', 'reps'];
+                }
+
+                return {
+                    id: ex.id || ('ex_' + Date.now() + '_' + (exIdx + 1)),
+                    order: exIdx + 1,
+                    name: exName,
+                    sets: sets,
+                    reps: reps,
+                    restSeconds: restSeconds,
+                    exerciseType: ex.exerciseType || 'weight_reps',
+                    trackMetrics: trackMetrics,
+                    category: ex.category || 'compound',
+                    muscleGroups: Array.isArray(ex.muscleGroups) ? [...ex.muscleGroups] : [],
+                    alternatives: Array.isArray(ex.alternatives) ? [...ex.alternatives] : []
+                };
+            });
+
+            return {
+                id: sId,
+                sessionId: sId,
+                name: sName,
+                description: s.description || '',
+                exercises: cleanedExs
+            };
+        });
+
+        let targetPlan = null;
+        if (existingPlanId) {
+            targetPlan = this.plans.find(p => p.id === existingPlanId);
+        }
+
+        if (targetPlan) {
+            targetPlan.name = name;
+            targetPlan.description = description;
+            targetPlan.level = level;
+            targetPlan.goal = goal;
+            targetPlan.schedule = {
+                ...(targetPlan.schedule || {}),
+                frequencyType: 'sessions_per_week',
+                targetSessionsPerWeek: targetSessions,
+                minRecoveryHours: minRecovery,
+                defaultSessionOrder: cleanedSessions.map(s => s.id)
+            };
+            targetPlan.sessions = cleanedSessions;
+            this.touchPlan(targetPlan);
+        } else {
+            targetPlan = {
+                id: this.generateId('plan'),
+                planId: 'plan_' + Date.now(),
+                schemaVersion: '2.0',
+                author: 'Eigen',
+                name: name,
+                description: description,
+                level: level,
+                goal: goal,
+                schedule: {
+                    frequencyType: 'sessions_per_week',
+                    targetSessionsPerWeek: targetSessions,
+                    minRecoveryHours: minRecovery,
+                    defaultSessionOrder: cleanedSessions.map(s => s.id)
+                },
+                sessions: cleanedSessions
+            };
+            this.touchPlan(targetPlan);
+            this.plans.push(targetPlan);
+        }
+
+        this.savePlans();
+        return targetPlan;
+    }
     // Uniek over devices heen: sync merget op id, dus een botsing zou data laten verdwijnen
     generateId(prefix) {
         return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -2691,6 +2799,7 @@ const app = {
                             </div>
                             <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
                                 ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
+                                <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.openPlanEditor(${this.jsArg(p.id)})" title="Schema bewerken">edit</span>
                                 <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan(${this.jsArg(p.id)})" title="Schema delen">ios_share</span>
                                 <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', ${this.jsArg(p.id)})">delete_outline</span>
                             </div>
@@ -2719,13 +2828,385 @@ const app = {
 
                     ${sessionsListHtml}
                     
-                    ${!isActive ? `<button class="btn-secondary mt-3 w-full" onclick="app.setActivePlan(${this.jsArg(p.id)})">Maak Actief</button>` : ''}
+                    <div style="display:flex; gap:8px; margin-top:10px;">
+                        <button class="btn-secondary flex-1" style="display:inline-flex; align-items:center; justify-content:center; gap:4px; font-size:0.85rem; padding:8px 12px;" onclick="app.openPlanEditor(${this.jsArg(p.id)})">
+                            <span class="material-icons-round" style="font-size:1rem;">edit</span> Bewerken
+                        </button>
+                        ${!isActive ? `<button class="btn-secondary flex-1" onclick="app.setActivePlan(${this.jsArg(p.id)})">Maak Actief</button>` : ''}
+                    </div>
                 `;
                 list.appendChild(el);
             });
         }
 
         this.renderExerciseLibrary();
+    },
+
+    // --- SCHEMA EDITOR & VRIJ SCHEMA LOGIC (GOF-52) ---
+
+    openPlanEditor(planId = null, skipInit = false) {
+        if (!skipInit) {
+            this.editingPlanId = planId || null;
+            if (planId && typeof store !== 'undefined' && store.plans) {
+                const existing = store.plans.find(p => p.id === planId);
+                if (existing) {
+                    this.editingPlan = JSON.parse(JSON.stringify(existing));
+                }
+            }
+            if (!this.editingPlan || !this.editingPlanId) {
+                this.editingPlanId = null;
+                this.editingPlan = {
+                    id: null,
+                    name: '',
+                    description: '',
+                    level: 'Beginner',
+                    goal: '',
+                    schedule: {
+                        frequencyType: 'sessions_per_week',
+                        targetSessionsPerWeek: 3,
+                        minRecoveryHours: 48
+                    },
+                    sessions: [
+                        {
+                            id: 'session_' + Date.now(),
+                            name: 'Sessie 1',
+                            exercises: []
+                        }
+                    ]
+                };
+            }
+        }
+
+        const titleEl = document.getElementById('plan-editor-title');
+        if (titleEl) {
+            titleEl.textContent = this.editingPlanId ? 'Schema Bewerken' : 'Nieuw Schema';
+        }
+
+        const nameInput = document.getElementById('plan-edit-name');
+        if (nameInput) nameInput.value = this.editingPlan.name || '';
+
+        const descInput = document.getElementById('plan-edit-description');
+        if (descInput) descInput.value = this.editingPlan.description || '';
+
+        const levelInput = document.getElementById('plan-edit-level');
+        if (levelInput) levelInput.value = this.editingPlan.level || 'Beginner';
+
+        const goalInput = document.getElementById('plan-edit-goal');
+        if (goalInput) goalInput.value = this.editingPlan.goal || '';
+
+        const freqInput = document.getElementById('plan-edit-frequency');
+        if (freqInput) {
+            const freq = (this.editingPlan.schedule && this.editingPlan.schedule.targetSessionsPerWeek) || this.editingPlan.targetSessionsPerWeek || 3;
+            freqInput.value = String(freq);
+        }
+
+        const recInput = document.getElementById('plan-edit-recovery');
+        if (recInput) {
+            const rec = (this.editingPlan.schedule && this.editingPlan.schedule.minRecoveryHours) || this.editingPlan.minRecoveryHours || 48;
+            recInput.value = String(rec);
+        }
+
+        this.renderPlanEditorSessions();
+
+        const modal = document.getElementById('modal-plan-editor');
+        if (modal) modal.classList.remove('hidden');
+    },
+
+    hidePlanEditorModal() {
+        const modal = document.getElementById('modal-plan-editor');
+        if (modal) modal.classList.add('hidden');
+        this.editingPlan = null;
+        this.editingPlanId = null;
+    },
+
+    openSaveSessionAsPlanModal() {
+        if (!this.activeWorkout) {
+            this.showToast('Geen actieve training om als schema op te slaan.', 'error');
+            return;
+        }
+
+        const session = this.activeWorkout.session || {};
+        const sessionName = (session.name && session.name !== 'Vrije Sessie') ? session.name : 'Sessie 1';
+        let planName = '';
+        if (this.activeWorkout.planName && this.activeWorkout.planName !== 'Vrije Sessie' && this.activeWorkout.planName !== 'Overige Sessies') {
+            planName = this.activeWorkout.planName;
+        } else if (session.name && session.name !== 'Vrije Sessie') {
+            planName = `${session.name} Schema`;
+        } else {
+            planName = 'Mijn Vrije Sessie Schema';
+        }
+
+        const exercises = (this.activeWorkout.exercises || []).map((ex, idx) => {
+            const defaultSets = Math.max(1, parseInt(ex.sets, 10) || 3);
+            let repsVal = '8-12';
+            if (ex.reps) repsVal = String(ex.reps);
+            else if (ex.repsMin && ex.repsMax) repsVal = `${ex.repsMin}-${ex.repsMax}`;
+            else if (ex.actualReps && ex.actualReps.length > 0 && ex.actualReps[0]) repsVal = String(ex.actualReps[0]);
+
+            return {
+                id: ex.id || ('ex_' + Date.now() + '_' + idx),
+                order: idx + 1,
+                name: ex.name,
+                sets: defaultSets,
+                reps: repsVal,
+                restSeconds: ex.restSeconds || 60,
+                exerciseType: ex.exerciseType || 'weight_reps',
+                trackMetrics: ex.trackMetrics || ['weight', 'reps'],
+                muscleGroups: Array.isArray(ex.muscleGroups) ? [...ex.muscleGroups] : [],
+                category: ex.category || 'compound',
+                alternatives: Array.isArray(ex.alternatives) ? [...ex.alternatives] : []
+            };
+        });
+
+        this.editingPlanId = null;
+        this.editingPlan = {
+            id: null,
+            name: planName,
+            description: 'Aangemaakt vanuit een trainingssessie.',
+            level: 'Alle niveaus',
+            goal: '',
+            schedule: {
+                frequencyType: 'sessions_per_week',
+                targetSessionsPerWeek: 3,
+                minRecoveryHours: 48
+            },
+            sessions: [
+                {
+                    id: 'session_' + Date.now(),
+                    name: sessionName,
+                    exercises: exercises
+                }
+            ]
+        };
+
+        this.openPlanEditor(null, true);
+    },
+
+    syncPlanEditorFromDOM() {
+        if (!this.editingPlan) return;
+
+        const nameInput = document.getElementById('plan-edit-name');
+        if (nameInput) this.editingPlan.name = nameInput.value;
+
+        const descInput = document.getElementById('plan-edit-description');
+        if (descInput) this.editingPlan.description = descInput.value;
+
+        const levelInput = document.getElementById('plan-edit-level');
+        if (levelInput) this.editingPlan.level = levelInput.value;
+
+        const goalInput = document.getElementById('plan-edit-goal');
+        if (goalInput) this.editingPlan.goal = goalInput.value;
+
+        if (!this.editingPlan.schedule) this.editingPlan.schedule = {};
+        const freqInput = document.getElementById('plan-edit-frequency');
+        if (freqInput) this.editingPlan.schedule.targetSessionsPerWeek = parseInt(freqInput.value, 10) || 3;
+
+        const recInput = document.getElementById('plan-edit-recovery');
+        if (recInput) this.editingPlan.schedule.minRecoveryHours = parseInt(recInput.value, 10) || 48;
+
+        if (Array.isArray(this.editingPlan.sessions)) {
+            this.editingPlan.sessions.forEach((session, sIdx) => {
+                const sNameInput = document.querySelector(`.plan-session-name-input[data-session="${sIdx}"]`);
+                if (sNameInput) session.name = sNameInput.value;
+
+                if (Array.isArray(session.exercises)) {
+                    session.exercises.forEach((ex, exIdx) => {
+                        const setsInput = document.querySelector(`.plan-ex-sets[data-session="${sIdx}"][data-ex="${exIdx}"]`);
+                        if (setsInput) ex.sets = Math.max(1, parseInt(setsInput.value, 10) || 1);
+
+                        const repsInput = document.querySelector(`.plan-ex-reps[data-session="${sIdx}"][data-ex="${exIdx}"]`);
+                        if (repsInput) ex.reps = repsInput.value;
+
+                        const restInput = document.querySelector(`.plan-ex-rest[data-session="${sIdx}"][data-ex="${exIdx}"]`);
+                        if (restInput) ex.restSeconds = Math.max(0, parseInt(restInput.value, 10) || 0);
+                    });
+                }
+            });
+        }
+    },
+
+    renderPlanEditorSessions() {
+        const container = document.getElementById('plan-editor-sessions-list');
+        if (!container || !this.editingPlan) return;
+
+        if (!Array.isArray(this.editingPlan.sessions) || this.editingPlan.sessions.length === 0) {
+            this.editingPlan.sessions = [{
+                id: 'session_' + Date.now(),
+                name: 'Sessie 1',
+                exercises: []
+            }];
+        }
+
+        container.innerHTML = this.editingPlan.sessions.map((s, sIdx) => {
+            const hasMultipleSessions = this.editingPlan.sessions.length > 1;
+            const exercises = Array.isArray(s.exercises) ? s.exercises : [];
+
+            let exercisesHtml = '';
+            if (exercises.length === 0) {
+                exercisesHtml = `<div class="text-sm text-muted" style="padding: 10px; text-align: center; background: rgba(0,0,0,0.02); border-radius: 8px;">Nog geen oefeningen toegevoegd aan deze sessie.</div>`;
+            } else {
+                exercisesHtml = exercises.map((ex, exIdx) => {
+                    const musclesStr = Array.isArray(ex.muscleGroups) && ex.muscleGroups.length > 0
+                        ? `<span class="text-xs text-muted" style="margin-left: 6px;">(${ex.muscleGroups.join(', ')})</span>`
+                        : '';
+                    const isFirst = exIdx === 0;
+                    const isLast = exIdx === exercises.length - 1;
+
+                    return `
+                        <div class="plan-editor-ex-item" data-session="${sIdx}" data-ex="${exIdx}">
+                            <div class="plan-editor-ex-header">
+                                <div style="font-weight: 500; font-size: 0.9rem; color: var(--text-primary); display:flex; align-items:center; flex-wrap:wrap;">
+                                    <span>${this.escapeHTML(ex.name)}</span>
+                                    ${musclesStr}
+                                </div>
+                                <div class="plan-editor-reorder-group">
+                                    <button type="button" class="icon-btn" onclick="app.moveExerciseInPlanSession(${sIdx}, ${exIdx}, -1)" title="Omhoog" ${isFirst ? 'disabled style="opacity:0.3;"' : ''}><span class="material-icons-round" style="font-size:1.1rem;">arrow_upward</span></button>
+                                    <button type="button" class="icon-btn" onclick="app.moveExerciseInPlanSession(${sIdx}, ${exIdx}, 1)" title="Omlaag" ${isLast ? 'disabled style="opacity:0.3;"' : ''}><span class="material-icons-round" style="font-size:1.1rem;">arrow_downward</span></button>
+                                    <button type="button" class="icon-btn" onclick="app.removeExerciseFromPlanSession(${sIdx}, ${exIdx})" title="Verwijderen"><span class="material-icons-round" style="font-size:1.1rem; color:#ff5252;">delete_outline</span></button>
+                                </div>
+                            </div>
+                            <div class="plan-editor-ex-controls">
+                                <div class="plan-editor-control-group">
+                                    <label class="text-xs text-muted">Sets:</label>
+                                    <input type="number" class="input-field plan-ex-sets" data-session="${sIdx}" data-ex="${exIdx}" value="${ex.sets || 3}" min="1" max="20" style="width: 54px; text-align: center; padding: 4px 6px;">
+                                </div>
+                                <div class="plan-editor-control-group">
+                                    <label class="text-xs text-muted">Reps / Duur:</label>
+                                    <input type="text" class="input-field plan-ex-reps" data-session="${sIdx}" data-ex="${exIdx}" value="${this.escapeHTML(String(ex.reps || '8-12'))}" placeholder="8-12" style="width: 75px; text-align: center; padding: 4px 6px;">
+                                </div>
+                                <div class="plan-editor-control-group">
+                                    <label class="text-xs text-muted">Rust (s):</label>
+                                    <input type="number" class="input-field plan-ex-rest" data-session="${sIdx}" data-ex="${exIdx}" value="${ex.restSeconds !== undefined ? ex.restSeconds : 60}" min="0" max="600" step="5" style="width: 60px; text-align: center; padding: 4px 6px;">
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            return `
+                <div class="plan-editor-session-card" data-session-idx="${sIdx}">
+                    <div class="plan-editor-session-header">
+                        <div style="flex:1; display:flex; align-items:center; gap:8px;">
+                            <span class="material-icons-round text-accent" style="font-size:1.2rem;">event_note</span>
+                            <input type="text" class="input-field plan-session-name-input" data-session="${sIdx}" value="${this.escapeHTML(s.name || '')}" placeholder="Sessienaam (bijv. Sessie ${sIdx + 1})" style="font-weight:600;">
+                        </div>
+                        ${hasMultipleSessions ? `
+                            <button type="button" class="icon-btn" onclick="app.removeSessionFromPlanEditor(${sIdx})" title="Sessie verwijderen">
+                                <span class="material-icons-round" style="color:#ff5252; font-size:1.2rem;">delete_outline</span>
+                            </button>
+                        ` : ''}
+                    </div>
+                    <div class="flex-col gap-2 mt-2">
+                        ${exercisesHtml}
+                    </div>
+                    <button type="button" class="btn-secondary mt-2 w-full" onclick="app.showSelectExerciseForPlanModal(${sIdx})" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:7px 12px; font-size:0.85rem;">
+                        <span class="material-icons-round" style="font-size:1rem;">add</span> Oefening toevoegen
+                    </button>
+                </div>
+            `;
+        }).join('');
+    },
+
+    addSessionToPlanEditor() {
+        this.syncPlanEditorFromDOM();
+        const nextNum = (this.editingPlan.sessions || []).length + 1;
+        this.editingPlan.sessions.push({
+            id: 'session_' + Date.now() + '_' + nextNum,
+            name: 'Sessie ' + nextNum,
+            exercises: []
+        });
+        this.renderPlanEditorSessions();
+    },
+
+    removeSessionFromPlanEditor(sessionIdx) {
+        this.syncPlanEditorFromDOM();
+        if (this.editingPlan && Array.isArray(this.editingPlan.sessions)) {
+            this.editingPlan.sessions.splice(sessionIdx, 1);
+            if (this.editingPlan.sessions.length === 0) {
+                this.editingPlan.sessions.push({
+                    id: 'session_' + Date.now(),
+                    name: 'Sessie 1',
+                    exercises: []
+                });
+            }
+        }
+        this.renderPlanEditorSessions();
+    },
+
+    addExerciseToPlanSession(sessionIdx, exerciseData, setsCount = 3, defaultReps = '10') {
+        if (!this.editingPlan || !this.editingPlan.sessions || !this.editingPlan.sessions[sessionIdx]) return;
+        const session = this.editingPlan.sessions[sessionIdx];
+        if (!Array.isArray(session.exercises)) session.exercises = [];
+
+        const sets = Math.max(1, parseInt(setsCount, 10) || 3);
+        const exObj = {
+            id: 'ex_' + Math.random().toString(36).slice(2, 11),
+            order: session.exercises.length + 1,
+            name: exerciseData.name,
+            muscleGroups: exerciseData.muscleGroups || [],
+            exerciseType: exerciseData.exerciseType || 'weight_reps',
+            trackMetrics: exerciseData.trackMetrics || (exerciseData.exerciseType === 'duration' ? ['duration_seconds'] : (exerciseData.exerciseType === 'bodyweight_reps' ? ['reps'] : ['weight', 'reps'])),
+            category: exerciseData.category || 'compound',
+            alternatives: exerciseData.alternatives || [],
+            sets: sets,
+            reps: defaultReps || '8-12',
+            restSeconds: (exerciseData.category === 'isolation' ? 60 : 90)
+        };
+
+        session.exercises.push(exObj);
+        this.renderPlanEditorSessions();
+        this.showToast(`${exerciseData.name} toegevoegd aan schema!`, 'success');
+    },
+
+    removeExerciseFromPlanSession(sessionIdx, exIdx) {
+        this.syncPlanEditorFromDOM();
+        if (this.editingPlan && this.editingPlan.sessions && this.editingPlan.sessions[sessionIdx]) {
+            const session = this.editingPlan.sessions[sessionIdx];
+            if (Array.isArray(session.exercises)) {
+                session.exercises.splice(exIdx, 1);
+            }
+        }
+        this.renderPlanEditorSessions();
+    },
+
+    moveExerciseInPlanSession(sessionIdx, exIdx, direction) {
+        this.syncPlanEditorFromDOM();
+        if (this.editingPlan && this.editingPlan.sessions && this.editingPlan.sessions[sessionIdx]) {
+            const exs = this.editingPlan.sessions[sessionIdx].exercises;
+            if (Array.isArray(exs)) {
+                const targetIdx = exIdx + direction;
+                if (targetIdx >= 0 && targetIdx < exs.length) {
+                    const temp = exs[exIdx];
+                    exs[exIdx] = exs[targetIdx];
+                    exs[targetIdx] = temp;
+                }
+            }
+        }
+        this.renderPlanEditorSessions();
+    },
+
+    savePlanFromEditor() {
+        this.syncPlanEditorFromDOM();
+        const savedPlan = store.saveCustomPlan(this.editingPlan, this.editingPlanId);
+
+        // Als er een actieve sessie loopt die we zojuist hebben opgeslagen als schema, link de sessie aan dit schema
+        if (this.activeWorkout && !this.editingPlanId) {
+            this.activeWorkout.planId = savedPlan.id;
+            this.activeWorkout.planName = savedPlan.name;
+            store.saveActiveWorkoutState(this.activeWorkout);
+        }
+
+        // Als er nog geen actief schema was, maak dit direct het actieve schema
+        if (!store.activePlanId) {
+            store.activePlanId = savedPlan.id;
+            store.save();
+        }
+
+        this.hidePlanEditorModal();
+        this.renderPlans();
+        this.renderHome();
+        this.showToast(`Schema '${savedPlan.name}' succesvol opgeslagen!`, 'success');
     },
 
     renderPresets() {
@@ -4880,6 +5361,29 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const searchInput = document.getElementById('workout-ex-search');
         if (searchInput) searchInput.value = '';
 
+        const titleEl = document.querySelector('#modal-select-exercise-for-workout h3');
+        if (titleEl) titleEl.textContent = 'Oefening Toevoegen aan Sessie';
+
+        this.renderWorkoutExerciseSelectList();
+
+        const modal = document.getElementById('modal-select-exercise-for-workout');
+        if (modal) modal.classList.remove('hidden');
+    },
+
+    showSelectExerciseForPlanModal(sessionIdx) {
+        this.syncPlanEditorFromDOM();
+        this.exerciseSelectTarget = 'planEditor';
+        this.planEditorTargetSessionIdx = sessionIdx;
+        this.selectedWorkoutEx = null;
+        const configPanel = document.getElementById('workout-ex-configure');
+        if (configPanel) configPanel.classList.add('hidden');
+        
+        const searchInput = document.getElementById('workout-ex-search');
+        if (searchInput) searchInput.value = '';
+
+        const titleEl = document.querySelector('#modal-select-exercise-for-workout h3');
+        if (titleEl) titleEl.textContent = 'Oefening Toevoegen aan Schema';
+
         this.renderWorkoutExerciseSelectList();
 
         const modal = document.getElementById('modal-select-exercise-for-workout');
@@ -4889,6 +5393,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     hideSelectExerciseForWorkoutModal() {
         const modal = document.getElementById('modal-select-exercise-for-workout');
         if (modal) modal.classList.add('hidden');
+        const titleEl = document.querySelector('#modal-select-exercise-for-workout h3');
+        if (titleEl) titleEl.textContent = 'Oefening Toevoegen aan Sessie';
+        this.exerciseSelectTarget = 'activeWorkout';
     },
 
     showAddExerciseModalFromWorkout() {
@@ -4983,6 +5490,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         if (this.exerciseSelectTarget === 'editLog') {
             this.addExerciseToEditLog(this.selectedWorkoutEx, setsCount, defaultReps);
+        } else if (this.exerciseSelectTarget === 'planEditor') {
+            this.addExerciseToPlanSession(this.planEditorTargetSessionIdx, this.selectedWorkoutEx, setsCount, defaultReps);
         } else {
             this.addExerciseToActiveWorkout(this.selectedWorkoutEx, setsCount, defaultReps);
         }
@@ -5697,9 +6206,14 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 </div>
                 <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem;">Vrije Sessie Gestart</h3>
                 <p class="text-sm text-muted mt-1">Voeg je eerste oefening toe om te beginnen met trainen.</p>
-                <button class="btn-primary mt-4" style="padding:10px 20px; font-size:0.9rem;" onclick="app.showSelectExerciseForWorkoutModal()">
-                    <span class="material-icons-round" style="vertical-align:-3px;">add</span> Oefening Toevoegen
-                </button>
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top:16px; max-width:240px; margin-left:auto; margin-right:auto;">
+                    <button class="btn-primary" style="padding:10px 20px; font-size:0.9rem;" onclick="app.showSelectExerciseForWorkoutModal()">
+                        <span class="material-icons-round" style="vertical-align:-3px;">add</span> Oefening Toevoegen
+                    </button>
+                    <button class="btn-secondary" style="padding:8px 16px; font-size:0.85rem; display:inline-flex; align-items:center; justify-content:center; gap:6px;" onclick="app.openSaveSessionAsPlanModal()">
+                        <span class="material-icons-round" style="font-size:1rem;">bookmark_add</span> Opslaan als schema
+                    </button>
+                </div>
             `;
             list.appendChild(emptyCard);
             return;
@@ -6054,12 +6568,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             list.appendChild(card);
         });
 
-        // Appending Add Exercise button at the bottom of the active exercise list
+        // Appending Add Exercise and Save as Schema buttons at the bottom of the active exercise list
         const addBtnContainer = document.createElement('div');
-        addBtnContainer.className = 'mt-3';
+        addBtnContainer.className = 'mt-3 flex-col gap-2';
         addBtnContainer.innerHTML = `
             <button class="btn-primary w-full" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:12px; font-size:0.95rem;" onclick="app.showSelectExerciseForWorkoutModal()">
                 <span class="material-icons-round">add_circle_outline</span> Oefening Toevoegen
+            </button>
+            <button class="btn-secondary w-full" id="btn-save-session-as-plan" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:10px; font-size:0.9rem;" onclick="app.openSaveSessionAsPlanModal()">
+                <span class="material-icons-round">bookmark_add</span> Opslaan als schema
             </button>
         `;
         list.appendChild(addBtnContainer);
