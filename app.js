@@ -161,7 +161,7 @@ const PRESET_PLANS = [
             muscleGroupRecoveryHours: {
                 chest: 48,
                 back: 48,
-                legs: 72,
+                legs: 48,
                 glutes: 48,
                 shoulders: 48,
                 biceps: 48,
@@ -299,8 +299,8 @@ const PRESET_PLANS = [
             muscleGroupRecoveryHours: {
                 chest: 48,
                 back: 48,
-                legs: 72,
-                glutes: 72,
+                legs: 48,
+                glutes: 48,
                 shoulders: 48,
                 biceps: 48,
                 triceps: 48,
@@ -503,6 +503,23 @@ class DataStore {
     sanitizeLogPlanIds() {
         if (this.plans) {
             this.plans.forEach(p => {
+                const planMin = (p.schedule && p.schedule.minRecoveryHours !== undefined)
+                    ? Number(p.schedule.minRecoveryHours)
+                    : (p.minRecoveryHours !== undefined ? Number(p.minRecoveryHours) : null);
+                if (planMin !== null && !isNaN(planMin) && planMin >= 0) {
+                    if (p.recoveryRules) {
+                        if (p.recoveryRules.minGlobalRecoveryHours > planMin) {
+                            p.recoveryRules.minGlobalRecoveryHours = planMin;
+                        }
+                        if (p.recoveryRules.muscleGroupRecoveryHours) {
+                            Object.keys(p.recoveryRules.muscleGroupRecoveryHours).forEach(mg => {
+                                if (p.recoveryRules.muscleGroupRecoveryHours[mg] > planMin) {
+                                    p.recoveryRules.muscleGroupRecoveryHours[mg] = planMin;
+                                }
+                            });
+                        }
+                    }
+                }
                 if (p.sessions) {
                     p.sessions.forEach(s => {
                         if (s.exercises) {
@@ -690,6 +707,7 @@ class DataStore {
             targetPlan.description = description;
             targetPlan.level = level;
             targetPlan.goal = goal;
+            targetPlan.minRecoveryHours = minRecovery;
             targetPlan.schedule = {
                 ...(targetPlan.schedule || {}),
                 frequencyType: 'sessions_per_week',
@@ -697,6 +715,16 @@ class DataStore {
                 minRecoveryHours: minRecovery,
                 defaultSessionOrder: cleanedSessions.map(s => s.id)
             };
+            if (targetPlan.recoveryRules) {
+                targetPlan.recoveryRules.minGlobalRecoveryHours = minRecovery;
+                if (targetPlan.recoveryRules.muscleGroupRecoveryHours) {
+                    Object.keys(targetPlan.recoveryRules.muscleGroupRecoveryHours).forEach(mg => {
+                        if (targetPlan.recoveryRules.muscleGroupRecoveryHours[mg] > minRecovery) {
+                            targetPlan.recoveryRules.muscleGroupRecoveryHours[mg] = minRecovery;
+                        }
+                    });
+                }
+            }
             targetPlan.sessions = cleanedSessions;
             this.touchPlan(targetPlan);
         } else {
@@ -709,6 +737,7 @@ class DataStore {
                 description: description,
                 level: level,
                 goal: goal,
+                minRecoveryHours: minRecovery,
                 schedule: {
                     frequencyType: 'sessions_per_week',
                     targetSessionsPerWeek: targetSessions,
@@ -717,6 +746,17 @@ class DataStore {
                 },
                 sessions: cleanedSessions
             };
+            if (planData.recoveryRules) {
+                targetPlan.recoveryRules = JSON.parse(JSON.stringify(planData.recoveryRules));
+                targetPlan.recoveryRules.minGlobalRecoveryHours = minRecovery;
+                if (targetPlan.recoveryRules.muscleGroupRecoveryHours) {
+                    Object.keys(targetPlan.recoveryRules.muscleGroupRecoveryHours).forEach(mg => {
+                        if (targetPlan.recoveryRules.muscleGroupRecoveryHours[mg] > minRecovery) {
+                            targetPlan.recoveryRules.muscleGroupRecoveryHours[mg] = minRecovery;
+                        }
+                    });
+                }
+            }
             this.touchPlan(targetPlan);
             this.plans.push(targetPlan);
         }
@@ -1640,7 +1680,7 @@ const app = {
         return false;
     },
     
-    getRecoveryStatus() {
+    getRecoveryStatus(targetSession = null) {
         let hoursSinceLast = null;
         if (store.logs && store.logs.length > 0) {
             const validLogs = store.logs.filter(log => log && log.date);
@@ -1665,7 +1705,16 @@ const app = {
         const planLogs = store.logs.filter(log => this.isLogForPlan(log, plan) && log.date);
         if (planLogs.length === 0) return { status: 'green', text: 'Klaar om te trainen', hoursSinceLast };
 
-        const minHours = (plan.schedule && plan.schedule.minRecoveryHours) ? plan.schedule.minRecoveryHours : (plan.minRecoveryHours || 48);
+        // Schema-instelling voor minimale hersteltijd (ingestelde uren in schema bewerken of plan)
+        const rawMin = (plan.schedule && plan.schedule.minRecoveryHours !== undefined)
+            ? plan.schedule.minRecoveryHours
+            : (plan.minRecoveryHours !== undefined
+                ? plan.minRecoveryHours
+                : (plan.recoveryRules && plan.recoveryRules.minGlobalRecoveryHours !== undefined
+                    ? plan.recoveryRules.minGlobalRecoveryHours
+                    : 48));
+        const parsedMin = Number(rawMin);
+        const minHours = (!isNaN(parsedMin) && parsedMin >= 0) ? parsedMin : 48;
         const now = new Date();
 
         // Herstelregels per spiergroep, genormaliseerd op sleutel
@@ -1691,11 +1740,16 @@ const app = {
             });
         });
 
-        // Spiergroepen die de eerstvolgende (aanbevolen) sessie traint
-        const rec = (plan.sessions && plan.sessions.length > 0) ? this.getRecommendedSession() : null;
+        // Spiergroepen die de eerstvolgende (doelsessie of aanbevolen) sessie traint
+        let sessionToCheck = targetSession;
+        if (!sessionToCheck && plan.sessions && plan.sessions.length > 0) {
+            const rec = this.getRecommendedSession();
+            if (rec && rec.session) sessionToCheck = rec.session;
+        }
+
         const nextGroups = [];
-        if (rec && rec.session && rec.session.exercises) {
-            rec.session.exercises.forEach(ex => {
+        if (sessionToCheck && sessionToCheck.exercises) {
+            sessionToCheck.exercises.forEach(ex => {
                 const groups = (ex.muscleGroups && ex.muscleGroups.length > 0) ? ex.muscleGroups : this.guessMuscleGroupsFromName(ex.name);
                 groups.forEach(mg => {
                     const g = this.normalizeMuscleGroup(mg);
@@ -1706,13 +1760,23 @@ const app = {
 
         // Spiergroep-specifiek stoplicht: alleen de spiergroepen die de volgende sessie
         // traint tellen mee. "Benen gisteren, push vandaag" mag dus gewoon groen zijn.
+        // Let op: De ingestelde hersteltijd van het schema (minHours) fungeert altijd als bovengrens.
+        // Individuele spiergroepen mogen sneller herstellen (bijv. core), maar nooit een langere
+        // hersteltijd vereisen dan het schema voorschrijft (GOF-53).
         if (nextGroups.length > 0 && Object.keys(lastTrained).length > 0) {
             let worstRatio = Infinity;
             nextGroups.forEach(g => {
                 if (!lastTrained[g]) return; // nooit getraind -> hersteld
                 const hoursSince = (now - lastTrained[g]) / (1000 * 60 * 60);
-                const required = mgRules[g] || minHours;
-                worstRatio = Math.min(worstRatio, hoursSince / required);
+                let required = minHours;
+                if (mgRules[g] !== undefined && mgRules[g] !== null && !isNaN(Number(mgRules[g]))) {
+                    required = Math.min(Number(mgRules[g]), minHours);
+                }
+                if (required <= 0) {
+                    worstRatio = Infinity;
+                } else {
+                    worstRatio = Math.min(worstRatio, hoursSince / required);
+                }
             });
             if (worstRatio === Infinity || worstRatio >= 1) return { status: 'green', text: 'Klaar om te trainen', hoursSinceLast };
             if (worstRatio < 0.5) return { status: 'red', text: 'Beter rusten', hoursSinceLast };
@@ -2465,50 +2529,54 @@ const app = {
 
         this.renderHomeOnboarding();
 
-        const recStatus = this.getRecoveryStatus();
-        const suggestion = this.getSmartRecoverySuggestion ? this.getSmartRecoverySuggestion() : null;
-        const badge = document.getElementById('recovery-status');
-        if (badge) {
-            const suggestionClass = suggestion ? ' has-suggestion' : '';
-            badge.className = `status-badge ${recStatus.status}${suggestionClass}`;
-            const iconEl = badge.querySelector('.status-badge-primary .material-icons-round') || badge.querySelector('.material-icons-round');
-            if (iconEl) {
-                let icon = 'battery_charging_full';
-                if (recStatus.status === 'orange') icon = 'battery_3_bar';
-                if (recStatus.status === 'red') icon = 'battery_alert';
-                iconEl.textContent = icon;
-            }
-        }
-        
-        const recTextEl = document.getElementById('recovery-text');
-        if (recTextEl) recTextEl.textContent = recStatus.text;
-
-        const recHoursEl = document.getElementById('recovery-hours');
-        if (recHoursEl) {
-            if (recStatus.hoursSinceLast !== null && recStatus.hoursSinceLast !== undefined) {
-                const hours = Math.round(recStatus.hoursSinceLast);
-                const hoursText = hours < 1 ? '< 1u' : `${hours}u`;
-                recHoursEl.textContent = `• ${hoursText} geleden`;
-                recHoursEl.style.display = '';
-            } else {
-                recHoursEl.textContent = '';
-                recHoursEl.style.display = 'none';
-            }
-        }
-
-        const suggestionEl = document.getElementById('recovery-suggestion');
-        const suggestionTextEl = document.getElementById('recovery-suggestion-text');
-        if (suggestionEl) {
-            if (suggestion) {
-                suggestionEl.classList.remove('hidden');
-                if (suggestionTextEl) {
-                    suggestionTextEl.textContent = `Tijd voor: ${suggestion.title}`;
+        const updateRecoveryBadge = (targetSession = null) => {
+            const recStatus = this.getRecoveryStatus(targetSession);
+            const suggestion = this.getSmartRecoverySuggestion ? this.getSmartRecoverySuggestion() : null;
+            const badge = document.getElementById('recovery-status');
+            if (badge) {
+                const suggestionClass = suggestion ? ' has-suggestion' : '';
+                badge.className = `status-badge ${recStatus.status}${suggestionClass}`;
+                const iconEl = badge.querySelector('.status-badge-primary .material-icons-round') || badge.querySelector('.material-icons-round');
+                if (iconEl) {
+                    let icon = 'battery_charging_full';
+                    if (recStatus.status === 'orange') icon = 'battery_3_bar';
+                    if (recStatus.status === 'red') icon = 'battery_alert';
+                    iconEl.textContent = icon;
                 }
-                suggestionEl.setAttribute('aria-label', `Tijd voor: ${suggestion.title}. Klik voor toelichting.`);
-            } else {
-                suggestionEl.classList.add('hidden');
             }
-        }
+            
+            const recTextEl = document.getElementById('recovery-text');
+            if (recTextEl) recTextEl.textContent = recStatus.text;
+
+            const recHoursEl = document.getElementById('recovery-hours');
+            if (recHoursEl) {
+                if (recStatus.hoursSinceLast !== null && recStatus.hoursSinceLast !== undefined) {
+                    const hours = Math.round(recStatus.hoursSinceLast);
+                    const hoursText = hours < 1 ? '< 1u' : `${hours}u`;
+                    recHoursEl.textContent = `• ${hoursText} geleden`;
+                    recHoursEl.style.display = '';
+                } else {
+                    recHoursEl.textContent = '';
+                    recHoursEl.style.display = 'none';
+                }
+            }
+
+            const suggestionEl = document.getElementById('recovery-suggestion');
+            const suggestionTextEl = document.getElementById('recovery-suggestion-text');
+            if (suggestionEl) {
+                if (suggestion) {
+                    suggestionEl.classList.remove('hidden');
+                    if (suggestionTextEl) {
+                        suggestionTextEl.textContent = `Tijd voor: ${suggestion.title}`;
+                    }
+                    suggestionEl.setAttribute('aria-label', `Tijd voor: ${suggestion.title}. Klik voor toelichting.`);
+                } else {
+                    suggestionEl.classList.add('hidden');
+                }
+            }
+        };
+
+        updateRecoveryBadge();
 
         const btnStart = document.getElementById('btn-start-session');
         const pickerWrapper = document.getElementById('session-picker-wrapper');
@@ -2589,6 +2657,7 @@ const app = {
                     const updateCardForSelectedSession = () => {
                         const chosenVal = sessionSelect.value;
                         if (chosenVal === 'custom_session') {
+                            updateRecoveryBadge(null);
                             setCardText("Vrije Sessie", "Vrije Sessie", "Start een blanco training zonder vaste oefeningen. Voeg tijdens het trainen oefeningen toe.");
                             if (btnStart) {
                                 btnStart.textContent = "Start Vrije Sessie";
@@ -2600,6 +2669,7 @@ const app = {
                         } else if (activePlan) {
                             const chosenSession = activePlan.sessions.find(s => (s.id || s.sessionId) === chosenVal);
                             if (!chosenSession) return;
+                            updateRecoveryBadge(chosenSession);
                             const isRecChoice = recSession && (chosenSession.id || chosenSession.sessionId) === (recSession.session.id || recSession.session.sessionId);
                             setCardText(
                                 isRecChoice ? "Aanbevolen Sessie" : "Gekozen Sessie",
@@ -3428,7 +3498,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     "muscleGroupRecoveryHours": {
       "chest": 48,
       "back": 48,
-      "legs": 72,
+      "legs": 48,
       "glutes": 48,
       "shoulders": 48,
       "biceps": 48,

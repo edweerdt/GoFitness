@@ -25,7 +25,7 @@
     "muscleGroupRecoveryHours": {
       "chest": 48,
       "back": 48,
-      "legs": 72,
+      "legs": 48,
       "glutes": 48,
       "shoulders": 48,
       "biceps": 48,

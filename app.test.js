@@ -437,6 +437,140 @@ describe('app logic', () => {
             // For plan_1, no logs exist -> green
             expect(app.getRecoveryStatus().status).toBe('green');
         });
+
+        it('should follow schema recovery settings and not remain orange after 71h when minRecoveryHours is 48 (GOF-53)', () => {
+            const seventyOneHoursAgo = new Date();
+            seventyOneHoursAgo.setHours(seventyOneHoursAgo.getHours() - 71);
+
+            store.plans = [{
+                id: 'plan_fb',
+                name: 'Full Body Schema',
+                schedule: { minRecoveryHours: 48 },
+                recoveryRules: {
+                    minGlobalRecoveryHours: 48,
+                    muscleGroupRecoveryHours: {
+                        legs: 72, // Oude/stale 72u regel mag 48u schema niet overschrijden
+                        chest: 48
+                    }
+                },
+                sessions: [
+                    { id: 'fb_a', name: 'Full Body A', exercises: [{ id: 'sq', name: 'Squat', muscleGroups: ['legs'] }] },
+                    { id: 'fb_b', name: 'Full Body B', exercises: [{ id: 'lu', name: 'Lunge', muscleGroups: ['legs'] }] }
+                ]
+            }];
+            store.activePlanId = 'plan_fb';
+            store.logs = [{
+                planId: 'plan_fb',
+                sessionId: 'fb_a',
+                date: seventyOneHoursAgo.toISOString(),
+                exercises: [{ name: 'Squat', muscleGroups: ['legs'] }]
+            }];
+
+            const status = app.getRecoveryStatus();
+            // Schema instelling is 48u. Na 71u moet het groen zijn, NOOIT oranje!
+            expect(status.status).toBe('green');
+            expect(status.text).toBe('Klaar om te trainen');
+            expect(status.hoursSinceLast).toBeCloseTo(71, 0);
+        });
+
+        it('should be orange between 24h and 48h and red under 24h when minRecoveryHours is 48 (GOF-53)', () => {
+            const thirtyHoursAgo = new Date();
+            thirtyHoursAgo.setHours(thirtyHoursAgo.getHours() - 30);
+
+            store.plans = [{
+                id: 'plan_fb',
+                name: 'Full Body Schema',
+                schedule: { minRecoveryHours: 48 },
+                recoveryRules: {
+                    muscleGroupRecoveryHours: { legs: 72 }
+                },
+                sessions: [
+                    { id: 'fb_a', name: 'Full Body A', exercises: [{ id: 'sq', name: 'Squat', muscleGroups: ['legs'] }] },
+                    { id: 'fb_b', name: 'Full Body B', exercises: [{ id: 'lu', name: 'Lunge', muscleGroups: ['legs'] }] }
+                ]
+            }];
+            store.activePlanId = 'plan_fb';
+            store.logs = [{
+                planId: 'plan_fb',
+                sessionId: 'fb_a',
+                date: thirtyHoursAgo.toISOString(),
+                exercises: [{ name: 'Squat', muscleGroups: ['legs'] }]
+            }];
+
+            const status30 = app.getRecoveryStatus();
+            expect(status30.status).toBe('orange');
+            expect(status30.text).toBe('Rustig aan');
+
+            // En rood onder 24u (< 0.5 * 48)
+            const tenHoursAgo = new Date();
+            tenHoursAgo.setHours(tenHoursAgo.getHours() - 10);
+            store.logs = [{
+                planId: 'plan_fb',
+                sessionId: 'fb_a',
+                date: tenHoursAgo.toISOString(),
+                exercises: [{ name: 'Squat', muscleGroups: ['legs'] }]
+            }];
+
+            const status10 = app.getRecoveryStatus();
+            expect(status10.status).toBe('red');
+            expect(status10.text).toBe('Beter rusten');
+        });
+
+        it('should allow fast-recovering muscle groups (e.g. core: 24) to recover faster than schema minRecoveryHours (GOF-53)', () => {
+            const twentyFiveHoursAgo = new Date();
+            twentyFiveHoursAgo.setHours(twentyFiveHoursAgo.getHours() - 25);
+
+            store.plans = [{
+                id: 'plan_core',
+                schedule: { minRecoveryHours: 48 },
+                recoveryRules: {
+                    muscleGroupRecoveryHours: { core: 24, legs: 48 }
+                },
+                sessions: [
+                    { id: 's_core', name: 'Core Session', exercises: [{ id: 'pl', name: 'Plank', muscleGroups: ['core'] }] }
+                ]
+            }];
+            store.activePlanId = 'plan_core';
+            store.logs = [{
+                planId: 'plan_core',
+                sessionId: 's_core',
+                date: twentyFiveHoursAgo.toISOString(),
+                exercises: [{ name: 'Plank', muscleGroups: ['core'] }]
+            }];
+
+            // Na 25u is core hersteld (24u regel), ook al is schema 48u
+            const status = app.getRecoveryStatus();
+            expect(status.status).toBe('green');
+        });
+
+        it('should adapt recovery status to the targetSession passed to getRecoveryStatus (GOF-53)', () => {
+            const twentyHoursAgo = new Date();
+            twentyHoursAgo.setHours(twentyHoursAgo.getHours() - 20);
+
+            const sessionLegs = { id: 'legs', name: 'Benen', exercises: [{ id: 'sq', name: 'Squat', muscleGroups: ['legs'] }] };
+            const sessionPush = { id: 'push', name: 'Push', exercises: [{ id: 'bp', name: 'Bench', muscleGroups: ['chest'] }] };
+
+            store.plans = [{
+                id: 'plan_split',
+                schedule: { minRecoveryHours: 48 },
+                sessions: [sessionLegs, sessionPush]
+            }];
+            store.activePlanId = 'plan_split';
+            store.logs = [{
+                planId: 'plan_split',
+                sessionId: 'legs',
+                date: twentyHoursAgo.toISOString(),
+                exercises: [{ name: 'Squat', muscleGroups: ['legs'] }]
+            }];
+
+            // Doelsessie Benen is nog niet hersteld (20u < 24u) -> red
+            const statusLegs = app.getRecoveryStatus(sessionLegs);
+            expect(statusLegs.status).toBe('red');
+
+            // Doelsessie Push is wel hersteld (borst niet getraind) -> green
+            const statusPush = app.getRecoveryStatus(sessionPush);
+            expect(statusPush.status).toBe('green');
+        });
     });
 
     describe('getRecommendedSession', () => {
@@ -5902,6 +6036,111 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             const workoutList = document.getElementById('workout-exercise-list');
             expect(workoutList.innerHTML).toContain('openSaveSessionAsPlanModal()');
             expect(workoutList.innerHTML).toContain('Opslaan als schema');
+        });
+
+        it('DataStore.saveCustomPlan synchroniseert minRecoveryHours en begrenst muscleGroupRecoveryHours (GOF-53)', () => {
+            const initialPlan = store.saveCustomPlan({
+                name: 'Test Recovery Sync Plan',
+                schedule: { minRecoveryHours: 48 },
+                recoveryRules: {
+                    minGlobalRecoveryHours: 48,
+                    muscleGroupRecoveryHours: { legs: 72, chest: 48 }
+                },
+                sessions: [{ id: 's1', name: 'Sessie 1', exercises: [] }]
+            });
+
+            // Bij opslaan met minRecovery = 24 moeten alle regels begrensd worden op 24
+            const updated = store.saveCustomPlan({
+                name: 'Test Recovery Sync Plan',
+                schedule: { minRecoveryHours: 24 },
+                recoveryRules: {
+                    minGlobalRecoveryHours: 48,
+                    muscleGroupRecoveryHours: { legs: 72, chest: 48 }
+                },
+                sessions: [{ id: 's1', name: 'Sessie 1', exercises: [] }]
+            }, initialPlan.id);
+
+            expect(updated.schedule.minRecoveryHours).toBe(24);
+            expect(updated.minRecoveryHours).toBe(24);
+            expect(updated.recoveryRules.minGlobalRecoveryHours).toBe(24);
+            expect(updated.recoveryRules.muscleGroupRecoveryHours.legs).toBe(24);
+            expect(updated.recoveryRules.muscleGroupRecoveryHours.chest).toBe(24);
+        });
+
+        it('DataStore.load sanitizes bestaande opgeslagen schemas zodat spiergroepherstel nooit minRecoveryHours overschrijdt (GOF-53)', () => {
+            const stalePlan = {
+                id: 'stale_plan',
+                name: 'Oud Schema met 72u benen',
+                schedule: { minRecoveryHours: 48 },
+                recoveryRules: {
+                    minGlobalRecoveryHours: 48,
+                    muscleGroupRecoveryHours: { legs: 72, back: 48 }
+                },
+                sessions: []
+            };
+            localStorage.setItem('plans', JSON.stringify([stalePlan]));
+            store.load();
+
+            const loaded = store.plans.find(p => p.id === 'stale_plan');
+            expect(loaded).toBeDefined();
+            expect(loaded.recoveryRules.muscleGroupRecoveryHours.legs).toBe(48);
+            expect(loaded.recoveryRules.muscleGroupRecoveryHours.back).toBe(48);
+        });
+
+        it('renderHome updatet recovery-status badge direct wanneer een andere sessie wordt gekozen in home-session-select (GOF-53)', () => {
+            document.body.innerHTML = `
+                <div id="recovery-status" class="status-badge green">
+                    <div class="status-badge-primary">
+                        <span class="material-icons-round">battery_charging_full</span>
+                        <span id="recovery-text">Klaar om te trainen</span>
+                        <span id="recovery-hours" class="recovery-hours-text"></span>
+                    </div>
+                </div>
+                <div id="recommended-card-title"></div>
+                <div id="recommended-session-name"></div>
+                <div id="recommended-reason"></div>
+                <div id="session-picker-wrapper" class="hidden"><select id="home-session-select"></select></div>
+                <button id="btn-start-session"></button>
+                <div id="home-date"></div>
+            `;
+
+            const twentyHoursAgo = new Date();
+            twentyHoursAgo.setHours(twentyHoursAgo.getHours() - 20);
+
+            const sessionLegs = { id: 'sess_legs', name: 'Benen Sessie', exercises: [{ name: 'Squat', muscleGroups: ['legs'] }] };
+            const sessionChest = { id: 'sess_chest', name: 'Borst Sessie', exercises: [{ name: 'Bench Press', muscleGroups: ['chest'] }] };
+
+            store.plans = [{
+                id: 'plan_home_test',
+                name: 'Split Plan',
+                schedule: { minRecoveryHours: 48, defaultSessionOrder: ['sess_legs', 'sess_chest'] },
+                sessions: [sessionLegs, sessionChest]
+            }];
+            store.activePlanId = 'plan_home_test';
+            store.logs = [{
+                planId: 'plan_home_test',
+                sessionId: 'sess_legs',
+                date: twentyHoursAgo.toISOString(),
+                exercises: [{ name: 'Squat', muscleGroups: ['legs'] }]
+            }];
+
+            app.renderHome();
+
+            const badge = document.getElementById('recovery-status');
+            const recText = document.getElementById('recovery-text');
+            const select = document.getElementById('home-session-select');
+
+            // Standaard recommended session is sess_chest (omdat legs 20u geleden is gedaan) -> green
+            expect(badge.className).toContain('green');
+            expect(recText.textContent).toBe('Klaar om te trainen');
+
+            // Als gebruiker handmatig sess_legs kiest uit de dropdown
+            select.value = 'sess_legs';
+            select.onchange();
+
+            // Badge moet nu direct rood worden voor de benensessie (20u < 24u)
+            expect(badge.className).toContain('red');
+            expect(recText.textContent).toBe('Beter rusten');
         });
     });
 });
