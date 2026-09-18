@@ -3098,6 +3098,7 @@ const app = {
     renderPlanEditorSessions() {
         const container = document.getElementById('plan-editor-sessions-list');
         if (!container || !this.editingPlan) return;
+        container.textContent = ''; // Safely clear
 
         if (!Array.isArray(this.editingPlan.sessions) || this.editingPlan.sessions.length === 0) {
             this.editingPlan.sessions = [{
@@ -3107,75 +3108,207 @@ const app = {
             }];
         }
 
-        container.innerHTML = this.editingPlan.sessions.map((s, sIdx) => {
+        this.editingPlan.sessions.forEach((s, sIdx) => {
             const hasMultipleSessions = this.editingPlan.sessions.length > 1;
             const exercises = Array.isArray(s.exercises) ? s.exercises : [];
 
-            let exercisesHtml = '';
+            const card = document.createElement('div');
+            card.className = 'plan-editor-session-card';
+            card.dataset.sessionIdx = String(sIdx);
+
+            // Header
+            const header = document.createElement('div');
+            header.className = 'plan-editor-session-header';
+
+            const headerLeft = document.createElement('div');
+            headerLeft.style.cssText = 'flex:1; display:flex; align-items:center; gap:8px;';
+
+            const icon = document.createElement('span');
+            icon.className = 'material-icons-round text-accent';
+            icon.style.fontSize = '1.2rem';
+            icon.textContent = 'event_note';
+
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.className = 'input-field plan-session-name-input';
+            nameInput.dataset.session = String(sIdx);
+            nameInput.value = s.name || '';
+            nameInput.placeholder = `Sessienaam (bijv. Sessie ${sIdx + 1})`;
+            nameInput.style.fontWeight = '600';
+
+            headerLeft.appendChild(icon);
+            headerLeft.appendChild(nameInput);
+            header.appendChild(headerLeft);
+
+            if (hasMultipleSessions) {
+                const deleteSessionBtn = document.createElement('button');
+                deleteSessionBtn.type = 'button';
+                deleteSessionBtn.className = 'icon-btn';
+                deleteSessionBtn.title = 'Sessie verwijderen';
+                deleteSessionBtn.innerHTML = '<span class="material-icons-round" style="color:#ff5252; font-size:1.2rem;">delete_outline</span>';
+                deleteSessionBtn.addEventListener('click', () => this.removeSessionFromPlanEditor(sIdx));
+                header.appendChild(deleteSessionBtn);
+            }
+            card.appendChild(header);
+
+            // Exercises container
+            const exContainer = document.createElement('div');
+            exContainer.className = 'flex-col gap-2 mt-2';
+
             if (exercises.length === 0) {
-                exercisesHtml = `<div class="text-sm text-muted" style="padding: 10px; text-align: center; background: rgba(0,0,0,0.02); border-radius: 8px;">Nog geen oefeningen toegevoegd aan deze sessie.</div>`;
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'text-sm text-muted';
+                emptyMsg.style.cssText = 'padding: 10px; text-align: center; background: rgba(0,0,0,0.02); border-radius: 8px;';
+                emptyMsg.textContent = 'Nog geen oefeningen toegevoegd aan deze sessie.';
+                exContainer.appendChild(emptyMsg);
             } else {
-                exercisesHtml = exercises.map((ex, exIdx) => {
-                    const musclesStr = Array.isArray(ex.muscleGroups) && ex.muscleGroups.length > 0
-                        ? `<span class="text-xs text-muted" style="margin-left: 6px;">(${ex.muscleGroups.join(', ')})</span>`
-                        : '';
+                exercises.forEach((ex, exIdx) => {
                     const isFirst = exIdx === 0;
                     const isLast = exIdx === exercises.length - 1;
 
-                    return `
-                        <div class="plan-editor-ex-item" data-session="${sIdx}" data-ex="${exIdx}">
-                            <div class="plan-editor-ex-header">
-                                <div style="font-weight: 500; font-size: 0.9rem; color: var(--text-primary); display:flex; align-items:center; flex-wrap:wrap;">
-                                    <span>${this.escapeHTML(ex.name)}</span>
-                                    ${musclesStr}
-                                </div>
-                                <div class="plan-editor-reorder-group">
-                                    <button type="button" class="icon-btn" onclick="app.moveExerciseInPlanSession(${sIdx}, ${exIdx}, -1)" title="Omhoog" ${isFirst ? 'disabled style="opacity:0.3;"' : ''}><span class="material-icons-round" style="font-size:1.1rem;">arrow_upward</span></button>
-                                    <button type="button" class="icon-btn" onclick="app.moveExerciseInPlanSession(${sIdx}, ${exIdx}, 1)" title="Omlaag" ${isLast ? 'disabled style="opacity:0.3;"' : ''}><span class="material-icons-round" style="font-size:1.1rem;">arrow_downward</span></button>
-                                    <button type="button" class="icon-btn" onclick="app.removeExerciseFromPlanSession(${sIdx}, ${exIdx})" title="Verwijderen"><span class="material-icons-round" style="font-size:1.1rem; color:#ff5252;">delete_outline</span></button>
-                                </div>
-                            </div>
-                            <div class="plan-editor-ex-controls">
-                                <div class="plan-editor-control-group">
-                                    <label class="text-xs text-muted">Sets:</label>
-                                    <input type="number" class="input-field plan-ex-sets" data-session="${sIdx}" data-ex="${exIdx}" value="${ex.sets || 3}" min="1" max="20" style="width: 54px; text-align: center; padding: 4px 6px;">
-                                </div>
-                                <div class="plan-editor-control-group">
-                                    <label class="text-xs text-muted">Reps / Duur:</label>
-                                    <input type="text" class="input-field plan-ex-reps" data-session="${sIdx}" data-ex="${exIdx}" value="${this.escapeHTML(String(ex.reps || '8-12'))}" placeholder="8-12" style="width: 75px; text-align: center; padding: 4px 6px;">
-                                </div>
-                                <div class="plan-editor-control-group">
-                                    <label class="text-xs text-muted">Rust (s):</label>
-                                    <input type="number" class="input-field plan-ex-rest" data-session="${sIdx}" data-ex="${exIdx}" value="${ex.restSeconds !== undefined ? ex.restSeconds : 60}" min="0" max="600" step="5" style="width: 60px; text-align: center; padding: 4px 6px;">
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
+                    const item = document.createElement('div');
+                    item.className = 'plan-editor-ex-item';
+                    item.dataset.session = String(sIdx);
+                    item.dataset.ex = String(exIdx);
 
-            return `
-                <div class="plan-editor-session-card" data-session-idx="${sIdx}">
-                    <div class="plan-editor-session-header">
-                        <div style="flex:1; display:flex; align-items:center; gap:8px;">
-                            <span class="material-icons-round text-accent" style="font-size:1.2rem;">event_note</span>
-                            <input type="text" class="input-field plan-session-name-input" data-session="${sIdx}" value="${this.escapeHTML(s.name || '')}" placeholder="Sessienaam (bijv. Sessie ${sIdx + 1})" style="font-weight:600;">
-                        </div>
-                        ${hasMultipleSessions ? `
-                            <button type="button" class="icon-btn" onclick="app.removeSessionFromPlanEditor(${sIdx})" title="Sessie verwijderen">
-                                <span class="material-icons-round" style="color:#ff5252; font-size:1.2rem;">delete_outline</span>
-                            </button>
-                        ` : ''}
-                    </div>
-                    <div class="flex-col gap-2 mt-2">
-                        ${exercisesHtml}
-                    </div>
-                    <button type="button" class="btn-secondary mt-2 w-full" onclick="app.showSelectExerciseForPlanModal(${sIdx})" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:7px 12px; font-size:0.85rem;">
-                        <span class="material-icons-round" style="font-size:1rem;">add</span> Oefening toevoegen
-                    </button>
-                </div>
-            `;
-        }).join('');
+                    // Item Header
+                    const itemHeader = document.createElement('div');
+                    itemHeader.className = 'plan-editor-ex-header';
+
+                    const itemTitle = document.createElement('div');
+                    itemTitle.style.cssText = 'font-weight: 500; font-size: 0.9rem; color: var(--text-primary); display:flex; align-items:center; flex-wrap:wrap;';
+                    const nameSpan = document.createElement('span');
+                    nameSpan.textContent = ex.name || '';
+                    itemTitle.appendChild(nameSpan);
+
+                    if (Array.isArray(ex.muscleGroups) && ex.muscleGroups.length > 0) {
+                        const muscleSpan = document.createElement('span');
+                        muscleSpan.className = 'text-xs text-muted';
+                        muscleSpan.style.marginLeft = '6px';
+                        muscleSpan.textContent = `(${ex.muscleGroups.join(', ')})`;
+                        itemTitle.appendChild(muscleSpan);
+                    }
+                    itemHeader.appendChild(itemTitle);
+
+                    // Reorder group
+                    const reorderGroup = document.createElement('div');
+                    reorderGroup.className = 'plan-editor-reorder-group';
+
+                    const upBtn = document.createElement('button');
+                    upBtn.type = 'button';
+                    upBtn.className = 'icon-btn';
+                    upBtn.title = 'Omhoog';
+                    if (isFirst) {
+                        upBtn.disabled = true;
+                        upBtn.style.opacity = '0.3';
+                    } else {
+                        upBtn.addEventListener('click', () => this.moveExerciseInPlanSession(sIdx, exIdx, -1));
+                    }
+                    upBtn.innerHTML = '<span class="material-icons-round" style="font-size:1.1rem;">arrow_upward</span>';
+                    reorderGroup.appendChild(upBtn);
+
+                    const downBtn = document.createElement('button');
+                    downBtn.type = 'button';
+                    downBtn.className = 'icon-btn';
+                    downBtn.title = 'Omlaag';
+                    if (isLast) {
+                        downBtn.disabled = true;
+                        downBtn.style.opacity = '0.3';
+                    } else {
+                        downBtn.addEventListener('click', () => this.moveExerciseInPlanSession(sIdx, exIdx, 1));
+                    }
+                    downBtn.innerHTML = '<span class="material-icons-round" style="font-size:1.1rem;">arrow_downward</span>';
+                    reorderGroup.appendChild(downBtn);
+
+                    const delBtn = document.createElement('button');
+                    delBtn.type = 'button';
+                    delBtn.className = 'icon-btn';
+                    delBtn.title = 'Verwijderen';
+                    delBtn.innerHTML = '<span class="material-icons-round" style="font-size:1.1rem; color:#ff5252;">delete_outline</span>';
+                    delBtn.addEventListener('click', () => this.removeExerciseFromPlanSession(sIdx, exIdx));
+                    reorderGroup.appendChild(delBtn);
+
+                    itemHeader.appendChild(reorderGroup);
+                    item.appendChild(itemHeader);
+
+                    // Controls
+                    const controls = document.createElement('div');
+                    controls.className = 'plan-editor-ex-controls';
+
+                    // Sets
+                    const setsGroup = document.createElement('div');
+                    setsGroup.className = 'plan-editor-control-group';
+                    const setsLabel = document.createElement('label');
+                    setsLabel.className = 'text-xs text-muted';
+                    setsLabel.textContent = 'Sets:';
+                    const setsInput = document.createElement('input');
+                    setsInput.type = 'number';
+                    setsInput.className = 'input-field plan-ex-sets';
+                    setsInput.dataset.session = String(sIdx);
+                    setsInput.dataset.ex = String(exIdx);
+                    setsInput.value = String(parseInt(ex.sets, 10) || 3);
+                    setsInput.min = '1';
+                    setsInput.max = '20';
+                    setsInput.style.cssText = 'width: 54px; text-align: center; padding: 4px 6px;';
+                    setsGroup.appendChild(setsLabel);
+                    setsGroup.appendChild(setsInput);
+                    controls.appendChild(setsGroup);
+
+                    // Reps
+                    const repsGroup = document.createElement('div');
+                    repsGroup.className = 'plan-editor-control-group';
+                    const repsLabel = document.createElement('label');
+                    repsLabel.className = 'text-xs text-muted';
+                    repsLabel.textContent = 'Reps / Duur:';
+                    const repsInput = document.createElement('input');
+                    repsInput.type = 'text';
+                    repsInput.className = 'input-field plan-ex-reps';
+                    repsInput.dataset.session = String(sIdx);
+                    repsInput.dataset.ex = String(exIdx);
+                    repsInput.value = String(ex.reps !== undefined && ex.reps !== null ? ex.reps : '8-12');
+                    repsInput.placeholder = '8-12';
+                    repsInput.style.cssText = 'width: 75px; text-align: center; padding: 4px 6px;';
+                    repsGroup.appendChild(repsLabel);
+                    repsGroup.appendChild(repsInput);
+                    controls.appendChild(repsGroup);
+
+                    // Rest
+                    const restGroup = document.createElement('div');
+                    restGroup.className = 'plan-editor-control-group';
+                    const restLabel = document.createElement('label');
+                    restLabel.className = 'text-xs text-muted';
+                    restLabel.textContent = 'Rust (s):';
+                    const restInput = document.createElement('input');
+                    restInput.type = 'number';
+                    restInput.className = 'input-field plan-ex-rest';
+                    restInput.dataset.session = String(sIdx);
+                    restInput.dataset.ex = String(exIdx);
+                    restInput.value = String(ex.restSeconds !== undefined ? (parseInt(ex.restSeconds, 10) || 0) : 60);
+                    restInput.min = '0';
+                    restInput.max = '600';
+                    restInput.step = '5';
+                    restInput.style.cssText = 'width: 60px; text-align: center; padding: 4px 6px;';
+                    restGroup.appendChild(restLabel);
+                    restGroup.appendChild(restInput);
+                    controls.appendChild(restGroup);
+
+                    item.appendChild(controls);
+                    exContainer.appendChild(item);
+                });
+            }
+            card.appendChild(exContainer);
+
+            // Add exercise button
+            const addExBtn = document.createElement('button');
+            addExBtn.type = 'button';
+            addExBtn.className = 'btn-secondary mt-2 w-full';
+            addExBtn.style.cssText = 'display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:7px 12px; font-size:0.85rem;';
+            addExBtn.innerHTML = '<span class="material-icons-round" style="font-size:1rem;">add</span> Oefening toevoegen';
+            addExBtn.addEventListener('click', () => this.showSelectExerciseForPlanModal(sIdx));
+            card.appendChild(addExBtn);
+
+            container.appendChild(card);
+        });
     },
 
     addSessionToPlanEditor() {

@@ -6142,11 +6142,47 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(badge.className).toContain('red');
             expect(recText.textContent).toBe('Beter rusten');
         });
+
+        it('voorkomt XSS bij het renderen van sessies en oefeningen in de plan editor (CodeQL Alert #25)', () => {
+            app.openPlanEditor();
+            app.editingPlan = {
+                id: 'plan_xss_test',
+                name: 'XSS Plan',
+                sessions: [
+                    {
+                        id: 's_1',
+                        name: '<img src="x" onerror="alert(1)">',
+                        exercises: [
+                            {
+                                name: '<b id="injected-bold">Evil</b><script>alert(2)</script>',
+                                muscleGroups: ['<script>evil()</script>'],
+                                sets: 3,
+                                reps: '10',
+                                restSeconds: 60
+                            }
+                        ]
+                    }
+                ]
+            };
+
+            app.renderPlanEditorSessions();
+
+            const container = document.getElementById('plan-editor-sessions-list');
+            // Zorg dat er geen geïnjecteerde HTML elementen zoals <img onerror> of <b> of <script> in de DOM zijn terechtgekomen
+            expect(container.querySelector('img')).toBeNull();
+            expect(container.querySelector('#injected-bold')).toBeNull();
+            expect(container.querySelector('script')).toBeNull();
+
+            // De tekst moet veilig als platte tekst (textContent / value) zijn weergegeven
+            const nameInput = container.querySelector('.plan-session-name-input');
+            expect(nameInput.value).toBe('<img src="x" onerror="alert(1)">');
+
+            const exTitle = container.querySelector('.plan-editor-ex-header');
+            expect(exTitle.textContent).toContain('<b id="injected-bold">Evil</b><script>alert(2)</script>');
+            expect(exTitle.textContent).toContain('(<script>evil()</script>)');
+        });
     });
 });
-
-
-
 
 
 
