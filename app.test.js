@@ -4420,6 +4420,75 @@ describe('add and remove sets during workout', () => {
             expect(css).toMatch(/\.theme-light \.rest-timer\s*\{[^}]*background:\s*linear-gradient\(135deg,\s*#f0f7ff 0%,\s*#e0f2fe 100%\);/);
             expect(css).toContain(':root:not(.theme-dark) .rest-timer');
         });
+
+        it('GOF-51: should support light theme styles and high contrast for .check-btn.checked-pr and checked-overload', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const css = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+
+            // Theme-light rules for checked-pr and checked-radiant
+            expect(css).toContain('.theme-light .check-btn.checked-pr');
+            expect(css).toContain('.theme-light .check-btn.checked-radiant');
+            expect(css).toContain(':root:not(.theme-dark) .check-btn.checked-pr');
+            expect(css).toContain(':root:not(.theme-dark) .check-btn.checked-radiant');
+
+            // Theme-light rules for checked-overload
+            expect(css).toContain('.theme-light .check-btn.checked-overload');
+            expect(css).toContain(':root:not(.theme-dark) .check-btn.checked-overload');
+
+            // High contrast sparkles in light theme
+            expect(css).toContain('.theme-light .check-btn.checked-pr::before');
+            expect(css).toContain('.theme-light .check-btn.checked-pr::after');
+            expect(css).toContain('#059669');
+            expect(css).toContain('#0284c7');
+
+            // Light theme animations
+            expect(css).toContain('@keyframes radiantPulseLight');
+            expect(css).toContain('@keyframes overloadPulseLight');
+        });
+
+        it('GOF-51: should render PR check button with accessible title and label during active workout', () => {
+            store.logs = [
+                {
+                    date: '2026-09-01T10:00:00.000Z',
+                    exercises: [
+                        { name: 'Bench Press', details: [{ weight: '50', reps: '10' }] }
+                    ]
+                }
+            ];
+
+            app.activeWorkout = {
+                session: { id: 's1', name: 'Push' },
+                startTime: new Date(),
+                exercises: [{
+                    id: 'e1',
+                    name: 'Bench Press',
+                    sets: 1,
+                    setsCompleted: [true],
+                    weights: ['55'], // Beat 50kg -> PR!
+                    actualReps: ['10']
+                }]
+            };
+
+            document.documentElement.classList.add('theme-light');
+            document.body.innerHTML = '<div id="workout-exercise-list"></div>';
+
+            app.renderWorkoutExercises();
+
+            const btn = document.querySelector('.check-btn');
+            expect(btn.classList.contains('checked-pr')).toBe(true);
+            expect(btn.getAttribute('title')).toBe('Persoonlijk Record (PR)!');
+            expect(btn.getAttribute('aria-label')).toBe('Persoonlijk Record (PR)!');
+
+            // Test updateCheckBtnDOM
+            app.activeWorkout.exercises[0].weights[0] = '60';
+            app.updateCheckBtnDOM(0, 0);
+            expect(btn.classList.contains('checked-pr')).toBe(true);
+            expect(btn.getAttribute('title')).toBe('Persoonlijk Record (PR)!');
+            expect(btn.getAttribute('aria-label')).toBe('Persoonlijk Record (PR)!');
+
+            document.documentElement.classList.remove('theme-light');
+        });
     });
 
     describe('GOF-33: Session | Oefeningen weergave & Wissel actielade', () => {

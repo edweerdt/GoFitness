@@ -5652,11 +5652,20 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             const achievement = this.evaluateSetAchievement(ex, setIndex);
             if (achievement === 'pr') {
                 checkBtn.classList.add('checked-pr');
+                checkBtn.title = 'Persoonlijk Record (PR)!';
+                checkBtn.setAttribute('aria-label', 'Persoonlijk Record (PR)!');
             } else if (achievement === 'overload') {
                 checkBtn.classList.add('checked-overload');
+                checkBtn.title = 'Progressive Overload!';
+                checkBtn.setAttribute('aria-label', 'Progressive Overload!');
             } else {
                 checkBtn.classList.add('checked');
+                checkBtn.title = 'Set voltooid';
+                checkBtn.setAttribute('aria-label', 'Set voltooid');
             }
+        } else {
+            checkBtn.title = 'Set afvinken';
+            checkBtn.setAttribute('aria-label', 'Set afvinken');
         }
     },
 
@@ -5804,11 +5813,19 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             let setsHtml = '';
             for(let i=0; i<ex.sets; i++) {
                 let checked = '';
+                let checkTitle = 'Set afvinken';
                 if (ex.setsCompleted && ex.setsCompleted[i]) {
                     const achievement = app.evaluateSetAchievement(ex, i);
-                    if (achievement === 'pr') checked = 'checked-pr';
-                    else if (achievement === 'overload') checked = 'checked-overload';
-                    else checked = 'checked';
+                    if (achievement === 'pr') {
+                        checked = 'checked-pr';
+                        checkTitle = 'Persoonlijk Record (PR)!';
+                    } else if (achievement === 'overload') {
+                        checked = 'checked-overload';
+                        checkTitle = 'Progressive Overload!';
+                    } else {
+                        checked = 'checked';
+                        checkTitle = 'Set voltooid';
+                    }
                 }
                 
                 const prevSet = app.getPreviousSetDetails(activeExerciseName, i, ex);
@@ -5888,7 +5905,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         </div>
                         <div class="set-actions">
                             ${inputsHtml}
-                            <button class="check-btn ${checked}" onclick="app.toggleSet(${exIndex}, ${i})">
+                            <button class="check-btn ${checked}" onclick="app.toggleSet(${exIndex}, ${i})" title="${checkTitle}" aria-label="${checkTitle}">
                                 <span class="material-icons-round">check</span>
                             </button>
                         </div>
