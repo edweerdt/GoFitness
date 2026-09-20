@@ -6182,6 +6182,38 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(exTitle.textContent).toContain('(<script>evil()</script>)');
         });
     });
+
+    describe('iOS Safari / Chrome compatibiliteit en safe-areas (GOF-54)', () => {
+        const fs = require('fs');
+        const path = require('path');
+
+        it('bevat env(safe-area-inset-top) in headers van style.css', () => {
+            const css = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+            expect(css).toMatch(/\.workout-header\s*\{[^}]*calc\([^}]*env\(safe-area-inset-top/s);
+            expect(css).toMatch(/\.top-nav\s*\{[^}]*calc\([^}]*env\(safe-area-inset-top/s);
+            expect(css).toMatch(/\.home-header\s*\{[^}]*calc\([^}]*env\(safe-area-inset-top/s);
+            expect(css).toMatch(/\.toast-container\s*\{[^}]*env\(safe-area-inset-top/s);
+        });
+
+        it('bevat env(safe-area-inset-bottom) op sticky-footer en modal-overlay in style.css', () => {
+            const css = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+            expect(css).toMatch(/\.sticky-footer\s*\{[^}]*env\(safe-area-inset-bottom/s);
+            expect(css).toMatch(/\.modal-overlay\s*\{[^}]*env\(safe-area-inset-bottom/s);
+        });
+
+        it('bevat font-size: 16px voor invoervelden om iOS auto-zoom te voorkomen', () => {
+            const css = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+            expect(css).toMatch(/\.weight-input\s*\{[^}]*font-size:\s*16px/s);
+            expect(css).toMatch(/\.input-field\s*\{[^}]*font-size:\s*16px/s);
+            expect(css).toMatch(/input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\)[^{]*\{[^}]*font-size:\s*16px/s);
+        });
+
+        it('bevat geen input of select met inline font-size kleiner dan 16px in index.html', () => {
+            const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+            expect(html).not.toMatch(/<select[^>]*font-size:\s*0\.[0-9]+rem/);
+            expect(html).not.toMatch(/<input[^>]*font-size:\s*0\.[0-9]+rem/);
+        });
+    });
 });
 
 

@@ -9812,7 +9812,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     <div class="glass-panel mt-3" style="padding:12px; border-left:3px solid var(--accent-color);">
                         <div style="font-weight:600; font-size:0.85rem; margin-bottom:8px;">Vriend Toevoegen</div>
                         <div style="display:flex; gap:8px;">
-                            <input type="text" id="input-friend-code" class="input-field" placeholder="Voer vrienden-code in (bijv. GF-XXXX...)" style="flex:1; text-transform:uppercase; font-family:monospace; font-size:0.85rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleSendFriendRequest();}">
+                            <input type="text" id="input-friend-code" class="input-field" placeholder="Voer vrienden-code in (bijv. GF-XXXX...)" style="flex:1; text-transform:uppercase; font-family:monospace; font-size:16px;" onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleSendFriendRequest();}">
                             <button class="btn-primary" style="padding:6px 14px; font-size:0.85rem; white-space:nowrap;" onclick="app.handleSendFriendRequest()">Verstuur</button>
                         </div>
                     </div>
