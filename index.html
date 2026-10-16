@@ -5,7 +5,7 @@
     <!-- Zoomen niet blokkeren (WCAG 1.4.4); viewport-fit voor de iPhone-notch -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Go Fitness</title>
-    <link rel="stylesheet" href="style.css?v=31">
+    <link rel="stylesheet" href="style.css?v=32">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -56,9 +56,16 @@
                         <h3 id="recommended-card-title">⚡ Direct Starten</h3>
                         <h2 id="recommended-session-name">Beginner Gym + Lichaamsgewicht Mix</h2>
                         <p id="recommended-reason" class="text-muted">Start direct met een beginnersschema of kies een schema uit de preset bibliotheek op het tabblad Schema's.</p>
+                        <div id="home-session-snapshot" class="home-session-snapshot hidden">
+                            <button type="button" id="btn-toggle-session-snapshot" class="home-snapshot-header" onclick="app.toggleHomeSessionPreview()" aria-expanded="false">
+                                <span id="home-snapshot-meta" class="home-snapshot-meta"></span>
+                                <span id="home-snapshot-toggle-label" class="home-snapshot-toggle-label">Oefeningen <span class="material-icons-round" style="font-size:16px; vertical-align:middle;" aria-hidden="true">expand_more</span></span>
+                            </button>
+                            <div id="home-snapshot-list" class="home-snapshot-list hidden"></div>
+                        </div>
                         <div id="session-picker-wrapper" class="hidden mt-3">
                             <label for="home-session-select" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Kies een andere sessie uit je schema:</label>
-                            <select id="home-session-select" class="input-field" style="font-family:inherit; font-size:0.9rem; padding:8px 12px;"></select>
+                            <select id="home-session-select" class="input-field" style="font-family:inherit; font-size:1rem; padding:8px 12px;"></select>
                         </div>
                         <button id="btn-start-session" class="btn-primary mt-4" disabled>Start Nu</button>
                     </div>
@@ -94,11 +101,15 @@
                         <div class="workout-title-container">
                             <h2 id="workout-title">Training</h2>
                             <span id="workout-session-timer" class="workout-session-timer" title="Totale sessieduur" aria-label="Totale sessieduur">00:00</span>
+                            <span id="workout-sets-badge" class="workout-sets-badge" title="Voltooide sets" aria-label="Voltooide sets">0 / 0 sets</span>
                         </div>
                         <button class="icon-btn theme-toggle-btn" onclick="app.showThemeModal()" title="Thema en kleuren aanpassen" aria-label="Thema en kleuren aanpassen">
                             <span class="material-icons-round">palette</span>
                         </button>
                     </header>
+                    <div id="workout-progress-track" class="workout-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Trainingsvoortgang">
+                        <div id="workout-progress-bar" class="workout-progress-bar" style="width: 0%;"></div>
+                    </div>
                     <div id="rest-timer" class="rest-timer glass-panel hidden" role="button" tabindex="0" aria-label="Rusttimer, tik om over te slaan" onclick="app.stopRestTimer()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" title="Tik om over te slaan">
                         <span class="material-icons-round">timer</span>
                         <span id="rest-timer-label">Rust: 0:00</span>
