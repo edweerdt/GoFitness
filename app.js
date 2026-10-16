@@ -2520,6 +2520,120 @@ const app = {
         `;
     },
 
+    isHomeSessionPreviewOpen: false,
+
+    toggleHomeSessionPreview() {
+        this.isHomeSessionPreviewOpen = !this.isHomeSessionPreviewOpen;
+        const listEl = document.getElementById('home-snapshot-list');
+        const btnEl = document.getElementById('btn-toggle-session-snapshot');
+        const toggleLabelEl = document.getElementById('home-snapshot-toggle-label');
+        if (listEl) {
+            listEl.classList.toggle('hidden', !this.isHomeSessionPreviewOpen);
+        }
+        if (btnEl) {
+            btnEl.setAttribute('aria-expanded', this.isHomeSessionPreviewOpen ? 'true' : 'false');
+        }
+        if (toggleLabelEl) {
+            toggleLabelEl.innerHTML = this.isHomeSessionPreviewOpen
+                ? 'Inklappen <span class="material-icons-round" style="font-size:16px; vertical-align:middle;" aria-hidden="true">expand_less</span>'
+                : 'Oefeningen <span class="material-icons-round" style="font-size:16px; vertical-align:middle;" aria-hidden="true">expand_more</span>';
+        }
+    },
+
+    renderHomeSessionSnapshot(session) {
+        const snapshotEl = document.getElementById('home-session-snapshot');
+        const btnEl = document.getElementById('btn-toggle-session-snapshot');
+        const metaEl = document.getElementById('home-snapshot-meta');
+        const toggleLabelEl = document.getElementById('home-snapshot-toggle-label');
+        const listEl = document.getElementById('home-snapshot-list');
+        if (!snapshotEl) return;
+
+        const exercises = (session && Array.isArray(session.exercises)) ? session.exercises.filter(Boolean) : [];
+        if (exercises.length === 0) {
+            snapshotEl.classList.add('hidden');
+            if (listEl) {
+                listEl.innerHTML = '';
+                listEl.classList.add('hidden');
+            }
+            return;
+        }
+
+        snapshotEl.classList.remove('hidden');
+
+        const exCount = exercises.length;
+        let estMins = Number(session.estimatedMinutes || session.durationMinutes) || 0;
+        if (!(estMins > 0)) {
+            const totalSets = exercises.reduce((sum, ex) => sum + (parseInt(ex && ex.sets, 10) || 3), 0);
+            const warmupMins = session.warmup ? 5 : 0;
+            estMins = Math.max(15, Math.round((totalSets * 2.2 + warmupMins) / 5) * 5);
+        }
+
+        const uniqueMuscles = [];
+        exercises.forEach(ex => {
+            let label = this.getExerciseMuscleLabel ? this.getExerciseMuscleLabel(ex) : '';
+            if (!label && ex && ex.name && this.guessMuscleGroupsFromName) {
+                const guessed = this.guessMuscleGroupsFromName(ex.name);
+                if (guessed && guessed.length > 0 && this.getExerciseMuscleLabel) {
+                    label = this.getExerciseMuscleLabel({ muscleGroups: guessed });
+                }
+            }
+            if (label && !uniqueMuscles.includes(label)) {
+                uniqueMuscles.push(label);
+            }
+        });
+
+        if (metaEl) {
+            const parts = [
+                `${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}`,
+                `~${estMins} min`
+            ];
+            if (uniqueMuscles.length > 0) {
+                parts.push(uniqueMuscles.slice(0, 4).join(', '));
+            }
+            metaEl.textContent = parts.join(' • ');
+        }
+
+        if (listEl) {
+            listEl.innerHTML = '';
+            exercises.forEach((ex, idx) => {
+                const rawName = (ex && (ex.chosenVariation || ex.name)) ? String(ex.chosenVariation || ex.name) : 'Oefening';
+                const sets = (ex && ex.sets) ? ex.sets : 3;
+                let repPart = '';
+                if (ex && ex.repsMin && ex.repsMax) repPart = `${ex.repsMin}-${ex.repsMax}`;
+                else if (ex && ex.reps) repPart = String(ex.reps);
+                else if (ex && ex.durationSecondsMin && ex.durationSecondsMax) repPart = `${ex.durationSecondsMin}-${ex.durationSecondsMax}s`;
+                else if (ex && ex.durationSeconds) repPart = `${ex.durationSeconds}s`;
+                else if (ex && ex.duration) repPart = String(ex.duration);
+                const schemeText = repPart ? `${sets}×${repPart}` : `${sets} sets`;
+
+                const row = document.createElement('div');
+                row.className = 'home-snapshot-item';
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'home-snapshot-item-name';
+                nameSpan.textContent = `${idx + 1}. ${rawName}`;
+
+                const schemeSpan = document.createElement('span');
+                schemeSpan.className = 'home-snapshot-item-scheme';
+                schemeSpan.textContent = schemeText;
+
+                row.appendChild(nameSpan);
+                row.appendChild(schemeSpan);
+                listEl.appendChild(row);
+            });
+            listEl.classList.toggle('hidden', !this.isHomeSessionPreviewOpen);
+        }
+
+        if (btnEl) {
+            btnEl.setAttribute('aria-expanded', this.isHomeSessionPreviewOpen ? 'true' : 'false');
+        }
+        if (toggleLabelEl) {
+            toggleLabelEl.innerHTML = this.isHomeSessionPreviewOpen
+                ? 'Inklappen <span class="material-icons-round" style="font-size:16px; vertical-align:middle;" aria-hidden="true">expand_less</span>'
+                : 'Oefeningen <span class="material-icons-round" style="font-size:16px; vertical-align:middle;" aria-hidden="true">expand_more</span>';
+        }
+    },
+
     renderHome() {
         const homeDateEl = document.getElementById('home-date');
         if (homeDateEl) {
@@ -2596,6 +2710,13 @@ const app = {
             const choosePresetsBtn = document.getElementById('btn-home-presets');
             if (choosePresetsBtn) choosePresetsBtn.classList.add('hidden');
             setCardText("Sessie in uitvoering", this.activeWorkout.session.name, "Je was al bezig met deze sessie. Pak hem weer op!");
+            const activeSessionPreview = {
+                ...this.activeWorkout.session,
+                exercises: Array.isArray(this.activeWorkout.exercises) && this.activeWorkout.exercises.length > 0
+                    ? this.activeWorkout.exercises
+                    : (this.activeWorkout.session.exercises || [])
+            };
+            this.renderHomeSessionSnapshot(activeSessionPreview);
             if (btnStart) {
                 btnStart.textContent = "Hervat Nu";
                 btnStart.disabled = false;
@@ -2612,6 +2733,13 @@ const app = {
                     "Beginner Gym + Lichaamsgewicht Mix",
                     "Start direct met een 3-daagse Full Body beginnersschema (Full Body A & B) of kies een ander schema uit de preset bibliotheek."
                 );
+                const starterPreset = (typeof PRESET_PLANS !== 'undefined' && Array.isArray(PRESET_PLANS))
+                    ? PRESET_PLANS.find(p => p.id === 'preset_beginner_gym_mix')
+                    : null;
+                const starterSession = (starterPreset && Array.isArray(starterPreset.sessions) && starterPreset.sessions.length > 0)
+                    ? starterPreset.sessions[0]
+                    : null;
+                this.renderHomeSessionSnapshot(starterSession);
                 if (btnStart) {
                     btnStart.textContent = "⚡ Start Beginnersschema";
                     btnStart.disabled = false;
@@ -2659,6 +2787,7 @@ const app = {
                         if (chosenVal === 'custom_session') {
                             updateRecoveryBadge(null);
                             setCardText("Vrije Sessie", "Vrije Sessie", "Start een blanco training zonder vaste oefeningen. Voeg tijdens het trainen oefeningen toe.");
+                            this.renderHomeSessionSnapshot(null);
                             if (btnStart) {
                                 btnStart.textContent = "Start Vrije Sessie";
                                 btnStart.disabled = false;
@@ -2676,6 +2805,7 @@ const app = {
                                 chosenSession.name,
                                 isRecChoice ? recSession.reason : `Handmatig gekozen uit schema (${activePlan.name}).`
                             );
+                            this.renderHomeSessionSnapshot(chosenSession);
                             if (btnStart) {
                                 btnStart.textContent = "Start Nu";
                                 btnStart.disabled = false;
@@ -2706,6 +2836,7 @@ const app = {
                     updateCardForSelectedSession();
                 } else {
                     setCardText("Vrije Sessie", "Vrije Sessie", "Start een blanco training zonder vaste oefeningen.");
+                    this.renderHomeSessionSnapshot(recSession ? recSession.session : null);
                     if (btnStart) {
                         btnStart.textContent = "Start Vrije Sessie";
                         btnStart.disabled = false;
@@ -6351,6 +6482,44 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         return 'normal';
     },
 
+    updateWorkoutProgressUI() {
+        if (typeof document === 'undefined') return;
+        const badgeEl = document.getElementById('workout-sets-badge');
+        const trackEl = document.getElementById('workout-progress-track');
+        const barEl = document.getElementById('workout-progress-bar');
+        if (!badgeEl && !barEl && !trackEl) return;
+
+        const exercises = (this.activeWorkout && Array.isArray(this.activeWorkout.exercises))
+            ? this.activeWorkout.exercises
+            : [];
+
+        let totalSets = 0;
+        let completedSets = 0;
+        exercises.forEach(ex => {
+            if (!ex) return;
+            const sCount = Math.max(0, parseInt(ex.sets, 10) || (Array.isArray(ex.setsCompleted) ? ex.setsCompleted.length : 0));
+            totalSets += sCount;
+            if (Array.isArray(ex.setsCompleted)) {
+                for (let i = 0; i < sCount; i++) {
+                    if (ex.setsCompleted[i]) completedSets++;
+                }
+            }
+        });
+
+        const pct = totalSets > 0 ? Math.min(100, Math.round((completedSets / totalSets) * 100)) : 0;
+
+        if (badgeEl) {
+            badgeEl.textContent = `${completedSets} / ${totalSets} sets`;
+            badgeEl.classList.toggle('all-done', totalSets > 0 && completedSets >= totalSets);
+        }
+        if (trackEl) {
+            trackEl.setAttribute('aria-valuenow', String(pct));
+        }
+        if (barEl) {
+            barEl.style.width = `${pct}%`;
+        }
+    },
+
     updateCheckBtnDOM(exIndex, setIndex) {
         if (typeof document === 'undefined' || !document.getElementById('workout-exercise-list')) return;
         const anchor = document.querySelector(`#workout-exercise-list input[data-ex="${exIndex}"][data-set="${setIndex}"]`);
@@ -6379,9 +6548,11 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             checkBtn.title = 'Set afvinken';
             checkBtn.setAttribute('aria-label', 'Set afvinken');
         }
+        this.updateWorkoutProgressUI();
     },
 
     renderWorkoutExercises() {
+        this.updateWorkoutProgressUI();
         const list = document.getElementById('workout-exercise-list');
         if (!list) return;
         list.innerHTML = '';

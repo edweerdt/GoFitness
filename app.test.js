@@ -6225,10 +6225,174 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(cssContent).toMatch(/@media\s*\(max-width:\s*420px\)\s*\{[\s\S]*?\.actions-row\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
         });
     });
+
+    describe('GOF-56: Mobile UX Fase 2 (Home Sessie Samenvatting & Uitklapbare Oefeningenlijst + Workout Voortgangsbalk)', () => {
+        it('toont op Home een sessiesamenvatting en uitklapbare oefeningenlijst zonder losse pills en werkt deze bij bij sessiewissel', () => {
+            document.body.innerHTML = `
+                <div id="recovery-status" class="status-badge green">
+                    <div class="status-badge-primary">
+                        <span class="material-icons-round">battery_charging_full</span>
+                        <span id="recovery-text">Klaar om te trainen</span>
+                        <span id="recovery-hours" class="recovery-hours-text"></span>
+                    </div>
+                </div>
+                <div id="recommended-card-title"></div>
+                <div id="recommended-session-name"></div>
+                <div id="recommended-reason"></div>
+                <div id="home-session-snapshot" class="home-session-snapshot hidden">
+                    <button type="button" id="btn-toggle-session-snapshot" class="home-snapshot-header" onclick="app.toggleHomeSessionPreview()" aria-expanded="false">
+                        <span id="home-snapshot-meta" class="home-snapshot-meta"></span>
+                        <span id="home-snapshot-toggle-label" class="home-snapshot-toggle-label">Oefeningen</span>
+                    </button>
+                    <div id="home-snapshot-list" class="home-snapshot-list hidden"></div>
+                </div>
+                <div id="session-picker-wrapper" class="hidden"><select id="home-session-select"></select></div>
+                <button id="btn-start-session"></button>
+                <div id="home-date"></div>
+            `;
+
+            const sessionA = {
+                id: 'sess_a',
+                name: 'Full Body A',
+                estimatedMinutes: 35,
+                exercises: [
+                    { name: 'Goblet Squat', sets: 3, repsMin: 8, repsMax: 10, muscleGroups: ['legs'] },
+                    { name: 'Dumbbell Bench Press', sets: 3, reps: '8-12', muscleGroups: ['chest'] },
+                    { name: 'Lat Pulldown', sets: 3, reps: '10-12', muscleGroups: ['back'] }
+                ]
+            };
+            const sessionB = {
+                id: 'sess_b',
+                name: 'Upper Body B',
+                exercises: [
+                    { name: 'Overhead Press', sets: 4, reps: '8', muscleGroups: ['shoulders'] },
+                    { name: 'Barbell Curl', sets: 3, reps: '12', muscleGroups: ['biceps'] }
+                ]
+            };
+
+            store.plans = [{
+                id: 'plan_gof56',
+                name: 'Test Schema',
+                sessions: [sessionA, sessionB]
+            }];
+            store.activePlanId = 'plan_gof56';
+            store.logs = [];
+            app.activeWorkout = null;
+            app.isHomeSessionPreviewOpen = false;
+
+            app.renderHome();
+
+            const snapshotEl = document.getElementById('home-session-snapshot');
+            const metaEl = document.getElementById('home-snapshot-meta');
+            const listEl = document.getElementById('home-snapshot-list');
+            const toggleBtn = document.getElementById('btn-toggle-session-snapshot');
+            const select = document.getElementById('home-session-select');
+
+            expect(snapshotEl.classList.contains('hidden')).toBe(false);
+            expect(metaEl.textContent).toContain('3 oefeningen');
+            expect(metaEl.textContent).toContain('~35 min');
+            expect(metaEl.textContent).toContain('Benen, Borst, Rug');
+
+            // Standaard ingeklapt
+            expect(listEl.classList.contains('hidden')).toBe(true);
+            expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+            expect(listEl.querySelectorAll('.home-snapshot-item').length).toBe(3);
+            expect(listEl.textContent).toContain('1. Goblet Squat');
+            expect(listEl.textContent).toContain('3×8-10');
+
+            // Uitklappen via toggleHomeSessionPreview
+            app.toggleHomeSessionPreview();
+            expect(listEl.classList.contains('hidden')).toBe(false);
+            expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
+
+            // Wissel naar sessie B in dropdown
+            select.value = 'sess_b';
+            select.onchange();
+            expect(metaEl.textContent).toContain('2 oefeningen');
+            expect(metaEl.textContent).toContain('Schouders, Biceps');
+            expect(listEl.querySelectorAll('.home-snapshot-item').length).toBe(2);
+            expect(listEl.textContent).toContain('1. Overhead Press');
+            expect(listEl.textContent).toContain('4×8');
+
+            // Wissel naar Vrije Sessie -> verbergt samenvatting
+            select.value = 'custom_session';
+            select.onchange();
+            expect(snapshotEl.classList.contains('hidden')).toBe(true);
+        });
+
+        it('werkt #workout-sets-badge en #workout-progress-bar live bij tijdens een actieve training', () => {
+            document.body.innerHTML = `
+                <div class="workout-sticky-header">
+                    <header class="workout-header">
+                        <div class="workout-title-container">
+                            <h2 id="workout-title">Training</h2>
+                            <span id="workout-session-timer" class="workout-session-timer">00:00</span>
+                            <span id="workout-sets-badge" class="workout-sets-badge">0 / 0 sets</span>
+                        </div>
+                    </header>
+                    <div id="workout-progress-track" class="workout-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                        <div id="workout-progress-bar" class="workout-progress-bar" style="width: 0%;"></div>
+                    </div>
+                    <div id="rest-timer" class="rest-timer hidden"><span id="rest-timer-label"></span></div>
+                </div>
+                <div id="workout-exercise-list"></div>
+            `;
+
+            app.activeWorkout = {
+                startTime: new Date(),
+                session: { id: 's1', name: 'Test Sessie' },
+                exercises: [
+                    {
+                        id: 'ex1',
+                        name: 'Squat',
+                        sets: 2,
+                        reps: '8',
+                        setsCompleted: [false, false],
+                        weights: ['', ''],
+                        actualReps: ['', '']
+                    },
+                    {
+                        id: 'ex2',
+                        name: 'Bench Press',
+                        sets: 2,
+                        reps: '10',
+                        setsCompleted: [false, false],
+                        weights: ['', ''],
+                        actualReps: ['', '']
+                    }
+                ]
+            };
+
+            app.renderWorkoutExercises();
+
+            const badgeEl = document.getElementById('workout-sets-badge');
+            const barEl = document.getElementById('workout-progress-bar');
+            const trackEl = document.getElementById('workout-progress-track');
+
+            expect(badgeEl.textContent).toBe('0 / 4 sets');
+            expect(barEl.style.width).toBe('0%');
+            expect(trackEl.getAttribute('aria-valuenow')).toBe('0');
+
+            // Vink 1e set af (1 van 4 = 25%)
+            app.toggleSet(0, 0);
+            expect(badgeEl.textContent).toBe('1 / 4 sets');
+            expect(barEl.style.width).toBe('25%');
+            expect(trackEl.getAttribute('aria-valuenow')).toBe('25');
+
+            // Auto-complete 2e set via updateWeight + updateReps met finalize=true (2 van 4 = 50%)
+            app.updateWeight(0, 1, '60', true);
+            app.updateReps(0, 1, '8', true);
+            expect(badgeEl.textContent).toBe('2 / 4 sets');
+            expect(barEl.style.width).toBe('50%');
+
+            // Vink overige 2 sets af (4 van 4 = 100%, all-done class)
+            app.toggleSet(1, 0);
+            app.toggleSet(1, 1);
+            expect(badgeEl.textContent).toBe('4 / 4 sets');
+            expect(barEl.style.width).toBe('100%');
+            expect(badgeEl.classList.contains('all-done')).toBe(true);
+        });
+    });
 });
-
-
-
-
 
 
