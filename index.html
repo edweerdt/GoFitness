@@ -5,7 +5,7 @@
     <!-- Zoomen niet blokkeren (WCAG 1.4.4); viewport-fit voor de iPhone-notch -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Go Fitness</title>
-    <link rel="stylesheet" href="style.css?v=30">
+    <link rel="stylesheet" href="style.css?v=31">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -129,7 +129,7 @@
 
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; margin-bottom:8px;">
                         <h3 style="margin:0;">Mijn Schema's</h3>
-                        <button id="btn-create-plan" class="btn-primary" onclick="app.openPlanEditor()" style="padding:6px 12px; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px;">
+                        <button id="btn-create-plan" class="btn-primary" onclick="app.openPlanEditor()" style="padding:8px 14px; min-height:44px; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px;">
                             <span class="material-icons-round" style="font-size:1.1rem;">add</span> Nieuw Schema
                         </button>
                     </div>
@@ -154,7 +154,7 @@
                                 <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Oefeningenbibliotheek</h3>
                                 <p class="text-sm text-muted mt-1">Beheer ingebouwde en eigen oefeningen</p>
                             </div>
-                            <button class="btn-primary" onclick="app.showAddExerciseModal()" style="padding:6px 12px; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px;">
+                            <button class="btn-primary" onclick="app.showAddExerciseModal()" style="padding:8px 14px; min-height:44px; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px;">
                                 <span class="material-icons-round" style="font-size:1.1rem;">add</span> Nieuw
                             </button>
                         </div>
@@ -186,7 +186,7 @@
                 <div class="content-padded pb-32">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                         <h3 style="margin:0;">Statistieken</h3>
-                        <button id="btn-share-stats" class="weeks-stepper-btn" onclick="app.openShareStatsModal()" title="Statistieken delen" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; height:auto; width:auto; border-radius:12px; background: rgba(37, 99, 235, 0.15); color: var(--accent-color); border: 1px solid rgba(37, 99, 235, 0.3);">
+                        <button id="btn-share-stats" class="weeks-stepper-btn" onclick="app.openShareStatsModal()" title="Statistieken delen" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; min-height:44px; height:auto; width:auto; border-radius:12px; background: rgba(37, 99, 235, 0.15); color: var(--accent-color); border: 1px solid rgba(37, 99, 235, 0.3);">
                             <span class="material-icons-round" style="font-size:18px;">share</span>
                             <span style="font-size:13px; font-weight:600;">Delen</span>
                         </button>
@@ -276,7 +276,7 @@
                 <span class="material-icons-round" aria-hidden="true">group</span>
                 <span>Vrienden</span>
             </button>
-            <button class="nav-item" data-target="achievements">
+            <button class="nav-item hidden" data-target="achievements">
                 <span class="material-icons-round" aria-hidden="true">emoji_events</span>
                 <span>Achievements</span>
             </button>
