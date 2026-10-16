@@ -6182,6 +6182,49 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(exTitle.textContent).toContain('(<script>evil()</script>)');
         });
     });
+
+    describe('GOF-55: Mobile UX Fase 1 (4-Tab Navigatie, 48px Touch-Targets & Overscroll Bescherming)', () => {
+        it('verbergt de Achievements tab in #bottom-nav en toont exact 4 zichtbare primaire tabs in index.html', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const htmlContent = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlContent, 'text/html');
+            const navItems = [...doc.querySelectorAll('#bottom-nav .nav-item')];
+            expect(navItems.length).toBe(5);
+
+            const visibleTabs = navItems.filter(btn => !btn.classList.contains('hidden')).map(btn => btn.getAttribute('data-target'));
+            expect(visibleTabs).toEqual(['home', 'plans', 'progress', 'friends']);
+
+            const achievementsBtn = doc.querySelector('#bottom-nav .nav-item[data-target="achievements"]');
+            expect(achievementsBtn).not.toBeNull();
+            expect(achievementsBtn.classList.contains('hidden')).toBe(true);
+        });
+
+        it('definieert 4-koloms #bottom-nav zonder horizontale scroll, 48px touch-targets en overscroll-behavior-y: contain in style.css', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const cssContent = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+
+            // Overscroll bescherming op #main-content
+            expect(cssContent).toMatch(/#main-content\s*\{[^}]*overscroll-behavior-y:\s*contain;/);
+
+            // 4-koloms bottom-nav zonder horizontale scroll
+            expect(cssContent).toMatch(/#bottom-nav\s*\{[^}]*display:\s*grid;/);
+            expect(cssContent).toMatch(/#bottom-nav\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/);
+            expect(cssContent).toMatch(/#bottom-nav\s*\{[^}]*overflow-x:\s*hidden;/);
+
+            // 48px touch-targets op .check-btn, .icon-btn en .nav-item
+            expect(cssContent).toMatch(/\.check-btn\s*\{[^}]*width:\s*48px;[^}]*height:\s*48px;/);
+            expect(cssContent).toMatch(/\.icon-btn\s*\{[^}]*width:\s*48px;[^}]*height:\s*48px;/);
+            expect(cssContent).toMatch(/\.nav-item\s*\{[^}]*height:\s*48px;/);
+            expect(cssContent).toMatch(/#btn-start-session\s*\{[^}]*min-height:\s*52px;/);
+
+            // 2x2 mobiel grid voor .actions-row op smalle schermen
+            expect(cssContent).toMatch(/@media\s*\(max-width:\s*420px\)\s*\{[\s\S]*?\.actions-row\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+        });
+    });
 });
 
 

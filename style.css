@@ -50,6 +50,8 @@ body {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden; /* Voorkom horizontale overflow (bijv. door brede knoprijen) */
+    overscroll-behavior-y: contain; /* Voorkom accidentele pull-to-refresh tijdens een workout */
+    -webkit-overflow-scrolling: touch;
     position: relative;
 }
 
@@ -190,7 +192,8 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 8px;
+    padding: 8px 10px;
+    min-height: 44px;
     border-radius: 8px;
     border: none;
     background: rgba(255, 255, 255, 0.12);
@@ -603,10 +606,15 @@ button:disabled {
     background: var(--accent-color);
     color: var(--accent-text, #ffffff);
     padding: 14px 20px;
+    min-height: 48px;
     border-radius: var(--border-radius-sm);
     font-weight: 600;
     font-size: 1rem;
     box-shadow: 0 4px 12px rgba(var(--accent-rgb, 59, 130, 246), 0.3);
+}
+
+#btn-start-session {
+    min-height: 52px;
 }
 
 .btn-primary:active { transform: scale(0.98); background: var(--accent-hover); }
@@ -615,6 +623,7 @@ button:disabled {
     background: var(--surface-light);
     color: var(--text-primary);
     padding: 12px 16px;
+    min-height: 44px;
     border-radius: var(--border-radius-sm);
     font-weight: 500;
     display: inline-flex;
@@ -631,6 +640,8 @@ button:disabled {
     padding: 8px;
     min-width: 44px;
     min-height: 44px; /* tap-target */
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     display: grid;
     place-items: center;
@@ -642,10 +653,11 @@ button:disabled {
     gap: 10px;
 }
 
-/* Knoppen in een actierij gelijkmatig verdelen en op één regel houden */
+/* Knoppen in een actierij gelijkmatig verdelen en 48px touch-target garanderen */
 .actions-row .btn-secondary {
     flex: 1;
     min-width: 0;
+    min-height: 48px;
     padding: 12px 8px;
     gap: 6px;
     white-space: nowrap;
@@ -653,6 +665,18 @@ button:disabled {
 
 .actions-row .btn-secondary .material-icons-round {
     font-size: 1.15rem;
+}
+
+/* Op smalle mobiele schermen vormen 4 knoppen in een actierij een ruim 2x2 grid */
+@media (max-width: 420px) {
+    .actions-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .actions-row > :only-child {
+        grid-column: 1 / -1;
+    }
 }
 
 /* Stat Boxes & Grids */
@@ -729,24 +753,23 @@ button:disabled {
     color: var(--text-muted);
 }
 
-/* Bottom Navigation */
+/* Bottom Navigation (Fase 1: 4 gelijke kolommen zonder horizontale scroll) */
 #bottom-nav {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    display: flex;
-    justify-content: space-around;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     align-items: center;
-    padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px));
+    gap: 4px;
+    padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px));
     background: rgba(26, 29, 36, 0.85);
     backdrop-filter: blur(16px);
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     z-index: 100;
     border-radius: 24px 24px 0 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+    overflow-x: hidden;
 }
 
 #bottom-nav::-webkit-scrollbar {
@@ -755,13 +778,15 @@ button:disabled {
 
 .nav-item {
     flex: 1;
-    min-width: 62px;
+    min-width: 0;
     min-height: 44px; /* tap-target (Apple HIG / WCAG 2.5.8) */
+    height: 48px;
     background: transparent;
     color: var(--text-muted);
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     padding: 6px 4px;
     border-radius: 12px;
@@ -1031,18 +1056,20 @@ button:disabled {
 .set-actions {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
 .weight-input {
     background: var(--surface-light);
     border: 1px solid rgba(255,255,255,0.1);
     color: white;
-    padding: 8px;
-    border-radius: 6px;
+    padding: 8px 4px;
+    min-height: 44px;
+    border-radius: 8px;
     width: 70px;
     text-align: center;
-    font-family: 'Inter';
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
 }
 
 .check-btn {
@@ -1050,8 +1077,10 @@ button:disabled {
     background: var(--surface-light);
     border: 1px solid rgba(255,255,255,0.1);
     color: var(--text-muted);
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
     border-radius: 50%;
     display: grid;
     place-items: center;
@@ -2193,9 +2222,11 @@ button:disabled {
 }
 
 .weeks-stepper-btn {
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.15);
     background: rgba(255, 255, 255, 0.04);
     color: var(--text-primary);
@@ -2216,13 +2247,14 @@ button:disabled {
 .weeks-stepper-val,
 .weeks-stepper-input {
     width: 52px;
-    height: 34px;
-    border-radius: 8px;
+    height: 44px;
+    min-height: 44px;
+    border-radius: 10px;
     border: 1.5px solid var(--status-green);
     background: rgba(16, 185, 129, 0.12);
     color: var(--status-green);
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 16px;
     font-family: inherit;
     text-align: center;
     padding: 0 4px;
@@ -2994,7 +3026,8 @@ textarea:focus-visible,
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 5px 11px;
+    padding: 8px 12px;
+    min-height: 40px;
     border-radius: 7px;
     border: none;
     background: transparent;
