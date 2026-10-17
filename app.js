@@ -1557,7 +1557,7 @@ const app = {
 
         const bottomNav = document.getElementById('bottom-nav');
         if (bottomNav) {
-            if (viewId === 'workout') {
+            if (viewId === 'workout' || viewId === 'guide') {
                 bottomNav.classList.add('hidden');
             } else {
                 bottomNav.classList.remove('hidden');
@@ -1566,7 +1566,7 @@ const app = {
 
         this.currentView = viewId;
         // De rusttimer en sessietimer zijn puur UI van de workout-view; buiten die view niet laten doortikken
-        if (viewId !== 'workout') {
+        if (viewId !== 'workout' && viewId !== 'guide') {
             if (this.restTimer) this.stopRestTimer();
             if (this.sessionTimerInterval) this.stopSessionTimer();
         }
@@ -1576,6 +1576,7 @@ const app = {
         if(viewId === 'progress') this.renderProgress();
         if(viewId === 'friends') this.renderFriends();
         if(viewId === 'achievements') this.renderAchievements();
+        if(viewId === 'guide') this.initSessionGuide();
     },
 
     // Escape sluit de bovenste open modal via zijn eigen annuleer-/sluitknop
@@ -2534,20 +2535,328 @@ const app = {
         this.renderHome();
     },
 
-    showSessionGuideModal() {
+    guidePreviousView: 'home',
+    guideDemoWeight: 85,
+    guideDemoBar: 20,
+    guideDemoTimerSeconds: 90,
+    guideDemoTimerInterval: null,
+    guideDemoTimerRunning: false,
+    guideSpotlights: {
+        'plate-calc': {
+            title: 'Plate Calculator',
+            desc: 'Bepaal makkelijk welke schijven je nodig hebt.',
+            bullets: [
+                '<strong>Automatische detectie:</strong> Verschijnt vanzelf bij alle halter-oefeningen zoals Bench Press, Squat, Deadlift, Overhead Press en RDL.',
+                '<strong>Keuze uit stangen:</strong> Ondersteunt standaard 20 kg Olympische stangen, 15 kg stangen en 10 kg EZ-bars.',
+                '<strong>Kleurgecodeerde schijven:</strong> Officiële Olympische kleuren: 25 kg (rood), 20 kg (blauw), 15 kg (geel), 10 kg (groen), 5 kg (wit), 2.5 kg (donkergrijs) en 1.25 kg (lichtgrijs).'
+            ]
+        },
+        'timer': {
+            title: 'Rusttimer',
+            desc: 'Houdt automatisch je rusttijd bij tussen sets.',
+            bullets: [
+                '<strong>Start vanzelf:</strong> Zodra je een set afvinkt, begint de rusttijd die hoort bij de oefening (bijv. 90 seconden).',
+                '<strong>Snelle knoppen:</strong> Druk op -15s als je haast hebt, +30s als je een zware set deed, of Skip om direct door te gaan.',
+                '<strong>Haptische trilling:</strong> Je telefoon trilt zachtjes zodra je rusttijd voorbij is.'
+            ]
+        },
+        'swap': {
+            title: 'Oefening Wisselen',
+            desc: 'Vervang een oefening wanneer een apparaat in gebruik is.',
+            bullets: [
+                '<strong>Slimme alternatieven:</strong> Tik op "Wissel" om direct een lijst te openen met oefeningen die dezelfde spiergroep trainen.',
+                '<strong>Behoud van sets &amp; gewichten:</strong> Je actieve trainingsopbouw blijft intact.',
+                '<strong>Filters:</strong> Zoek en filter ook op materiaal (zoals dumbbells, kabels of lichaamsgewicht).'
+            ]
+        },
+        'note': {
+            title: 'Sticky Notes',
+            desc: 'Sla instellingen per oefening op en zie ze bij elke sessie direct terug.',
+            bullets: [
+                '<strong>Direct bewerken:</strong> Tik op "Notitie" of klik op een bestaande notitiestrip om hem aan te passen.',
+                '<strong>Permanent bewaard:</strong> De notitie blijft gekoppeld aan de oefening en komt bij elke volgende training automatisch terug.',
+                '<strong>Voorbeelden:</strong> Ideaal voor "Stoelhoogte stand 4" of "Incline stand 2".'
+            ]
+        },
+        'overload': {
+            title: 'Progressive Overload',
+            desc: 'Automatisch advies op basis van je vorige prestaties.',
+            bullets: [
+                '<strong>Vorige sessie analyse:</strong> De app kijkt wat je de vorige keer hebt gelogd.',
+                '<strong>Automatische suggestie:</strong> Haalde je overal het maximale aantal herhalingen? Dan stelt de app voor om het gewicht te verhogen.'
+            ]
+        },
+        'hold': {
+            title: 'Hold Timer',
+            desc: 'Tijdregistratie voor isometrische oefeningen zoals planks en wall-sits.',
+            bullets: [
+                '<strong>Startvertraging:</strong> Kies voor 1, 2, 3 of 5 seconden vertraging zodat je eerst rustig kunt gaan liggen.',
+                '<strong>De stopwatch:</strong> kleurt geel als je binnen 10s van je record bent, en groen zodra je je record breekt!',
+                '<strong>Stop &amp; Auto-fill:</strong> Tik op Stop en de behaalde seconden worden automatisch in je set ingevuld.'
+            ]
+        },
+        'reorder': {
+            title: 'Volgorde Verschuiven &amp; Verwijderen',
+            desc: 'Pas de volgorde van je oefeningen tijdens de training aan.',
+            bullets: [
+                '<strong>Pijltjes omhoog/omlaag:</strong> Verplaats een oefening naar later in de training als het apparaat bezet is.',
+                '<strong>Verwijderen:</strong> Verwijder een oefening uit de huidige sessie zonder je vaste schema aan te tasten.',
+                '<strong>Oefening toevoegen (+):</strong> Voeg onderaan eenvoudig een extra oefening toe aan je training.'
+            ]
+        },
+        'recap': {
+            title: 'Workout Recap',
+            desc: 'Overzicht van je trainingsresultaten bij het afronden.',
+            bullets: [
+                '<strong>Totaal Tonnage:</strong> Zie hoeveel kilo je in totaal hebt getild.',
+                '<strong>PR Overzicht:</strong> Alle persoonlijke records en overloads overzichtelijk onder elkaar.',
+                '<strong>Historie:</strong> Wordt direct opgeslagen en is terug te vinden in je trainingslogboek.'
+            ]
+        }
+    },
+
+    openSessionGuide(sourceView = 'home') {
         if (typeof localStorage !== 'undefined') {
             localStorage.setItem('gof_session_guide_viewed', '1');
         }
+        this.guidePreviousView = sourceView || this.currentView || 'home';
         const modal = document.getElementById('modal-session-guide');
         if (modal) modal.classList.remove('hidden');
+
+        this.navigate('guide');
+        try {
+            if (typeof window !== 'undefined' && typeof window.scrollTo === 'function' && typeof process === 'undefined') {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        } catch (e) {}
         if (document.getElementById('home-onboarding-container')) {
             this.renderHomeOnboarding();
         }
     },
 
-    hideSessionGuideModal() {
+    closeSessionGuide() {
+        if (this.guideDemoTimerInterval) {
+            clearInterval(this.guideDemoTimerInterval);
+            this.guideDemoTimerInterval = null;
+            this.guideDemoTimerRunning = false;
+        }
         const modal = document.getElementById('modal-session-guide');
         if (modal) modal.classList.add('hidden');
+
+        const targetView = this.guidePreviousView || (this.activeWorkoutSession ? 'workout' : 'home');
+        this.navigate(targetView);
+        if (targetView === 'home' && document.getElementById('home-onboarding-container')) {
+            this.renderHomeOnboarding();
+        }
+    },
+
+    showSessionGuideModal(sourceView = 'home') {
+        this.openSessionGuide(sourceView);
+    },
+
+    hideSessionGuideModal() {
+        this.closeSessionGuide();
+    },
+
+    initSessionGuide() {
+        this.filterGuideCategory('all');
+        this.showGuideSpotlight('plate-calc');
+        this.calcGuideDemoPlates();
+        this.renderGuideDemoTimer();
+    },
+
+    showGuideSpotlight(key, triggerBtn = null) {
+        const data = (this.guideSpotlights && this.guideSpotlights[key]) || (this.guideSpotlights && this.guideSpotlights['plate-calc']);
+        if (!data) return;
+
+        const titleEl = document.getElementById('guide-spotlight-title');
+        const descEl = document.getElementById('guide-spotlight-desc');
+        const bulletsEl = document.getElementById('guide-spotlight-bullets');
+
+        if (titleEl) titleEl.innerHTML = data.title;
+        if (descEl) descEl.innerHTML = data.desc;
+        if (bulletsEl) {
+            bulletsEl.innerHTML = data.bullets.map(b => `
+                <li style="margin-bottom: 8px; line-height: 1.45; font-size: 0.88rem; color: var(--text-primary);">
+                    ${b}
+                </li>
+            `).join('');
+        }
+
+        document.querySelectorAll('.guide-spot-pill').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        if (triggerBtn) {
+            triggerBtn.classList.add('active');
+        } else {
+            const matchBtn = Array.from(document.querySelectorAll('.guide-spot-pill')).find(b => {
+                const onclickAttr = b.getAttribute('onclick') || '';
+                return onclickAttr.includes(`'${key}'`);
+            });
+            if (matchBtn) matchBtn.classList.add('active');
+        }
+    },
+
+    filterGuideCategory(category) {
+        document.querySelectorAll('.guide-cat-btn').forEach(btn => {
+            const btnCat = btn.getAttribute('data-cat');
+            if (btnCat === category) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        const cards = document.querySelectorAll('#guide-feature-cards .guide-feature-card');
+        cards.forEach(card => {
+            const cat = card.getAttribute('data-category');
+            if (category === 'all' || cat === category) {
+                card.style.display = 'flex';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    },
+
+    setGuideDemoWeight(kg) {
+        this.guideDemoWeight = kg;
+        const input = document.getElementById('guide-plate-input');
+        if (input) input.value = kg;
+        this.calcGuideDemoPlates();
+    },
+
+    setGuideDemoBar(kg) {
+        this.guideDemoBar = kg;
+        ['20', '15', '10'].forEach(b => {
+            const btn = document.getElementById(`guide-bar-${b}`);
+            if (btn) {
+                if (parseInt(b, 10) === kg) {
+                    btn.className = 'btn-primary';
+                } else {
+                    btn.className = 'btn-secondary';
+                }
+            }
+        });
+        this.calcGuideDemoPlates();
+    },
+
+    calcGuideDemoPlates() {
+        const input = document.getElementById('guide-plate-input');
+        const total = Math.max(0, parseFloat(input ? input.value : this.guideDemoWeight) || 0);
+        const barWeight = this.guideDemoBar || 20;
+        const net = Math.max(0, total - barWeight);
+        const perSide = Math.round((net / 2) * 100) / 100;
+
+        const perSideEl = document.getElementById('guide-plates-perside-text');
+        if (perSideEl) perSideEl.textContent = `${perSide} kg / kant`;
+
+        const container = document.getElementById('guide-plates-badges-row');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (perSide <= 0) {
+            container.innerHTML = `<span class="text-xs text-muted" style="font-style: italic;">Alleen de lege stang (${barWeight} kg)</span>`;
+            return;
+        }
+
+        const OLYMPIC_PLATES = [
+            { weight: 25, cls: 'plate-badge-25', label: '25' },
+            { weight: 20, cls: 'plate-badge-20', label: '20' },
+            { weight: 15, cls: 'plate-badge-15', label: '15' },
+            { weight: 10, cls: 'plate-badge-10', label: '10' },
+            { weight: 5,  cls: 'plate-badge-5',  label: '5' },
+            { weight: 2.5, cls: 'plate-badge-2_5', label: '2.5' },
+            { weight: 1.25, cls: 'plate-badge-1_25', label: '1.25' }
+        ];
+
+        let rem = perSide;
+        const plateList = [];
+        for (const p of OLYMPIC_PLATES) {
+            const count = Math.floor((rem + 0.001) / p.weight);
+            if (count > 0) {
+                for (let i = 0; i < count; i++) {
+                    plateList.push(p);
+                }
+                rem = Math.round((rem - count * p.weight) * 100) / 100;
+            }
+        }
+
+        if (plateList.length === 0) {
+            container.innerHTML = '<span class="text-xs text-muted" style="font-style: italic;">Geen passende schijven</span>';
+            return;
+        }
+
+        plateList.forEach(p => {
+            const badge = document.createElement('span');
+            badge.className = `status-badge ${p.cls}`;
+            badge.style.padding = '3px 8px';
+            badge.style.fontWeight = '700';
+            badge.style.fontFamily = 'monospace';
+            badge.style.fontSize = '0.78rem';
+            badge.textContent = `${p.label}kg`;
+            container.appendChild(badge);
+        });
+    },
+
+    renderGuideDemoTimer() {
+        const displayEl = document.getElementById('guide-timer-display');
+        if (!displayEl) return;
+        const totalSec = Math.max(0, this.guideDemoTimerSeconds ?? 90);
+        const mins = Math.floor(totalSec / 60);
+        const secs = totalSec % 60;
+        displayEl.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    },
+
+    toggleGuideDemoTimer() {
+        const btn = document.getElementById('btn-guide-timer-toggle');
+        const statusEl = document.getElementById('guide-timer-status');
+
+        if (this.guideDemoTimerInterval) {
+            clearInterval(this.guideDemoTimerInterval);
+            this.guideDemoTimerInterval = null;
+            this.guideDemoTimerRunning = false;
+            if (btn) btn.textContent = 'Hervat';
+            if (statusEl) statusEl.textContent = 'Gepauzeerd';
+        } else {
+            if ((this.guideDemoTimerSeconds ?? 90) <= 0) {
+                this.guideDemoTimerSeconds = 90;
+            }
+            this.guideDemoTimerRunning = true;
+            if (btn) btn.textContent = 'Pauzeer';
+            if (statusEl) statusEl.textContent = 'Rusttijd loopt...';
+
+            this.guideDemoTimerInterval = setInterval(() => {
+                if ((this.guideDemoTimerSeconds ?? 90) > 0) {
+                    this.guideDemoTimerSeconds--;
+                    this.renderGuideDemoTimer();
+                } else {
+                    clearInterval(this.guideDemoTimerInterval);
+                    this.guideDemoTimerInterval = null;
+                    this.guideDemoTimerRunning = false;
+                    if (btn) btn.textContent = 'Start';
+                    if (statusEl) statusEl.textContent = '⚡ Tijd voor je volgende set!';
+                }
+            }, 1000);
+        }
+    },
+
+    adjustGuideDemoTimer(secondsDelta) {
+        this.guideDemoTimerSeconds = Math.max(0, (this.guideDemoTimerSeconds ?? 90) + secondsDelta);
+        this.renderGuideDemoTimer();
+    },
+
+    resetGuideDemoTimer() {
+        if (this.guideDemoTimerInterval) {
+            clearInterval(this.guideDemoTimerInterval);
+            this.guideDemoTimerInterval = null;
+            this.guideDemoTimerRunning = false;
+        }
+        this.guideDemoTimerSeconds = 90;
+        this.renderGuideDemoTimer();
+        const btn = document.getElementById('btn-guide-timer-toggle');
+        const statusEl = document.getElementById('guide-timer-status');
+        if (btn) btn.textContent = 'Start';
+        if (statusEl) statusEl.textContent = 'Start zodra je een set afvinkt';
     },
 
     renderHomeOnboarding() {
@@ -2649,7 +2958,7 @@ const app = {
                                 Handige functies tijdens je training: sets loggen, rusttimers, Plate Calculator en oefeningen wisselen.
                             </div>
                             <div style="margin-top: 8px;">
-                                <button class="btn-secondary" style="padding: 5px 12px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px;" onclick="app.showSessionGuideModal();">
+                                <button class="btn-secondary" style="padding: 5px 12px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px;" onclick="app.openSessionGuide('home');">
                                     <span class="material-icons-round" style="font-size: 1rem;">menu_book</span>
                                     <span>${step2Done ? 'Gids opnieuw bekijken' : 'Open Sessie Gids'}</span>
                                 </button>

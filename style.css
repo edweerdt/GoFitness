@@ -4379,4 +4379,223 @@ textarea:focus-visible,
     font-size: 0.75rem;
 }
 
+/* --- Session Guide View (#view-guide) --- */
+.guide-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding-bottom: 80px;
+}
+
+.guide-welcome-card {
+    padding: 20px;
+    border-radius: 16px;
+    background: var(--card-bg, rgba(255, 255, 255, 0.03));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+}
+
+.guide-category-nav {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 20px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.guide-category-nav::-webkit-scrollbar {
+    display: none;
+}
+
+.guide-cat-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.guide-cat-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+
+.guide-cat-btn.active {
+    background: var(--accent-color, #2563eb);
+    border-color: var(--accent-color, #2563eb);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+}
+
+.guide-interactive-section {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 20px;
+    align-items: start;
+    margin-bottom: 24px;
+    border-radius: 20px;
+}
+
+@media (max-width: 820px) {
+    .guide-interactive-section {
+        grid-template-columns: 1fr;
+    }
+}
+
+.guide-phone-shell {
+    background: #090d16;
+    border: 3px solid rgba(255, 255, 255, 0.12);
+    border-radius: 32px;
+    padding: 14px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+    max-width: 340px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.guide-phone-notch {
+    width: 90px;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 99px;
+    margin: 0 auto 10px auto;
+}
+
+.guide-mockup-header {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.guide-mockup-timer {
+    background: rgba(37, 99, 235, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    padding: 8px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.guide-mockup-timer:hover {
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+}
+
+.guide-mockup-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 12px;
+}
+
+.guide-spotlight-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.guide-spot-pill {
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.guide-spot-pill:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+
+.guide-spot-pill.active {
+    background: rgba(37, 99, 235, 0.18);
+    border-color: var(--accent-color);
+    color: #ffffff;
+}
+
+.guide-spotlight-detail-card {
+    background: var(--card-bg, rgba(255, 255, 255, 0.03));
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 20px;
+    min-height: 220px;
+}
+
+.guide-tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.guide-tool-card {
+    border-radius: 16px;
+    padding: 18px;
+    background: var(--card-bg, rgba(255, 255, 255, 0.03));
+    border: 1px solid var(--border-color);
+}
+
+.plate-badge-25 { background-color: #ef4444; color: #ffffff; }
+.plate-badge-20 { background-color: #3b82f6; color: #ffffff; }
+.plate-badge-15 { background-color: #eab308; color: #000000; }
+.plate-badge-10 { background-color: #22c55e; color: #ffffff; }
+.plate-badge-5  { background-color: #f8fafc; color: #0f172a; }
+.plate-badge-2_5 { background-color: #64748b; color: #ffffff; }
+.plate-badge-1_25 { background-color: #94a3b8; color: #0f172a; }
+
+.guide-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.guide-feature-card {
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: var(--card-bg, rgba(255, 255, 255, 0.03));
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.guide-feature-card:hover {
+    border-color: rgba(59, 130, 246, 0.4);
+    transform: translateY(-2px);
+}
+
+.guide-tips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.guide-tip-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+
 
