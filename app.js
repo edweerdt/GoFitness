@@ -6884,6 +6884,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 let wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : false;
                 let wantsDuration = (ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false) || isHold;
                 const wantsLevel = (ex.trackMetrics ? (ex.trackMetrics.includes('level') || ex.trackMetrics.includes('stand')) : false) || activeExerciseName.toLowerCase().includes('row machine') || activeExerciseName.toLowerCase().includes('roeimachine');
+                const isBarbell = app.isBarbellExercise ? app.isBarbellExercise(ex) : false;
 
                 if (!wantsReps && !wantsDuration) {
                     wantsReps = true;
@@ -6898,6 +6899,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         oninput="app.updateWeight(${exIndex}, ${i}, this.value)"
                         onchange="app.updateWeight(${exIndex}, ${i}, this.value, true)"
                         onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'weight');}">`;
+                    if (isBarbell) {
+                        inputsHtml += `<button type="button" class="plate-calc-trigger-btn" id="plate-set-btn-${exIndex}-${i}" onclick="app.openPlateCalculatorModal(${exIndex}, ${i})" title="Schijven-helper voor Set ${i + 1}" aria-label="Schijven-helper voor Set ${i + 1}"><span class="material-icons-round" aria-hidden="true">fitness_center</span></button>`;
+                    }
                 }
                 if (wantsReps && !isHold) {
                     inputsHtml += `<input type="number" class="weight-input" placeholder="${app.escapeHTML(String(repsPlaceholder))}" style="width: 55px;"
@@ -7070,6 +7074,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             const personalNote = this.getPersonalExerciseNote(ex);
             const isNoteEditorOpen = Boolean(this.openNoteEditors && this.openNoteEditors.has(exIndex));
             const noteBtnActiveCls = (personalNote || isNoteEditorOpen) ? ' active' : '';
+            const isBarbellCard = this.isBarbellExercise ? this.isBarbellExercise(ex) : false;
 
             let personalNoteHtml = '';
             if (personalNote && !isNoteEditorOpen) {
@@ -7128,6 +7133,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 <button id="note-btn-${exIndex}" class="btn-secondary exercise-action-btn${noteBtnActiveCls}" onclick="app.toggleExerciseNoteEditor(${exIndex})" title="Persoonlijke notitie voor deze oefening">
                                     <span class="material-icons-round">sticky_note_2</span> Notitie
                                 </button>
+                                ${isBarbellCard ? `<button type="button" id="plate-btn-${exIndex}" class="btn-secondary exercise-action-btn" onclick="app.openPlateCalculatorModal(${exIndex})" title="Barbell Schijven-helper"><span class="material-icons-round">fitness_center</span> Schijven</button>` : ''}
                                 ${orderControlsHtml}
                             </div>
                         </div>
@@ -7158,6 +7164,317 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             </button>
         `;
         list.appendChild(addBtnContainer);
+    },
+
+    // --- GOF-60: BARBELL SCHIJVEN-HELPER (PLATE CALCULATOR) ---
+    OLYMPIC_PLATES: [
+        { weight: 25, cls: 'plate-25', color: '#ef4444', label: '25' },
+        { weight: 20, cls: 'plate-20', color: '#3b82f6', label: '20' },
+        { weight: 15, cls: 'plate-15', color: '#eab308', label: '15' },
+        { weight: 10, cls: 'plate-10', color: '#22c55e', label: '10' },
+        { weight: 5,  cls: 'plate-5',  color: '#f8fafc', label: '5' },
+        { weight: 2.5, cls: 'plate-2_5', color: '#64748b', label: '2.5' },
+        { weight: 1.25, cls: 'plate-1_25', color: '#94a3b8', label: '1.25' }
+    ],
+
+    plateCalculatorState: null,
+    preferredBarWeight: 20,
+
+    isBarbellExercise(exOrName) {
+        if (!exOrName) return false;
+        const rawName = typeof exOrName === 'string'
+            ? exOrName
+            : (this.getActiveExerciseName ? this.getActiveExerciseName(exOrName) : (exOrName.chosenVariation || exOrName.name || ''));
+        const name = String(rawName || '').toLowerCase().trim();
+        if (!name) return false;
+
+        // Sluit expliciete Dumbbell / Kabel / Machine / Kettlebell / Bodyweight oefeningen uit
+        const nonBarbellTokens = [
+            'dumbbell', 'db ', '(db', 'machine', 'cable', 'kabel', 'kettlebell',
+            'goblet', 'leg press', 'leg extension', 'leg curl', 'lat pulldown',
+            'pec deck', 'push-up', 'push up', 'pull-up', 'pull up', 'chin-up',
+            'dip', 'plank', 'crunch', 'smith', 'seated row', 'chest press machine',
+            'hack squat', 'bulgarian split squat'
+        ];
+        if (nonBarbellTokens.some(token => name.includes(token))) {
+            return false;
+        }
+
+        const barbellKeywords = [
+            'barbell', 'bb ', '(bb', 'halter', 'ez-bar', 'ez bar',
+            'deadlift', 'rdl', 'bench press', 'squat', 'overhead press',
+            'military press', 'pendlay row', 'hip thrust', 'good morning',
+            'skullcrusher', 'preacher curl', 'upright row', 'clean', 'snatch',
+            'thruster', 'landmine'
+        ];
+        if (barbellKeywords.some(kw => name.includes(kw))) {
+            return true;
+        }
+
+        if (this.substitutionEngine && typeof this.substitutionEngine.getExercise === 'function') {
+            const dbEx = this.substitutionEngine.getExercise(rawName);
+            if (dbEx && Array.isArray(dbEx.equipment)) {
+                return dbEx.equipment.some(eq => {
+                    const e = String(eq).toLowerCase();
+                    return e === 'barbell' || e === 'ez_bar' || e === 'ez-bar' || e === 'olympic_barbell';
+                });
+            }
+        }
+        return false;
+    },
+
+    getDefaultBarWeightForExercise(exOrName) {
+        const rawName = typeof exOrName === 'string'
+            ? exOrName
+            : (this.getActiveExerciseName ? this.getActiveExerciseName(exOrName) : (exOrName && (exOrName.chosenVariation || exOrName.name) || ''));
+        const name = String(rawName || '').toLowerCase();
+        if (name.includes('ez-bar') || name.includes('ez bar') || name.includes('skullcrusher') || name.includes('preacher curl')) {
+            return 10;
+        }
+        return this.preferredBarWeight || 20;
+    },
+
+    calculatePlatesPerSide(totalWeight, barWeight = 20) {
+        const total = Math.max(0, parseFloat(totalWeight) || 0);
+        const bar = Math.max(0, parseFloat(barWeight) || 20);
+        const netWeight = Math.max(0, total - bar);
+        const perSide = Math.round((netWeight / 2) * 100) / 100;
+
+        const plates = [];
+        const flatPlates = [];
+        let rem = perSide;
+
+        for (const p of this.OLYMPIC_PLATES) {
+            const count = Math.floor((rem + 0.001) / p.weight);
+            if (count > 0) {
+                plates.push({
+                    weight: p.weight,
+                    count,
+                    cls: p.cls,
+                    color: p.color,
+                    label: p.label
+                });
+                for (let i = 0; i < count; i++) {
+                    flatPlates.push(p);
+                }
+                rem = Math.round((rem - count * p.weight) * 100) / 100;
+            }
+        }
+
+        return {
+            totalWeight: total,
+            barWeight: bar,
+            perSide,
+            plates,
+            flatPlates,
+            remainder: Math.max(0, rem)
+        };
+    },
+
+    openPlateCalculatorModal(exIndex = 0, setIndex = null) {
+        const ex = (this.activeWorkout && Array.isArray(this.activeWorkout.exercises))
+            ? this.activeWorkout.exercises[exIndex]
+            : null;
+
+        let resolvedSetIdx = typeof setIndex === 'number' ? setIndex : 0;
+        if (setIndex === null && ex && Array.isArray(ex.setsCompleted)) {
+            const firstUncompleted = ex.setsCompleted.findIndex(c => !c);
+            resolvedSetIdx = firstUncompleted !== -1 ? firstUncompleted : 0;
+        }
+
+        const activeName = ex ? (this.getActiveExerciseName ? this.getActiveExerciseName(ex) : (ex.chosenVariation || ex.name || 'Halter Oefening')) : 'Halter Oefening';
+        const barWeight = this.getDefaultBarWeightForExercise(activeName);
+
+        let initialWeight = 0;
+        if (ex) {
+            const currentVal = ex.weights && ex.weights[resolvedSetIdx] != null ? parseFloat(ex.weights[resolvedSetIdx]) : NaN;
+            if (!isNaN(currentVal) && currentVal > 0) {
+                initialWeight = currentVal;
+            } else if (Array.isArray(ex.weights)) {
+                for (let k = resolvedSetIdx - 1; k >= 0; k--) {
+                    const prevW = parseFloat(ex.weights[k]);
+                    if (!isNaN(prevW) && prevW > 0) {
+                        initialWeight = prevW;
+                        break;
+                    }
+                }
+            }
+            if (!initialWeight && this.getPreviousSetDetails) {
+                const prevSet = this.getPreviousSetDetails(activeName, resolvedSetIdx, ex);
+                const prevLogged = prevSet && prevSet.weight != null ? parseFloat(prevSet.weight) : NaN;
+                if (!isNaN(prevLogged) && prevLogged > 0) {
+                    initialWeight = prevLogged;
+                }
+            }
+        }
+        if (!initialWeight || initialWeight < barWeight) {
+            initialWeight = barWeight === 10 ? 30 : 60;
+        }
+
+        this.plateCalculatorState = {
+            exIndex,
+            setIndex: resolvedSetIdx,
+            exerciseName: activeName,
+            targetWeight: initialWeight,
+            barWeight
+        };
+
+        this.renderPlateCalculator(true);
+
+        if (typeof document !== 'undefined') {
+            const modal = document.getElementById('modal-plate-calculator');
+            if (modal) modal.classList.remove('hidden');
+        }
+    },
+
+    hidePlateCalculatorModal() {
+        if (typeof document === 'undefined') return;
+        const modal = document.getElementById('modal-plate-calculator');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    setPlateCalculatorBarWeight(barKg) {
+        const parsedBar = parseFloat(barKg) || 20;
+        this.preferredBarWeight = parsedBar;
+        if (!this.plateCalculatorState) {
+            this.plateCalculatorState = { exIndex: 0, setIndex: 0, exerciseName: 'Halter Oefening', targetWeight: 60, barWeight: parsedBar };
+        } else {
+            this.plateCalculatorState.barWeight = parsedBar;
+            if (this.plateCalculatorState.targetWeight < parsedBar) {
+                this.plateCalculatorState.targetWeight = parsedBar;
+            }
+        }
+        this.renderPlateCalculator(true);
+    },
+
+    setPlateCalculatorWeight(weightVal, syncInput = false) {
+        const parsed = Math.max(0, parseFloat(weightVal) || 0);
+        if (!this.plateCalculatorState) {
+            this.plateCalculatorState = { exIndex: 0, setIndex: 0, exerciseName: 'Halter Oefening', targetWeight: parsed, barWeight: 20 };
+        } else {
+            this.plateCalculatorState.targetWeight = parsed;
+        }
+        this.renderPlateCalculator(syncInput);
+    },
+
+    adjustPlateCalculatorWeight(deltaKg) {
+        if (!this.plateCalculatorState) {
+            this.plateCalculatorState = { exIndex: 0, setIndex: 0, exerciseName: 'Halter Oefening', targetWeight: 60, barWeight: 20 };
+        }
+        const minBar = this.plateCalculatorState.barWeight || 0;
+        const nextVal = Math.max(minBar, Math.round(((parseFloat(this.plateCalculatorState.targetWeight) || 0) + (parseFloat(deltaKg) || 0)) * 100) / 100);
+        this.plateCalculatorState.targetWeight = nextVal;
+        this.renderPlateCalculator(true);
+    },
+
+    renderPlateCalculator(syncInput = true) {
+        if (typeof document === 'undefined' || !this.plateCalculatorState) return;
+        const state = this.plateCalculatorState;
+        const result = this.calculatePlatesPerSide(state.targetWeight, state.barWeight);
+
+        const subtitleEl = document.getElementById('plate-calc-subtitle');
+        if (subtitleEl) {
+            subtitleEl.textContent = `${state.exerciseName} • Set ${(state.setIndex || 0) + 1}`;
+        }
+
+        const inputEl = document.getElementById('plate-calc-weight-input');
+        if (inputEl && syncInput) {
+            inputEl.value = String(result.totalWeight);
+        }
+
+        const barSubEl = document.getElementById('plate-calc-bar-sub');
+        if (barSubEl) {
+            const barLabel = result.barWeight === 10 ? '10 kg EZ-Bar' : `${result.barWeight} kg halterstang`;
+            barSubEl.textContent = `Inclusief ${barLabel}`;
+        }
+
+        const barBtns = document.querySelectorAll('#modal-plate-calculator .plate-bar-btn');
+        barBtns.forEach(btn => {
+            const btnBar = parseFloat(btn.getAttribute('data-bar-weight'));
+            btn.classList.toggle('active', btnBar === result.barWeight);
+        });
+
+        const perSidePill = document.getElementById('plate-calc-per-side-pill');
+        if (perSidePill) {
+            perSidePill.textContent = `${result.perSide} kg / kant`;
+        }
+
+        const stackEl = document.getElementById('plate-calc-visual-stack');
+        if (stackEl) {
+            stackEl.textContent = '';
+            if (result.flatPlates.length === 0) {
+                const emptySpan = document.createElement('span');
+                emptySpan.className = 'text-sm text-muted';
+                emptySpan.style.padding = '0 10px';
+                emptySpan.textContent = 'Alleen lege stang';
+                stackEl.appendChild(emptySpan);
+            } else {
+                result.flatPlates.forEach(p => {
+                    const plateDiv = document.createElement('div');
+                    plateDiv.className = `plate-vis ${p.cls}`;
+                    plateDiv.textContent = p.label;
+                    stackEl.appendChild(plateDiv);
+                });
+            }
+        }
+
+        const badgesEl = document.getElementById('plate-calc-breakdown-badges');
+        if (badgesEl) {
+            badgesEl.textContent = '';
+            if (result.plates.length === 0) {
+                const noneSpan = document.createElement('span');
+                noneSpan.className = 'text-sm text-muted';
+                noneSpan.textContent = 'Geen extra schijven nodig';
+                badgesEl.appendChild(noneSpan);
+            } else {
+                result.plates.forEach(item => {
+                    const badge = document.createElement('span');
+                    badge.className = 'plate-badge-pill';
+                    const dot = document.createElement('span');
+                    dot.className = 'plate-badge-dot';
+                    dot.style.background = item.color;
+                    badge.appendChild(dot);
+                    badge.appendChild(document.createTextNode(`${item.count}× ${item.weight} kg`));
+                    badgesEl.appendChild(badge);
+                });
+            }
+        }
+
+        const remWarnEl = document.getElementById('plate-calc-remainder-warning');
+        if (remWarnEl) {
+            if (result.remainder > 0) {
+                remWarnEl.textContent = `Let op: ${result.remainder} kg per kant kan niet met standaard schijven (kleinste schijf = 1.25 kg).`;
+                remWarnEl.classList.remove('hidden');
+            } else {
+                remWarnEl.textContent = '';
+                remWarnEl.classList.add('hidden');
+            }
+        }
+
+        const applyLabelEl = document.getElementById('btn-apply-plate-weight-label');
+        if (applyLabelEl) {
+            applyLabelEl.textContent = `Gebruik ${result.totalWeight} kg voor Set ${(state.setIndex || 0) + 1}`;
+        }
+    },
+
+    applyPlateCalculatorWeight() {
+        if (!this.plateCalculatorState) return;
+        const { exIndex, setIndex, targetWeight } = this.plateCalculatorState;
+        const weightStr = String(targetWeight);
+
+        if (this.activeWorkout && this.activeWorkout.exercises && this.activeWorkout.exercises[exIndex]) {
+            this.updateWeight(exIndex, setIndex, weightStr, false);
+            if (typeof document !== 'undefined') {
+                const inputEl = document.querySelector(`#workout-exercise-list input[data-ex="${exIndex}"][data-set="${setIndex}"][data-type="weight"]`);
+                if (inputEl) {
+                    inputEl.value = weightStr;
+                } else {
+                    this.renderWorkoutExercises();
+                }
+            }
+        }
+        this.triggerHaptic(15);
+        this.hidePlateCalculatorModal();
     },
 
     openNoteEditors: null,

@@ -6750,6 +6750,119 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(app.getPersonalExerciseNote(app.activeWorkout.exercises[0])).toBe('');
         });
     });
+
+    describe('GOF-60: Workout UX | Barbell Schijven-helper (Plate Calculator) voor Halter-oefeningen', () => {
+        beforeEach(() => {
+            app.plateCalculatorState = null;
+            app.preferredBarWeight = 20;
+        });
+
+        it('1. herkent Barbell en EZ-Bar oefeningen en sluit Dumbbell, Kabel, Machine en Bodyweight oefeningen uit', () => {
+            expect(app.isBarbellExercise('Barbell Bench Press')).toBe(true);
+            expect(app.isBarbellExercise('Romanian Deadlift (RDL)')).toBe(true);
+            expect(app.isBarbellExercise('Barbell Back Squat')).toBe(true);
+            expect(app.isBarbellExercise('Overhead Press')).toBe(true);
+            expect(app.isBarbellExercise('EZ-Bar Curl')).toBe(true);
+
+            expect(app.isBarbellExercise('Dumbbell Bench Press')).toBe(false);
+            expect(app.isBarbellExercise('Dumbbell Romanian Deadlift (DB RDL)')).toBe(false);
+            expect(app.isBarbellExercise('Goblet Squat')).toBe(false);
+            expect(app.isBarbellExercise('Lat Pulldown')).toBe(false);
+            expect(app.isBarbellExercise('Leg Press')).toBe(false);
+            expect(app.isBarbellExercise('Push-Up')).toBe(false);
+
+            // EZ-Bar krijgt standaard 10 kg stanggewicht
+            expect(app.getDefaultBarWeightForExercise('EZ-Bar Skullcrusher')).toBe(10);
+            expect(app.getDefaultBarWeightForExercise('Barbell Bench Press')).toBe(20);
+        });
+
+        it('2. berekent exact de benodigde Olympische schijven per kant voor 20 kg, 15 kg en 10 kg stangen', () => {
+            // 82.5 kg met 20 kg stang -> 62.5 kg netto -> 31.25 kg per kant = 1x25 + 1x5 + 1x1.25
+            const res825 = app.calculatePlatesPerSide(82.5, 20);
+            expect(res825.perSide).toBe(31.25);
+            expect(res825.plates.map(p => `${p.count}x${p.weight}`)).toEqual(['1x25', '1x5', '1x1.25']);
+            expect(res825.remainder).toBe(0);
+
+            // 100 kg met 20 kg stang -> 80 kg netto -> 40 kg per kant = 1x25 + 1x15
+            const res100 = app.calculatePlatesPerSide(100, 20);
+            expect(res100.perSide).toBe(40);
+            expect(res100.plates.map(p => `${p.count}x${p.weight}`)).toEqual(['1x25', '1x15']);
+
+            // 55 kg met 15 kg stang -> 40 kg netto -> 20 kg per kant = 1x20
+            const res55 = app.calculatePlatesPerSide(55, 15);
+            expect(res55.perSide).toBe(20);
+            expect(res55.plates.map(p => `${p.count}x${p.weight}`)).toEqual(['1x20']);
+
+            // Alleen lege stang (20 kg)
+            const resEmpty = app.calculatePlatesPerSide(20, 20);
+            expect(resEmpty.perSide).toBe(0);
+            expect(resEmpty.plates).toEqual([]);
+        });
+
+        it('3. toont de Schijven-knop alleen bij Barbell-oefeningen, werkt de calculator live bij en vult het gewicht in bij de set', () => {
+            document.body.innerHTML = `
+                <div id="workout-exercise-list"></div>
+                <div id="modal-plate-calculator" class="modal-overlay hidden">
+                    <div class="modal-content glass-panel plate-calc-modal-content">
+                        <h3 id="plate-calc-title">Schijven-helper</h3>
+                        <p id="plate-calc-subtitle"></p>
+                        <div class="plate-bar-selector">
+                            <button type="button" class="plate-bar-btn active" data-bar-weight="20" onclick="app.setPlateCalculatorBarWeight(20)">20 kg Stang</button>
+                            <button type="button" class="plate-bar-btn" data-bar-weight="15" onclick="app.setPlateCalculatorBarWeight(15)">15 kg Stang</button>
+                            <button type="button" class="plate-bar-btn" data-bar-weight="10" onclick="app.setPlateCalculatorBarWeight(10)">10 kg EZ-Bar</button>
+                        </div>
+                        <input type="number" id="plate-calc-weight-input" value="60">
+                        <span id="plate-calc-bar-sub"></span>
+                        <span id="plate-calc-per-side-pill"></span>
+                        <div id="plate-calc-visual-stack"></div>
+                        <div id="plate-calc-breakdown-badges"></div>
+                        <div id="plate-calc-remainder-warning" class="hidden"></div>
+                        <button type="button" id="btn-apply-plate-weight" onclick="app.applyPlateCalculatorWeight()">
+                            <span id="btn-apply-plate-weight-label"></span>
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            app.activeWorkout = {
+                startTime: new Date(),
+                session: { id: 's_plate', name: 'Push' },
+                exercises: [
+                    { id: 'ex_bb', name: 'Barbell Bench Press', sets: 2, reps: '8', setsCompleted: [false, false], weights: ['80', ''], actualReps: ['8', ''] },
+                    { id: 'ex_db', name: 'Dumbbell Fly', sets: 2, reps: '12', setsCompleted: [false, false], weights: ['14', ''], actualReps: ['12', ''] }
+                ]
+            };
+
+            app.renderWorkoutExercises();
+
+            // Barbell Bench Press (index 0) heeft wél de Schijven-knop, Dumbbell Fly (index 1) niet
+            expect(document.getElementById('plate-btn-0')).not.toBeNull();
+            expect(document.getElementById('plate-set-btn-0-0')).not.toBeNull();
+            expect(document.getElementById('plate-btn-1')).toBeNull();
+            expect(document.getElementById('plate-set-btn-1-0')).toBeNull();
+
+            // Open de Schijven-helper voor Barbell Bench Press Set 1 (heeft 80 kg ingevuld)
+            app.openPlateCalculatorModal(0, 0);
+            const modal = document.getElementById('modal-plate-calculator');
+            expect(modal.classList.contains('hidden')).toBe(false);
+            expect(document.getElementById('plate-calc-subtitle').textContent).toBe('Barbell Bench Press • Set 1');
+            expect(document.getElementById('plate-calc-weight-input').value).toBe('80');
+            expect(document.getElementById('plate-calc-per-side-pill').textContent).toBe('30 kg / kant');
+            expect(document.getElementById('plate-calc-breakdown-badges').textContent).toContain('1× 25 kg');
+            expect(document.getElementById('plate-calc-breakdown-badges').textContent).toContain('1× 5 kg');
+
+            // Verhoog met +2.5 kg -> 82.5 kg (31.25 kg / kant)
+            app.adjustPlateCalculatorWeight(2.5);
+            expect(document.getElementById('plate-calc-weight-input').value).toBe('82.5');
+            expect(document.getElementById('plate-calc-per-side-pill').textContent).toBe('31.25 kg / kant');
+            expect(document.getElementById('btn-apply-plate-weight-label').textContent).toBe('Gebruik 82.5 kg voor Set 1');
+
+            // Pas toe op Set 1
+            app.applyPlateCalculatorWeight();
+            expect(modal.classList.contains('hidden')).toBe(true);
+            expect(app.activeWorkout.exercises[0].weights[0]).toBe('82.5');
+            const weightInputDom = document.querySelector('#workout-exercise-list input[data-ex="0"][data-set="0"][data-type="weight"]');
+            expect(weightInputDom.value).toBe('82.5');
+        });
+    });
 });
-
-

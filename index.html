@@ -5,7 +5,7 @@
     <!-- Zoomen niet blokkeren (WCAG 1.4.4); viewport-fit voor de iPhone-notch -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Go Fitness</title>
-    <link rel="stylesheet" href="style.css?v=35">
+    <link rel="stylesheet" href="style.css?v=36">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -864,6 +864,78 @@
                     </button>
                     <button type="button" id="btn-recap-close" class="btn-primary" data-modal-close onclick="app.hideWorkoutRecapModal()">
                         <span class="material-icons-round" aria-hidden="true">check</span> Klaar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Barbell Schijven-helper (Plate Calculator, GOF-60) -->
+        <div id="modal-plate-calculator" class="modal-overlay hidden">
+            <div class="modal-content glass-panel plate-calc-modal-content">
+                <div class="plate-calc-header">
+                    <div class="plate-calc-title-group">
+                        <span class="material-icons-round plate-calc-icon" aria-hidden="true">fitness_center</span>
+                        <div>
+                            <h3 id="plate-calc-title">Schijven-helper</h3>
+                            <p id="plate-calc-subtitle" class="text-sm text-muted"></p>
+                        </div>
+                    </div>
+                    <button type="button" class="icon-btn" data-modal-close onclick="app.hidePlateCalculatorModal()" aria-label="Sluiten">
+                        <span class="material-icons-round" aria-hidden="true">close</span>
+                    </button>
+                </div>
+
+                <div class="plate-bar-selector" role="group" aria-label="Kies gewicht van de halterstang">
+                    <button type="button" class="plate-bar-btn active" data-bar-weight="20" onclick="app.setPlateCalculatorBarWeight(20)">20 kg Stang</button>
+                    <button type="button" class="plate-bar-btn" data-bar-weight="15" onclick="app.setPlateCalculatorBarWeight(15)">15 kg Stang</button>
+                    <button type="button" class="plate-bar-btn" data-bar-weight="10" onclick="app.setPlateCalculatorBarWeight(10)">10 kg EZ-Bar</button>
+                </div>
+
+                <div class="plate-weight-stepper">
+                    <button type="button" class="plate-step-btn" onclick="app.adjustPlateCalculatorWeight(-2.5)" aria-label="2,5 kg minder">-2.5 kg</button>
+                    <div class="plate-total-display">
+                        <div class="plate-total-input-wrap">
+                            <input type="number" id="plate-calc-weight-input" class="plate-total-input" inputmode="decimal" step="0.5" min="0" value="60" oninput="app.setPlateCalculatorWeight(this.value)" aria-label="Totaal doelgewicht in kg">
+                            <span class="plate-total-unit">kg</span>
+                        </div>
+                        <span id="plate-calc-bar-sub" class="plate-total-sub">Inclusief 20 kg halterstang</span>
+                    </div>
+                    <button type="button" class="plate-step-btn" onclick="app.adjustPlateCalculatorWeight(2.5)" aria-label="2,5 kg meer">+2.5 kg</button>
+                </div>
+
+                <div class="plate-preset-chips">
+                    <button type="button" class="plate-preset-chip" onclick="app.setPlateCalculatorWeight(40)">40 kg</button>
+                    <button type="button" class="plate-preset-chip" onclick="app.setPlateCalculatorWeight(60)">60 kg</button>
+                    <button type="button" class="plate-preset-chip" onclick="app.setPlateCalculatorWeight(80)">80 kg</button>
+                    <button type="button" class="plate-preset-chip" onclick="app.setPlateCalculatorWeight(100)">100 kg</button>
+                    <button type="button" class="plate-preset-chip" onclick="app.setPlateCalculatorWeight(120)">120 kg</button>
+                    <button type="button" class="plate-preset-chip" onclick="app.setPlateCalculatorWeight(140)">140 kg</button>
+                </div>
+
+                <div class="plate-barbell-stage">
+                    <div class="plate-stage-top">
+                        <span class="plate-stage-label">Visueel per kant</span>
+                        <span id="plate-calc-per-side-pill" class="plate-per-side-pill">20 kg / kant</span>
+                    </div>
+                    <div class="plate-barbell-visual">
+                        <div class="plate-bar-shaft"></div>
+                        <div class="plate-bar-collar"></div>
+                        <div id="plate-calc-visual-stack" class="plate-visual-stack"></div>
+                        <div class="plate-bar-sleeve-end"></div>
+                    </div>
+                </div>
+
+                <div class="plate-breakdown-box">
+                    <div class="plate-breakdown-title">Schijven per kant (van binnen naar buiten):</div>
+                    <div id="plate-calc-breakdown-badges" class="plate-breakdown-badges"></div>
+                    <div id="plate-calc-remainder-warning" class="plate-remainder-warning hidden"></div>
+                </div>
+
+                <div class="modal-actions mt-4">
+                    <button type="button" class="btn-secondary" data-modal-close onclick="app.hidePlateCalculatorModal()">Sluiten</button>
+                    <button type="button" id="btn-apply-plate-weight" class="btn-primary" onclick="app.applyPlateCalculatorWeight()">
+                        <span class="material-icons-round" aria-hidden="true">check_circle</span>
+                        <span id="btn-apply-plate-weight-label">Gebruik 60 kg</span>
                     </button>
                 </div>
             </div>
