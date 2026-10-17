@@ -5569,18 +5569,37 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             `;
         });
 
-        it('toont de onboarding-kaart met de juiste tekst en 3 stappen voor nieuwe gebruikers zonder logs', () => {
+        it('toont de onboarding-kaart met de juiste tekst en stappen inclusief sessie gids voor nieuwe gebruikers', () => {
             app.renderHome();
 
             const container = document.getElementById('home-onboarding-container');
             expect(container.classList.contains('hidden')).toBe(false);
-            expect(container.innerHTML).toContain('Kies een schema, log eenvoudig je gewichten en herhalingen, en train op basis van slim spierherstel. Go');
+            expect(container.innerHTML).toContain('Kies een schema, log eenvoudig je gewichten en herhalingen, en train op basis van slim spierherstel.');
             expect(container.innerHTML).not.toContain('🚀 Welkom bij GoFitness');
             expect(container.innerHTML).toContain('Kies je schema');
+            expect(container.innerHTML).toContain('Bekijk hoe een sessie werkt');
+            expect(container.innerHTML).toContain('Open Sessie Gids');
             expect(container.innerHTML).toContain('Doe je eerste training');
             expect(container.innerHTML).toContain('Volg je herstel &amp; progressie');
             expect(container.innerHTML).toContain('Al eerder GoFitness gebruikt?');
             expect(container.innerHTML).toContain('Log in met Google Drive');
+        });
+
+        it('opent en sluit de sessie gids modal en markeert stap als gelezen', () => {
+            const modal = document.createElement('div');
+            modal.id = 'modal-session-guide';
+            modal.className = 'modal-overlay hidden';
+            document.body.appendChild(modal);
+
+            app.renderHome();
+            expect(localStorage.getItem('gof_session_guide_viewed')).toBeNull();
+
+            app.showSessionGuideModal();
+            expect(localStorage.getItem('gof_session_guide_viewed')).toBe('1');
+            expect(modal.classList.contains('hidden')).toBe(false);
+
+            app.hideSessionGuideModal();
+            expect(modal.classList.contains('hidden')).toBe(true);
         });
 
         it('verbergt de onboarding-kaart wanneer dismissOnboarding wordt aangeroepen', () => {

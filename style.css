@@ -4291,3 +4291,92 @@ textarea:focus-visible,
     white-space: nowrap;
 }
 
+/* --- Sessie Gids Modal (Onboarding & In-Workout Help) --- */
+.session-guide-modal-content {
+    max-width: 520px;
+    width: 100%;
+    max-height: 88vh;
+    max-height: 88dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.session-guide-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.session-guide-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.session-guide-icon-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: rgba(37, 99, 235, 0.15);
+    color: var(--accent-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.session-guide-scroll {
+    overflow-y: auto;
+    padding-right: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+}
+
+.session-guide-card {
+    background: var(--card-bg, rgba(255, 255, 255, 0.03));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+
+.session-guide-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 0.92rem;
+    color: var(--text-primary);
+}
+
+.session-guide-bullets {
+    margin: 0;
+    padding-left: 18px;
+    list-style-type: disc;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.session-guide-bullets li strong {
+    color: var(--text-primary);
+}
+
+.session-guide-bullets code,
+.session-guide-bullets kbd {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-color);
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.75rem;
+}
+
+
