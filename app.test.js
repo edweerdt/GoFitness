@@ -6413,4 +6413,132 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(cssContent).toMatch(/#btn-start-session\s*\{[^}]*border-radius:\s*12px;/);
         });
     });
+
+    describe('GOF-58: Mobile UX Fase 3 | Native Bottom Sheets voor Modals, Haptische Feedback & Mobiel Toetsenbord Ergonomie', () => {
+        it('bevat @media (max-width: 640px) bottom-sheet styling met drag-handle en 90dvh max-height in style.css', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const cssContent = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+
+            expect(cssContent).toContain('@media (max-width: 640px)');
+            expect(cssContent).toContain('align-items: flex-end;');
+            expect(cssContent).toContain('max-height: 90dvh !important;');
+            expect(cssContent).toContain('border-radius: 24px 24px 0 0 !important;');
+            expect(cssContent).toMatch(/\.modal-content::before\s*\{[^}]*width:\s*38px;/);
+            expect(cssContent).toMatch(/\.modal-content::before\s*\{[^}]*height:\s*4px;/);
+        });
+
+        it('sluit de bovenste open modal bij backdrop-tap en bij swipe-down vanaf de bovenrand', () => {
+            document.body.innerHTML = `
+                <div id="modal-test-sheet" class="modal-overlay">
+                    <div id="sheet-content" class="modal-content glass-panel">
+                        <h3>Test Bottom Sheet</h3>
+                        <button type="button" id="sheet-close-btn" data-modal-close onclick="document.getElementById('modal-test-sheet').classList.add('hidden')">Sluiten</button>
+                    </div>
+                </div>
+            `;
+
+            app.setupModalSheetInteractions();
+
+            const overlay = document.getElementById('modal-test-sheet');
+            const sheet = document.getElementById('sheet-content');
+
+            // 1. Backdrop-tap op .modal-overlay sluit de modal
+            overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            expect(overlay.classList.contains('hidden')).toBe(true);
+
+            // Heropen modal voor swipe-down test
+            overlay.classList.remove('hidden');
+            sheet.scrollTop = 0;
+
+            const startEvent = new Event('touchstart', { bubbles: true });
+            startEvent.touches = [{ clientX: 180, clientY: 100 }];
+            sheet.dispatchEvent(startEvent);
+
+            const moveEvent = new Event('touchmove', { bubbles: true });
+            moveEvent.touches = [{ clientX: 182, clientY: 210 }]; // deltaY = +110px (> 70px drempel)
+            sheet.dispatchEvent(moveEvent);
+            expect(sheet.style.transform).toContain('translateY(');
+
+            const endEvent = new Event('touchend', { bubbles: true });
+            sheet.dispatchEvent(endEvent);
+
+            expect(sheet.style.transform).toBe('');
+            expect(overlay.classList.contains('hidden')).toBe(true);
+        });
+
+        it('activeert subtiele haptische feedback bij set afvinken (normaal vs. PR/overload) en bij finishWorkout', () => {
+            const vibrateMock = jest.fn();
+            Object.defineProperty(navigator, 'vibrate', {
+                value: vibrateMock,
+                configurable: true,
+                writable: true
+            });
+
+            store.logs = [
+                {
+                    id: 'log_prev',
+                    date: new Date(Date.now() - 86400000 * 3).toISOString(),
+                    exercises: [
+                        {
+                            name: 'Bench Press',
+                            setsCompleted: 2,
+                            details: [
+                                { setNumber: 1, weight: '80', reps: '8' },
+                                { setNumber: 2, weight: '80', reps: '8' }
+                            ]
+                        }
+                    ]
+                }
+            ];
+
+            app.activeWorkout = {
+                startTime: new Date(Date.now() - 1800000),
+                session: { id: 's_hap', name: 'Upper Body' },
+                exercises: [
+                    {
+                        id: 'ex_bp',
+                        name: 'Bench Press',
+                        sets: 2,
+                        reps: '8',
+                        setsCompleted: [false, false],
+                        weights: ['80', '85'],
+                        actualReps: ['8', '8']
+                    }
+                ]
+            };
+
+            document.body.innerHTML = `<div id="workout-exercise-list"></div>`;
+
+            // Set 1: gelijke prestatie (80kg x 8) -> normale haptische tik (15ms)
+            app.toggleSet(0, 0);
+            expect(vibrateMock).toHaveBeenLastCalledWith(15);
+
+            // Set 2: zwaarder gewicht (85kg x 8 vs 80kg x 8) -> PR/Overload dubbele puls ([25, 40, 35])
+            app.toggleSet(0, 1);
+            expect(vibrateMock).toHaveBeenLastCalledWith([25, 40, 35]);
+
+            // Workout afronden -> finish puls ([30, 50, 60])
+            app.finishWorkout();
+            expect(vibrateMock).toHaveBeenCalledWith([30, 50, 60]);
+        });
+
+        it('scrollt een gefocust invoerveld binnen .modal-content automatisch in beeld (scrollIntoView)', () => {
+            document.body.innerHTML = `
+                <div id="modal-add-exercise" class="modal-overlay">
+                    <div class="modal-content">
+                        <input type="text" id="new-ex-name" class="input-field" />
+                    </div>
+                </div>
+            `;
+
+            app.setupModalSheetInteractions();
+            const input = document.getElementById('new-ex-name');
+            input.scrollIntoView = jest.fn();
+
+            input.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+            expect(input.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', behavior: 'smooth' });
+        });
+    });
 });
+
