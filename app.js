@@ -8181,18 +8181,21 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (statsEl) {
             const volText = data.totalVolumeKg > 0 ? `${data.totalVolumeKg.toLocaleString('nl-NL')} kg` : `${data.exercisesCompleted}`;
             const volLabel = data.totalVolumeKg > 0 ? 'Volume' : 'Oefeningen';
+            const safeDuration = this.escapeHTML(String(data.duration));
+            const safeSetsCompleted = this.escapeHTML(String(data.setsCompleted));
+            const safeVolLabel = this.escapeHTML(String(volLabel));
             statsEl.innerHTML = `
                 <div class="workout-recap-stat-card">
-                    <span class="workout-recap-stat-val">${data.duration}m</span>
+                    <span class="workout-recap-stat-val">${safeDuration}m</span>
                     <span class="workout-recap-stat-lbl">Duur</span>
                 </div>
                 <div class="workout-recap-stat-card">
-                    <span class="workout-recap-stat-val">${data.setsCompleted}</span>
+                    <span class="workout-recap-stat-val">${safeSetsCompleted}</span>
                     <span class="workout-recap-stat-lbl">Sets</span>
                 </div>
                 <div class="workout-recap-stat-card">
                     <span class="workout-recap-stat-val">${this.escapeHTML(String(volText))}</span>
-                    <span class="workout-recap-stat-lbl">${volLabel}</span>
+                    <span class="workout-recap-stat-lbl">${safeVolLabel}</span>
                 </div>
             `;
         }
