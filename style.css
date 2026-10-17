@@ -662,7 +662,13 @@ button:disabled {
 }
 
 #btn-start-session {
+    width: 100%;
     min-height: 52px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
 .btn-primary:active { transform: scale(0.98); background: var(--accent-hover); }

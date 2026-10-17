@@ -6393,6 +6393,24 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(badgeEl.classList.contains('all-done')).toBe(true);
         });
     });
+
+    describe('GOF-57: Home | Startknop (#btn-start-session) over de volledige breedte conform UX mock-up', () => {
+        it('stelt #btn-start-session in op volledige breedte (w-full / width: 100%) en min-height: 52px in index.html en style.css', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const htmlContent = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+            const cssContent = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlContent, 'text/html');
+            const startBtn = doc.getElementById('btn-start-session');
+            expect(startBtn).not.toBeNull();
+            expect(startBtn.classList.contains('w-full')).toBe(true);
+            expect(startBtn.classList.contains('btn-primary')).toBe(true);
+
+            expect(cssContent).toMatch(/#btn-start-session\s*\{[^}]*width:\s*100%;/);
+            expect(cssContent).toMatch(/#btn-start-session\s*\{[^}]*min-height:\s*52px;/);
+            expect(cssContent).toMatch(/#btn-start-session\s*\{[^}]*border-radius:\s*12px;/);
+        });
+    });
 });
-
-
