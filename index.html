@@ -104,7 +104,7 @@
                             <span id="workout-sets-badge" class="workout-sets-badge" title="Voltooide sets" aria-label="Voltooide sets">0 / 0 sets</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:6px;">
-                            <button class="icon-btn" onclick="app.showSessionGuideModal()" title="Sessie Gids &amp; Uitleg" aria-label="Sessie Gids &amp; Uitleg">
+                            <button class="icon-btn" onclick="app.openSessionGuide('workout')" title="Sessie Gids &amp; Uitleg" aria-label="Sessie Gids &amp; Uitleg">
                                 <span class="material-icons-round">help_outline</span>
                             </button>
                             <button class="icon-btn theme-toggle-btn" onclick="app.showThemeModal()" title="Thema en kleuren aanpassen" aria-label="Thema en kleuren aanpassen">
@@ -276,6 +276,540 @@
                 </header>
                 <div class="content-padded pb-32" id="friends-container">
                     <!-- Injected by JS (FriendsManager / app.renderFriends) -->
+                </div>
+            </section>
+
+            <!-- Session Guide View (Complete Visuele Handleiding) -->
+            <section id="view-guide" class="view">
+                <header class="top-nav" style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <button type="button" class="icon-btn" onclick="app.closeSessionGuide()" aria-label="Terug" title="Terug">
+                            <span class="material-icons-round">arrow_back</span>
+                        </button>
+                        <h2 style="margin:0; font-size:1.25rem;">Sessie Gids</h2>
+                    </div>
+                    <button type="button" class="btn-secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="app.closeSessionGuide()">
+                        Sluiten
+                    </button>
+                </header>
+
+                <div class="content-padded pb-32 guide-container">
+                    <!-- Welkomstkaart -->
+                    <div class="glass-panel guide-welcome-card mb-4">
+                        <div class="status-badge" style="display:inline-flex; align-items:center; gap:6px; padding:3px 10px; font-size:0.75rem; background:rgba(37,99,235,0.15); color:var(--accent-color); border:1px solid rgba(59,130,246,0.3); border-radius:999px; margin-bottom:8px;">
+                            <span class="material-icons-round" style="font-size:1rem;">menu_book</span>
+                            <span>GoFitness Handleiding</span>
+                        </div>
+                        <h3 style="margin:0 0 6px 0; font-size:1.4rem; color:var(--text-primary); text-transform:none;">Welkom bij GoFitness</h3>
+                        <p class="text-sm text-muted" style="margin:0; line-height:1.5;">
+                            In deze gids vind je een overzicht van alle handige functies die je kunt gebruiken tijdens een trainingssessie. Bekijk hieronder hoe je sets logt, de rusttimer en Plate Calculator gebruikt, en hoe je eenvoudig oefeningen wisselt als een toestel in de gym bezet is.
+                        </p>
+                    </div>
+
+                    <!-- Category Filter Bar -->
+                    <div class="guide-category-nav" id="guide-category-filter">
+                        <button type="button" onclick="app.filterGuideCategory('all')" class="guide-cat-btn active" data-cat="all">
+                            <span class="material-icons-round" style="font-size:1rem;">dashboard</span> Alle Features
+                        </button>
+                        <button type="button" onclick="app.filterGuideCategory('tracking')" class="guide-cat-btn" data-cat="tracking">
+                            <span class="material-icons-round" style="font-size:1rem;">edit_note</span> Sets &amp; Gewichten
+                        </button>
+                        <button type="button" onclick="app.filterGuideCategory('timers')" class="guide-cat-btn" data-cat="timers">
+                            <span class="material-icons-round" style="font-size:1rem;">timer</span> Rust- &amp; Hold-Timers
+                        </button>
+                        <button type="button" onclick="app.filterGuideCategory('plate-calc')" class="guide-cat-btn" data-cat="plate-calc">
+                            <span class="material-icons-round" style="font-size:1rem;">fitness_center</span> Plate Calculator
+                        </button>
+                        <button type="button" onclick="app.filterGuideCategory('flexibility')" class="guide-cat-btn" data-cat="flexibility">
+                            <span class="material-icons-round" style="font-size:1rem;">swap_horiz</span> Wisselen &amp; Volgorde
+                        </button>
+                        <button type="button" onclick="app.filterGuideCategory('coaching')" class="guide-cat-btn" data-cat="coaching">
+                            <span class="material-icons-round" style="font-size:1rem;">auto_awesome</span> Progressie &amp; Recap
+                        </button>
+                    </div>
+
+                    <!-- Interactive Tour Section -->
+                    <div class="glass-panel p-4 mb-6 guide-interactive-section">
+                        <!-- Left: Mockup Telefoon -->
+                        <div class="guide-phone-shell">
+                            <div class="guide-phone-notch"></div>
+
+                            <!-- Mockup Header -->
+                            <div class="guide-mockup-header">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span class="material-icons-round text-muted" style="font-size:1rem;">close</span>
+                                    <div style="text-align:center;">
+                                        <div style="font-weight:700; font-size:0.75rem; color:var(--text-primary);">Full Body A</div>
+                                        <div style="font-size:0.68rem; color:var(--text-muted); display:flex; align-items:center; justify-content:center; gap:6px;">
+                                            <span style="color:var(--accent-color);">⏱ 24:18</span>
+                                            <span>•</span>
+                                            <span style="color:var(--status-green);">6 / 12 sets</span>
+                                        </div>
+                                    </div>
+                                    <span class="material-icons-round text-muted" style="font-size:1rem;">palette</span>
+                                </div>
+                                <div style="width:100%; height:4px; background:rgba(255,255,255,0.1); border-radius:99px; margin-top:6px; overflow:hidden;">
+                                    <div style="width:50%; height:100%; background:var(--accent-color); border-radius:99px;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Mockup Timer Chip -->
+                            <div class="guide-mockup-timer" onclick="app.showGuideSpotlight('timer')" title="Klik om Rusttimer uitleg te bekijken">
+                                <div style="display:flex; align-items:center; gap:6px; font-size:0.78rem; font-weight:700; color:var(--accent-color);">
+                                    <span class="material-icons-round" style="font-size:1rem;">timer</span>
+                                    <span>Rust: 0:45</span>
+                                </div>
+                                <div style="display:flex; gap:4px;">
+                                    <span class="status-badge" style="font-size:0.62rem; padding:1px 5px; background:rgba(37,99,235,0.2); color:var(--accent-color);">-15s</span>
+                                    <span class="status-badge" style="font-size:0.62rem; padding:1px 5px; background:rgba(37,99,235,0.2); color:var(--accent-color);">+30s</span>
+                                    <span class="status-badge" style="font-size:0.62rem; padding:1px 5px; background:rgba(255,255,255,0.1);">Skip</span>
+                                </div>
+                            </div>
+
+                            <!-- Mockup Card -->
+                            <div class="guide-mockup-card">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                                    <div>
+                                        <div style="display:inline-flex; align-items:center; gap:4px; background:rgba(37,99,235,0.15); border:1px solid rgba(59,130,246,0.3); border-radius:999px; padding:2px 8px; font-size:0.72rem; font-weight:700; color:var(--text-primary);">
+                                            <span class="material-icons-round" style="font-size:0.85rem; color:var(--accent-color);">fitness_center</span>
+                                            <span>Barbell Bench Press</span>
+                                        </div>
+                                        <div class="text-sm text-muted" style="font-size:0.68rem; margin-top:2px;">Borst • 3 sets • 8-10 reps • 90s rust</div>
+                                    </div>
+                                    <div style="display:flex; gap:3px;">
+                                        <button type="button" class="btn-secondary" style="padding:2px 6px; font-size:0.65rem;" onclick="app.showGuideSpotlight('swap')">Wissel</button>
+                                        <button type="button" class="btn-secondary" style="padding:2px 6px; font-size:0.65rem;" onclick="app.showGuideSpotlight('note')">
+                                            <span class="material-icons-round" style="font-size:0.75rem;">sticky_note_2</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Sticky Note Strip -->
+                                <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); border-radius:8px; padding:4px 8px; font-size:0.68rem; color:#fde68a; margin-bottom:6px; cursor:pointer;" onclick="app.showGuideSpotlight('note')">
+                                    📝 Stoelhoogte stand 4 of Incline stand 2
+                                </div>
+
+                                <!-- Overload Hint -->
+                                <div style="background:rgba(6,182,212,0.12); border:1px solid rgba(6,182,212,0.3); border-radius:8px; padding:4px 8px; font-size:0.68rem; color:#a5f3fc; margin-bottom:8px; cursor:pointer;" onclick="app.showGuideSpotlight('overload')">
+                                    📈 Haalde je overal het maximale aantal reps? Verhoog het gewicht.
+                                </div>
+
+                                <!-- Set Rows -->
+                                <div style="display:flex; flex-direction:column; gap:5px;">
+                                    <!-- Set 1 (PR) -->
+                                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.3); padding:4px 6px; border-radius:8px; border:1px solid var(--border-color);">
+                                        <span style="font-size:0.7rem; font-weight:600; color:var(--text-muted);">Set 1</span>
+                                        <div style="display:flex; align-items:center; gap:4px;">
+                                            <span style="font-size:0.72rem; font-weight:700; background:rgba(0,0,0,0.4); border:1px solid var(--border-color); padding:2px 6px; border-radius:6px;">82.5</span>
+                                            <span style="font-size:0.72rem; font-weight:700; background:rgba(0,0,0,0.4); border:1px solid var(--border-color); padding:2px 6px; border-radius:6px;">10</span>
+                                            <span class="check-btn checked-pr" style="width:24px; height:24px; font-size:0.8rem; display:flex; align-items:center; justify-content:center; border-radius:6px; background:#f59e0b; color:#000;">★</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Set 2 (Plate Calc trigger) -->
+                                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.3); padding:4px 6px; border-radius:8px; border:1px solid rgba(59,130,246,0.4);">
+                                        <span style="font-size:0.7rem; font-weight:600; color:var(--text-muted);">Set 2</span>
+                                        <div style="display:flex; align-items:center; gap:4px;">
+                                            <div style="position:relative; display:flex; align-items:center;">
+                                                <span style="font-size:0.72rem; font-weight:700; background:rgba(0,0,0,0.4); border:1px solid var(--border-color); padding:2px 14px 2px 6px; border-radius:6px;">82.5</span>
+                                                <button type="button" style="position:absolute; right:2px; background:var(--accent-color); color:#fff; border:none; border-radius:4px; padding:1px 3px; cursor:pointer;" onclick="app.showGuideSpotlight('plate-calc')">
+                                                    <span class="material-icons-round" style="font-size:0.75rem;">fitness_center</span>
+                                                </button>
+                                            </div>
+                                            <span style="font-size:0.72rem; font-weight:700; background:rgba(0,0,0,0.4); border:1px solid var(--border-color); padding:2px 6px; border-radius:6px;">10</span>
+                                            <span class="check-btn checked" style="width:24px; height:24px; font-size:0.8rem; display:flex; align-items:center; justify-content:center; border-radius:6px; background:var(--status-green); color:#fff;">✓</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Set 3 -->
+                                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.3); padding:4px 6px; border-radius:8px; border:1px solid var(--border-color);">
+                                        <span style="font-size:0.7rem; font-weight:600; color:var(--text-muted);">Set 3</span>
+                                        <div style="display:flex; align-items:center; gap:4px;">
+                                            <span style="font-size:0.72rem; color:var(--text-muted); background:rgba(0,0,0,0.4); border:1px solid var(--border-color); padding:2px 6px; border-radius:6px;">82.5</span>
+                                            <span style="font-size:0.72rem; color:var(--text-muted); background:rgba(0,0,0,0.4); border:1px solid var(--border-color); padding:2px 6px; border-radius:6px;">reps</span>
+                                            <span class="check-btn" style="width:24px; height:24px; font-size:0.8rem; display:flex; align-items:center; justify-content:center; border-radius:6px; border:1px solid var(--border-color);"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Spotlight Detail Box -->
+                        <div>
+                            <div class="guide-spotlight-pills">
+                                <button type="button" class="guide-spot-pill active" onclick="app.showGuideSpotlight('plate-calc', this)">🏋️ Plate Calculator</button>
+                                <button type="button" class="guide-spot-pill" onclick="app.showGuideSpotlight('timer', this)">⏱️ Rusttimer</button>
+                                <button type="button" class="guide-spot-pill" onclick="app.showGuideSpotlight('swap', this)">🔄 Oefening Wisselen</button>
+                                <button type="button" class="guide-spot-pill" onclick="app.showGuideSpotlight('note', this)">📝 Sticky Notes</button>
+                                <button type="button" class="guide-spot-pill" onclick="app.showGuideSpotlight('overload', this)">📈 Progressive Overload</button>
+                                <button type="button" class="guide-spot-pill" onclick="app.showGuideSpotlight('hold', this)">⏳ Hold Timer</button>
+                                <button type="button" class="guide-spot-pill" onclick="app.showGuideSpotlight('reorder', this)">⬆️ Volgorde Verschuiven</button>
+                                <button type="button" class="guide-spot-pill" onclick="app.showGuideSpotlight('recap', this)">🏆 Workout Recap</button>
+                            </div>
+
+                            <div id="guide-spotlight-card" class="guide-spotlight-detail-card">
+                                <h3 id="guide-spotlight-title" style="margin:0 0 4px 0; font-size:1.3rem; color:var(--text-primary); text-transform:none;">Plate Calculator</h3>
+                                <p id="guide-spotlight-desc" class="text-sm text-muted" style="margin:0 0 16px 0;">Bepaal makkelijk welke schijven je nodig hebt.</p>
+                                <div style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; font-weight:700; color:var(--accent-color); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                                    <span class="material-icons-round" style="font-size:0.95rem;">info</span>
+                                    <span>Hoe het werkt</span>
+                                </div>
+                                <ul id="guide-spotlight-bullets" class="session-guide-bullets" style="padding-left:18px;">
+                                    <!-- Injected by JS -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Mini Tools Section -->
+                    <div class="guide-tools-grid">
+                        <!-- Tool 1: Plate Calculator Live Demo -->
+                        <div class="glass-panel guide-tool-card">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span class="material-icons-round text-accent" style="font-size:1.4rem;">fitness_center</span>
+                                    <div>
+                                        <h4 style="margin:0; font-size:1rem; text-transform:none; color:var(--text-primary);">Plate Calculator</h4>
+                                        <div class="text-xs text-muted">Bepaal makkelijk welke schijven je nodig hebt</div>
+                                    </div>
+                                </div>
+                                <span class="status-badge" style="padding:2px 8px; font-size:0.7rem; background:rgba(37,99,235,0.15); color:var(--accent-color);">Live Demo</span>
+                            </div>
+
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                                <span class="text-xs text-muted">Gewicht:</span>
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <input type="number" id="guide-plate-input" value="85" step="2.5" min="20" style="width:70px; text-align:center; padding:4px 6px; font-weight:700; font-size:0.95rem; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); border-radius:8px; color:var(--text-primary);" oninput="app.calcGuideDemoPlates()">
+                                    <span class="text-xs text-muted" style="font-weight:700;">kg</span>
+                                </div>
+                            </div>
+
+                            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+                                <button type="button" class="btn-secondary" style="padding:3px 8px; font-size:0.75rem;" onclick="app.setGuideDemoWeight(60)">60 kg</button>
+                                <button type="button" class="btn-secondary" style="padding:3px 8px; font-size:0.75rem;" onclick="app.setGuideDemoWeight(80)">80 kg</button>
+                                <button type="button" class="btn-primary" style="padding:3px 8px; font-size:0.75rem;" onclick="app.setGuideDemoWeight(85)">85 kg</button>
+                                <button type="button" class="btn-secondary" style="padding:3px 8px; font-size:0.75rem;" onclick="app.setGuideDemoWeight(100)">100 kg</button>
+                                <button type="button" class="btn-secondary" style="padding:3px 8px; font-size:0.75rem;" onclick="app.setGuideDemoWeight(120)">120 kg</button>
+                            </div>
+
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:0.75rem;">
+                                <span class="text-muted">Stang:</span>
+                                <div style="display:flex; gap:4px;">
+                                    <button type="button" id="guide-bar-20" class="btn-primary" style="padding:2px 8px; font-size:0.72rem;" onclick="app.setGuideDemoBar(20)">20 kg Olympisch</button>
+                                    <button type="button" id="guide-bar-15" class="btn-secondary" style="padding:2px 8px; font-size:0.72rem;" onclick="app.setGuideDemoBar(15)">15 kg</button>
+                                    <button type="button" id="guide-bar-10" class="btn-secondary" style="padding:2px 8px; font-size:0.72rem;" onclick="app.setGuideDemoBar(10)">10 kg EZ</button>
+                                </div>
+                            </div>
+
+                            <div style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); border-radius:12px; padding:10px 12px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; font-weight:700; margin-bottom:6px;">
+                                    <span class="text-muted">Schijven per kant:</span>
+                                    <span id="guide-plates-perside-text" style="color:var(--accent-color);">32.5 kg / kant</span>
+                                </div>
+                                <div id="guide-plates-badges-row" style="display:flex; gap:6px; flex-wrap:wrap; min-height:28px; align-items:center;">
+                                    <!-- Injected by JS -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tool 2: Rusttimer Live Demo -->
+                        <div class="glass-panel guide-tool-card">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span class="material-icons-round" style="font-size:1.4rem; color:var(--status-green);">timer</span>
+                                    <div>
+                                        <h4 style="margin:0; font-size:1rem; text-transform:none; color:var(--text-primary);">Rusttimer</h4>
+                                        <div class="text-xs text-muted">Past zich direct aan met snelle chips</div>
+                                    </div>
+                                </div>
+                                <span class="status-badge" style="padding:2px 8px; font-size:0.7rem; background:rgba(52,211,153,0.15); color:var(--status-green);">Live Demo</span>
+                            </div>
+
+                            <div style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); border-radius:14px; padding:16px; text-align:center; margin-bottom:12px;">
+                                <div class="text-xs text-muted" style="margin-bottom:2px;">Resterende Rusttijd</div>
+                                <div id="guide-timer-display" style="font-size:2.2rem; font-weight:800; font-variant-numeric:tabular-nums; color:var(--status-green);">01:30</div>
+                                <div id="guide-timer-status" class="text-xs text-muted" style="margin-top:2px;">Start zodra je een set afvinkt</div>
+                            </div>
+
+                            <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px; margin-bottom:10px;">
+                                <button type="button" class="btn-secondary" style="padding:6px 0; font-size:0.78rem;" onclick="app.adjustGuideDemoTimer(-15)">-15s</button>
+                                <button type="button" class="btn-secondary" style="padding:6px 0; font-size:0.78rem;" onclick="app.adjustGuideDemoTimer(30)">+30s</button>
+                                <button type="button" id="btn-guide-timer-toggle" class="btn-primary" style="padding:6px 0; font-size:0.78rem;" onclick="app.toggleGuideDemoTimer()">Start</button>
+                                <button type="button" class="btn-secondary" style="padding:6px 0; font-size:0.78rem;" onclick="app.resetGuideDemoTimer()">Skip</button>
+                            </div>
+
+                            <div style="display:flex; align-items:center; gap:8px; font-size:0.75rem; color:var(--text-muted); padding:6px 10px; background:rgba(0,0,0,0.2); border-radius:8px;">
+                                <span class="material-icons-round text-accent" style="font-size:1rem;">lock_clock</span>
+                                <span>Loopt synchroon door met Date.now(), ook wanneer je telefoon vergrendeld is.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- All 12 Feature Cards in Detail -->
+                    <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="margin:0; font-size:1.2rem; text-transform:none; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                            <span class="material-icons-round text-accent">view_carousel</span>
+                            <span>Alle Sessie Features in Detail</span>
+                        </h3>
+                    </div>
+
+                    <div class="guide-cards-grid" id="guide-feature-cards">
+                        <!-- Card 1 -->
+                        <div class="glass-panel guide-feature-card" data-category="tracking">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="material-icons-round text-accent" style="font-size:1.3rem;">edit_note</span>
+                                    <span class="status-badge" style="font-size:0.7rem;">Basis</span>
+                                </div>
+                                <h4 style="margin:0 0 6px 0; font-size:0.98rem; text-transform:none; color:var(--text-primary);">Set Invoer &amp; Placeholders</h4>
+                                <p class="text-sm text-muted" style="margin:0; font-size:0.8rem; line-height:1.45;">
+                                    Vorige gewichten en herhalingen staan lichtgrijs in elk vakje. Druk op <kbd>Enter</kbd> om direct door te springen naar de herhalingen.
+                                </p>
+                            </div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:0.75rem; color:var(--accent-color); display:flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:0.9rem;">check_circle</span>
+                                <span>Sets vinken zichzelf automatisch af na invoer</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 2 -->
+                        <div class="glass-panel guide-feature-card" data-category="plate-calc">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="material-icons-round" style="font-size:1.3rem; color:#ef4444;">fitness_center</span>
+                                    <span class="status-badge" style="font-size:0.7rem; background:rgba(239,68,68,0.15); color:#ef4444;">Halters</span>
+                                </div>
+                                <h4 style="margin:0 0 6px 0; font-size:0.98rem; text-transform:none; color:var(--text-primary);">Plate Calculator</h4>
+                                <p class="text-sm text-muted" style="margin:0; font-size:0.8rem; line-height:1.45;">
+                                    Bepaal makkelijk welke schijven je nodig hebt. Tik op het halter-icoontje naast het gewicht of op "Schijven". De app splitst je gewicht automatisch uit per kant in officiële Olympische kleuren.
+                                </p>
+                            </div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:0.75rem; color:#ef4444; display:flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:0.9rem;">bolt</span>
+                                <span>Met één tik overnemen naar je actieve set</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 3 -->
+                        <div class="glass-panel guide-feature-card" data-category="timers">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="material-icons-round" style="font-size:1.3rem; color:var(--status-green);">timer</span>
+                                    <span class="status-badge" style="font-size:0.7rem; background:rgba(52,211,153,0.15); color:var(--status-green);">Automatisch</span>
+                                </div>
+                                <h4 style="margin:0 0 6px 0; font-size:0.98rem; text-transform:none; color:var(--text-primary);">Rusttimer</h4>
+                                <p class="text-sm text-muted" style="margin:0; font-size:0.8rem; line-height:1.45;">
+                                    Start vanzelf zodra je een set afrondt. Met snelle knoppen pas je direct <code>-15s</code> of <code>+30s</code> toe, of sla je de rust over met Skip.
+                                </p>
+                            </div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:0.75rem; color:var(--status-green); display:flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:0.9rem;">vibration</span>
+                                <span>Haptische trilling bij einde rusttijd</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 4 -->
+                        <div class="glass-panel guide-feature-card" data-category="flexibility">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="material-icons-round" style="font-size:1.3rem; color:#818cf8;">swap_horiz</span>
+                                    <span class="status-badge" style="font-size:0.7rem;">Flexibiliteit</span>
+                                </div>
+                                <h4 style="margin:0 0 6px 0; font-size:0.98rem; text-transform:none; color:var(--text-primary);">Oefening Wisselen</h4>
+                                <p class="text-sm text-muted" style="margin:0; font-size:0.8rem; line-height:1.45;">
+                                    Is een apparaat bezet? Tik op "Wissel". De app toont direct gelijkwaardige alternatieven die dezelfde spiergroep aanspreken (bijv. van Barbell Squat naar Leg Press).
+                                </p>
+                            </div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:0.75rem; color:#818cf8; display:flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:0.9rem;">speed</span>
+                                <span>Directe wisselstrip onder de oefening</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 5 -->
+                        <div class="glass-panel guide-feature-card" data-category="tracking">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="material-icons-round" style="font-size:1.3rem; color:#f59e0b;">sticky_note_2</span>
+                                    <span class="status-badge" style="font-size:0.7rem; background:rgba(245,158,11,0.15); color:#f59e0b;">Notities</span>
+                                </div>
+                                <h4 style="margin:0 0 6px 0; font-size:0.98rem; text-transform:none; color:var(--text-primary);">Sticky Notes</h4>
+                                <p class="text-sm text-muted" style="margin:0; font-size:0.8rem; line-height:1.45;">
+                                    Sla apparaat-instellingen op per oefening via "Notitie". Ideaal voor "Stoelhoogte stand 4" of "Incline stand 2". Blijft automatisch bewaard voor volgende sessies.
+                                </p>
+                            </div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:0.75rem; color:#f59e0b; display:flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:0.9rem;">bookmark</span>
+                                <span>Blijft bewaard voor toekomstige sessies</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 6 -->
+                        <div class="glass-panel guide-feature-card" data-category="coaching">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="material-icons-round" style="font-size:1.3rem; color:#06b6d4;">trending_up</span>
+                                    <span class="status-badge" style="font-size:0.7rem; background:rgba(6,182,212,0.15); color:#06b6d4;">Progressie</span>
+                                </div>
+                                <h4 style="margin:0 0 6px 0; font-size:0.98rem; text-transform:none; color:var(--text-primary);">Progressive Overload</h4>
+                                <p class="text-sm text-muted" style="margin:0; font-size:0.8rem; line-height:1.45;">
+                                    Automatische suggestie: Haalde je overal het maximale aantal herhalingen? Dan stelt de app voor om het gewicht te verhogen.
+                                </p>
+                            </div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:0.75rem; color:#06b6d4; display:flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:0.9rem;">military_tech</span>
+                                <span>Advies op basis van je vorige training</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 7 -->
+                        <div class="glass-panel guide-feature-card" data-category="timers">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="material-icons-round" style="font-size:1.3rem; color:#a855f7;">hourglass_top</span>
+                                    <span class="status-badge" style="font-size:0.7rem;">Isometrisch</span>
+                                </div>
+                                <h4 style="margin:0 0 6px 0; font-size:0.98rem; text-transform:none; color:var(--text-primary);">Hold Timer</h4>
+                                <p class="text-sm text-muted" style="margin:0; font-size:0.8rem; line-height:1.45;">
+                                    Bij planks of wall-sits start de Hold Timer met 1 tot 5 seconden startvertraging. De stopwatch kleurt geel als je binnen 10s van je record bent, en groen zodra je je record breekt!
+                                </p>
+                            </div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:0.75rem; color:#a855f7; display:flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:0.9rem;">smart_toy</span>
+                                <span>Vult automatisch je behaalde seconden in</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 8 -->
+                        <div class="glass-panel guide-feature-card" data-category="flexibility">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="material-icons-round" style="font-size:1.3rem; color:#f43f5e;">low_priority</span>
+                                    <span class="status-badge" style="font-size:0.7rem;">Volgorde</span>
+                                </div>
+                                <h4 style="margin:0 0 6px 0; font-size:0.98rem; text-transform:none; color:var(--text-primary);">Volgorde Verschuiven</h4>
+                                <p class="text-sm text-muted" style="margin:0; font-size:0.8rem; line-height:1.45;">
+                                    Tik op het pijltje omlaag <code>⬇️</code> om eerst een andere oefening te doen als een toestel bezet is. Met het prullenbakje verwijder je een oefening alleen uit de huidige sessie.
+                                </p>
+                            </div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:0.75rem; color:#f43f5e; display:flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:0.9rem;">published_with_changes</span>
+                                <span>Heeft geen invloed op je opgeslagen basisschema</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 9 -->
+                        <div class="glass-panel guide-feature-card" data-category="tracking">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="material-icons-round" style="font-size:1.3rem; color:#14b8a6;">search</span>
+                                    <span class="status-badge" style="font-size:0.7rem;">Techniek</span>
+                                </div>
+                                <h4 style="margin:0 0 6px 0; font-size:0.98rem; text-transform:none; color:var(--text-primary);">Video Zoekknop (🔍)</h4>
+                                <p class="text-sm text-muted" style="margin:0; font-size:0.8rem; line-height:1.45;">
+                                    Tik op het vergrootglas-icoontje naast de oefeningnaam om direct een demonstratie of instructievideo van de juiste techniek te bekijken.
+                                </p>
+                            </div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:0.75rem; color:#14b8a6; display:flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:0.9rem;">play_circle</span>
+                                <span>Directe techniek-controle</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 10 -->
+                        <div class="glass-panel guide-feature-card" data-category="timers">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="material-icons-round" style="font-size:1.3rem; color:#f97316;">stay_current_portrait</span>
+                                    <span class="status-badge" style="font-size:0.7rem;">Display</span>
+                                </div>
+                                <h4 style="margin:0 0 6px 0; font-size:0.98rem; text-transform:none; color:var(--text-primary);">Scherm Blijft Aan (Wake Lock)</h4>
+                                <p class="text-sm text-muted" style="margin:0; font-size:0.8rem; line-height:1.45;">
+                                    Tijdens een actieve sessie houdt de app het scherm automatisch actief, zodat je telefoon niet op slot springt tussen de sets door.
+                                </p>
+                            </div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:0.75rem; color:#f97316; display:flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:0.9rem;">battery_charging_full</span>
+                                <span>Schakelt automatisch uit bij afronden</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 11 -->
+                        <div class="glass-panel guide-feature-card" data-category="coaching">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="material-icons-round" style="font-size:1.3rem; color:#f59e0b;">military_tech</span>
+                                    <span class="status-badge" style="font-size:0.7rem;">Records</span>
+                                </div>
+                                <h4 style="margin:0 0 6px 0; font-size:0.98rem; text-transform:none; color:var(--text-primary);">PR &amp; Overload Detectie</h4>
+                                <p class="text-sm text-muted" style="margin:0; font-size:0.8rem; line-height:1.45;">
+                                    Bij een nieuw persoonlijk record (of berekend 1RM) kleurt de vinkknop goud met een ster. Verbeter je je gewicht of herhalingen ten opzichte van vorige week, dan kleurt hij groen.
+                                </p>
+                            </div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:0.75rem; color:#f59e0b; display:flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:0.9rem;">stars</span>
+                                <span>Directe feedback bij records</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 12 -->
+                        <div class="glass-panel guide-feature-card" data-category="coaching">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span class="material-icons-round" style="font-size:1.3rem; color:var(--status-green);">emoji_events</span>
+                                    <span class="status-badge" style="font-size:0.7rem; background:rgba(52,211,153,0.15); color:var(--status-green);">Overzicht</span>
+                                </div>
+                                <h4 style="margin:0 0 6px 0; font-size:0.98rem; text-transform:none; color:var(--text-primary);">Workout Recap</h4>
+                                <p class="text-sm text-muted" style="margin:0; font-size:0.8rem; line-height:1.45;">
+                                    Bij het afronden toont de app een overzicht met je trainingstijd, voltooide sets, totaal getild volume (kg) en een samenvatting van je behaalde records.
+                                </p>
+                            </div>
+                            <div style="margin-top:12px; padding-top:8px; border-top:1px solid var(--border-color); font-size:0.75rem; color:var(--status-green); display:flex; align-items:center; gap:4px;">
+                                <span class="material-icons-round" style="font-size:0.9rem;">share</span>
+                                <span>Direct terugkijken in de trainingshistorie</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Practical Tips Grid -->
+                    <div class="glass-panel p-4 mb-4">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                            <span class="material-icons-round text-accent" style="font-size:1.3rem;">tips_and_updates</span>
+                            <h3 style="margin:0; font-size:1.15rem; text-transform:none; color:var(--text-primary);">Handige Tips tijdens het Trainen</h3>
+                        </div>
+                        <div class="guide-tips-grid">
+                            <div class="guide-tip-card">
+                                <div style="font-weight:700; font-size:0.85rem; color:var(--accent-color); margin-bottom:4px;">1. Enter-toets navigatie</div>
+                                <div class="text-xs text-muted" style="line-height:1.4;">Vul gewicht in, tik op Enter om naar reps te springen, en nogmaals op Enter: de set is afgevinkt en de rusttimer start.</div>
+                            </div>
+                            <div class="guide-tip-card">
+                                <div style="font-weight:700; font-size:0.85rem; color:var(--status-green); margin-bottom:4px;">2. Rusttijd aanpassen</div>
+                                <div class="text-xs text-muted" style="line-height:1.4;">Tik op <code>-15s</code> of <code>Skip</code> bij sneller herstel, of op <code>+30s</code> na een zware set.</div>
+                            </div>
+                            <div class="guide-tip-card">
+                                <div style="font-weight:700; font-size:0.85rem; color:#ef4444; margin-bottom:4px;">3. Plate Calculator</div>
+                                <div class="text-xs text-muted" style="line-height:1.4;">Tik op het halter-icoontje naast het gewicht om direct af te lezen welke schijven je per kant moet laden.</div>
+                            </div>
+                            <div class="guide-tip-card">
+                                <div style="font-weight:700; font-size:0.85rem; color:#f59e0b; margin-bottom:4px;">4. Sticky Notes voor apparaten</div>
+                                <div class="text-xs text-muted" style="line-height:1.4;">Noteer bij apparaten direct de zithoogte of stand (bijv. "Stoelhoogte stand 4"). Dit staat er de volgende keer automatisch weer.</div>
+                            </div>
+                            <div class="guide-tip-card">
+                                <div style="font-weight:700; font-size:0.85rem; color:#818cf8; margin-bottom:4px;">5. Oefening verplaatsen</div>
+                                <div class="text-xs text-muted" style="line-height:1.4;">Is een apparaat bezet? Schuif de oefening omlaag met <code>⬇️</code> of kies direct een alternatief via "Wissel".</div>
+                            </div>
+                            <div class="guide-tip-card">
+                                <div style="font-weight:700; font-size:0.85rem; color:#a855f7; margin-bottom:4px;">6. Vrije sessies opslaan</div>
+                                <div class="text-xs text-muted" style="line-height:1.4;">Een vrije sessie gedaan? Klik onderaan op "Opslaan als schema" om de opzet direct als nieuw schema te bewaren.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="text-align:center; margin-top:20px;">
+                        <button type="button" class="btn-primary" style="padding:10px 24px;" onclick="app.closeSessionGuide()">
+                            Terug naar Training / Overzicht
+                        </button>
+                    </div>
                 </div>
             </section>
         </main>
@@ -948,127 +1482,6 @@
             </div>
         </div>
 
-        <!-- Session Guide Modal -->
-        <div id="modal-session-guide" class="modal-overlay hidden" onclick="if(event.target===this) app.hideSessionGuideModal();">
-            <div class="modal-content glass-panel session-guide-modal-content">
-                <div class="session-guide-header">
-                    <div class="session-guide-title-group">
-                        <div class="session-guide-icon-badge">
-                            <span class="material-icons-round" aria-hidden="true">menu_book</span>
-                        </div>
-                        <div>
-                            <h3 id="session-guide-title">Sessie Gids</h3>
-                            <p id="session-guide-subtitle" class="text-sm text-muted">Handige functies tijdens je training</p>
-                        </div>
-                    </div>
-                    <button type="button" class="icon-btn" data-modal-close onclick="app.hideSessionGuideModal()" aria-label="Sluiten">
-                        <span class="material-icons-round" aria-hidden="true">close</span>
-                    </button>
-                </div>
-
-                <div class="session-guide-scroll">
-                    <!-- 1. Sets & Gewichten -->
-                    <div class="session-guide-card">
-                        <div class="session-guide-card-header">
-                            <span class="material-icons-round text-accent">edit_note</span>
-                            <strong>Sets &amp; Gewichten Loggen</strong>
-                        </div>
-                        <ul class="session-guide-bullets">
-                            <li><strong>Placeholders:</strong> Vorige gewichten en herhalingen staan lichtgrijs in elk vakje.</li>
-                            <li><strong>Snelle navigatie:</strong> Druk op <kbd>Enter</kbd> om direct door te springen naar de herhalingen.</li>
-                            <li><strong>Auto-vink:</strong> Sets vinken zichzelf automatisch af zodra je gewicht en herhalingen invult.</li>
-                        </ul>
-                    </div>
-
-                    <!-- 2. Rusttimer -->
-                    <div class="session-guide-card">
-                        <div class="session-guide-card-header">
-                            <span class="material-icons-round" style="color:var(--status-green);">timer</span>
-                            <strong>Rusttimer</strong>
-                        </div>
-                        <ul class="session-guide-bullets">
-                            <li><strong>Start vanzelf:</strong> Zodra je een set afvinkt, begint de rusttijd die hoort bij de oefening (bijv. 90 seconden).</li>
-                            <li><strong>Snelle knoppen:</strong> Druk op <code>-15s</code> als je haast hebt, <code>+30s</code> als je een zware set deed, of <code>Skip</code> om direct door te gaan.</li>
-                            <li><strong>Haptische trilling:</strong> Je telefoon trilt zachtjes zodra je rusttijd voorbij is.</li>
-                        </ul>
-                    </div>
-
-                    <!-- 3. Plate Calculator -->
-                    <div class="session-guide-card">
-                        <div class="session-guide-card-header">
-                            <span class="material-icons-round" style="color:#ef4444;">fitness_center</span>
-                            <div>
-                                <strong>Plate Calculator</strong>
-                                <div class="text-xs text-muted">Bepaal makkelijk welke schijven je nodig hebt.</div>
-                            </div>
-                        </div>
-                        <ul class="session-guide-bullets">
-                            <li><strong>Automatische detectie:</strong> Verschijnt vanzelf bij alle halter-oefeningen zoals Bench Press, Squat, Deadlift, Overhead Press en RDL.</li>
-                            <li><strong>Keuze uit stangen:</strong> Ondersteunt standaard 20 kg Olympische stangen, 15 kg stangen en 10 kg EZ-bars.</li>
-                            <li><strong>Kleurgecodeerde schijven:</strong> Officiële Olympische kleuren: 25 kg (rood), 20 kg (blauw), 15 kg (geel), 10 kg (groen), 5 kg (wit), 2.5 kg (donkergrijs) en 1.25 kg (lichtgrijs).</li>
-                            <li><strong>1-Tik overnemen:</strong> Neem het berekende gewicht met één tik direct over naar je actieve set.</li>
-                        </ul>
-                    </div>
-
-                    <!-- 4. Oefening Wisselen & Volgorde -->
-                    <div class="session-guide-card">
-                        <div class="session-guide-card-header">
-                            <span class="material-icons-round" style="color:#818cf8;">swap_horiz</span>
-                            <strong>Oefening Wisselen &amp; Volgorde</strong>
-                        </div>
-                        <ul class="session-guide-bullets">
-                            <li><strong>Apparaat bezet?</strong> Tik op <strong>Wissel</strong> voor directe alternatieven die dezelfde spiergroep aanspreken.</li>
-                            <li><strong>Volgorde aanpassen:</strong> Gebruik de pijltjes <code>⬆️</code> en <code>⬇️</code> om een oefening tijdelijk naar voren of achteren te schuiven.</li>
-                            <li><strong>Verwijderen:</strong> Met het prullenbakje haal je een oefening alleen uit de huidige sessie, zonder je basisschema aan te tasten.</li>
-                        </ul>
-                    </div>
-
-                    <!-- 5. Sticky Notes -->
-                    <div class="session-guide-card">
-                        <div class="session-guide-card-header">
-                            <span class="material-icons-round" style="color:#f59e0b;">sticky_note_2</span>
-                            <strong>Sticky Notes</strong>
-                        </div>
-                        <ul class="session-guide-bullets">
-                            <li><strong>Notities per oefening:</strong> Tik op <strong>Notitie</strong> om instellingen zoals zithoogte of greepbreedte op te slaan.</li>
-                            <li><strong>Voorbeelden:</strong> Ideaal voor <em>"Stoelhoogte stand 4"</em> of <em>"Incline stand 2"</em>.</li>
-                            <li><strong>Blijft bewaard:</strong> De notitie verschijnt automatisch telkens wanneer je deze oefening weer doet.</li>
-                        </ul>
-                    </div>
-
-                    <!-- 6. Progressive Overload & Hold Timer -->
-                    <div class="session-guide-card">
-                        <div class="session-guide-card-header">
-                            <span class="material-icons-round" style="color:#06b6d4;">trending_up</span>
-                            <strong>Progressie &amp; Timers</strong>
-                        </div>
-                        <ul class="session-guide-bullets">
-                            <li><strong>Progressive Overload:</strong> Automatische suggestie: Haalde je overal het maximale aantal herhalingen? Dan stelt de app voor om het gewicht te verhogen.</li>
-                            <li><strong>Hold Timer:</strong> Voor planks en wall-sits met 1-5s startvertraging. De stopwatch kleurt geel als je binnen 10s van je record bent, en groen zodra je je record breekt!</li>
-                        </ul>
-                    </div>
-
-                    <!-- 7. Gemak & Afronden -->
-                    <div class="session-guide-card">
-                        <div class="session-guide-card-header">
-                            <span class="material-icons-round" style="color:#a855f7;">stay_current_portrait</span>
-                            <strong>Scherm &amp; Workout Recap</strong>
-                        </div>
-                        <ul class="session-guide-bullets">
-                            <li><strong>Scherm blijft aan:</strong> Je telefoon springt tijdens een actieve sessie niet op de slaapstand (Wake Lock).</li>
-                            <li><strong>Techniek opzoeken (🔍):</strong> Tik op het vergrootglas naast een oefening voor een snelle video-instructie.</li>
-                            <li><strong>Workout Recap:</strong> Na het afronden zie je direct je totale trainingstijd, voltooide sets, getild volume en behaalde records.</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="modal-actions session-guide-actions mt-4">
-                    <button type="button" class="btn-primary w-full" onclick="app.hideSessionGuideModal()">
-                        Begrepen
-                    </button>
-                </div>
-            </div>
-        </div>
 
         <!-- Toast Container -->
         <div id="toast-container" class="toast-container" role="status" aria-live="polite"></div>

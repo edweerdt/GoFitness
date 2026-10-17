@@ -5602,6 +5602,136 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(modal.classList.contains('hidden')).toBe(true);
         });
 
+        it('opent en sluit de visuele sessie gids via openSessionGuide en closeSessionGuide', () => {
+            // Setup views
+            const homeView = document.getElementById('view-home') || (() => {
+                const el = document.createElement('div');
+                el.id = 'view-home';
+                el.className = 'view active';
+                document.body.appendChild(el);
+                return el;
+            })();
+
+            let guideView = document.getElementById('view-guide');
+            if (!guideView) {
+                guideView = document.createElement('div');
+                guideView.id = 'view-guide';
+                guideView.className = 'view';
+                document.body.appendChild(guideView);
+            }
+
+            app.currentView = 'home';
+            app.openSessionGuide('home');
+
+            expect(localStorage.getItem('gof_session_guide_viewed')).toBe('1');
+            expect(app.currentView).toBe('guide');
+            expect(guideView.classList.contains('active')).toBe(true);
+            expect(homeView.classList.contains('active')).toBe(false);
+
+            app.closeSessionGuide();
+            expect(app.currentView).toBe('home');
+            expect(homeView.classList.contains('active')).toBe(true);
+            expect(guideView.classList.contains('active')).toBe(false);
+        });
+
+        it('toont spotlight data en berekent schijven correct in de live demo', () => {
+            const titleEl = document.createElement('h3');
+            titleEl.id = 'guide-spotlight-title';
+            document.body.appendChild(titleEl);
+
+            const descEl = document.createElement('p');
+            descEl.id = 'guide-spotlight-desc';
+            document.body.appendChild(descEl);
+
+            const bulletsEl = document.createElement('ul');
+            bulletsEl.id = 'guide-spotlight-bullets';
+            document.body.appendChild(bulletsEl);
+
+            const perSideEl = document.createElement('div');
+            perSideEl.id = 'guide-plates-perside-text';
+            document.body.appendChild(perSideEl);
+
+            const badgesRow = document.createElement('div');
+            badgesRow.id = 'guide-plates-badges-row';
+            document.body.appendChild(badgesRow);
+
+            const inputEl = document.createElement('input');
+            inputEl.id = 'guide-plate-input';
+            inputEl.value = '85';
+            document.body.appendChild(inputEl);
+
+            app.showGuideSpotlight('plate-calc');
+            expect(titleEl.textContent).toBe('Plate Calculator');
+            expect(descEl.textContent).toContain('Bepaal makkelijk welke schijven je nodig hebt.');
+            expect(bulletsEl.innerHTML).toContain('Automatische detectie:');
+
+            // Test timer spotlight
+            app.showGuideSpotlight('timer');
+            expect(titleEl.textContent).toBe('Rusttimer');
+            expect(bulletsEl.innerHTML).toContain('Start vanzelf:');
+
+            // Test plate calculation (85kg - 20kg bar = 65kg / 2 = 32.5kg per side -> 25kg, 5kg, 2.5kg)
+            app.setGuideDemoBar(20);
+            app.setGuideDemoWeight(85);
+            expect(perSideEl.textContent).toBe('32.5 kg / kant');
+            expect(badgesRow.textContent).toContain('25kg');
+            expect(badgesRow.textContent).toContain('5kg');
+            expect(badgesRow.textContent).toContain('2.5kg');
+        });
+
+        it('filtert categorieën en bedient de interactieve rusttimer demo', () => {
+            const cardsContainer = document.createElement('div');
+            cardsContainer.id = 'guide-feature-cards';
+
+            const cardTracking = document.createElement('div');
+            cardTracking.className = 'guide-feature-card';
+            cardTracking.setAttribute('data-category', 'tracking');
+            cardsContainer.appendChild(cardTracking);
+
+            const cardTimers = document.createElement('div');
+            cardTimers.className = 'guide-feature-card';
+            cardTimers.setAttribute('data-category', 'timers');
+            cardsContainer.appendChild(cardTimers);
+
+            document.body.appendChild(cardsContainer);
+
+            // Filter op timers
+            app.filterGuideCategory('timers');
+            expect(cardTracking.style.display).toBe('none');
+            expect(cardTimers.style.display).toBe('flex');
+
+            // Filter op all
+            app.filterGuideCategory('all');
+            expect(cardTracking.style.display).toBe('flex');
+            expect(cardTimers.style.display).toBe('flex');
+
+            // Timer display & demo
+            const displayEl = document.createElement('div');
+            displayEl.id = 'guide-timer-display';
+            document.body.appendChild(displayEl);
+
+            const toggleBtn = document.createElement('button');
+            toggleBtn.id = 'btn-guide-timer-toggle';
+            document.body.appendChild(toggleBtn);
+
+            const statusEl = document.createElement('div');
+            statusEl.id = 'guide-timer-status';
+            document.body.appendChild(statusEl);
+
+            app.guideDemoTimerSeconds = 90;
+            app.renderGuideDemoTimer();
+            expect(displayEl.textContent).toBe('01:30');
+
+            app.adjustGuideDemoTimer(30);
+            expect(displayEl.textContent).toBe('02:00');
+
+            app.adjustGuideDemoTimer(-15);
+            expect(displayEl.textContent).toBe('01:45');
+
+            app.resetGuideDemoTimer();
+            expect(displayEl.textContent).toBe('01:30');
+        });
+
         it('verbergt de onboarding-kaart wanneer dismissOnboarding wordt aangeroepen', () => {
             app.renderHome();
             expect(document.getElementById('home-onboarding-container').classList.contains('hidden')).toBe(false);
