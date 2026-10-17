@@ -2534,6 +2534,22 @@ const app = {
         this.renderHome();
     },
 
+    showSessionGuideModal() {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('gof_session_guide_viewed', '1');
+        }
+        const modal = document.getElementById('modal-session-guide');
+        if (modal) modal.classList.remove('hidden');
+        if (document.getElementById('home-onboarding-container')) {
+            this.renderHomeOnboarding();
+        }
+    },
+
+    hideSessionGuideModal() {
+        const modal = document.getElementById('modal-session-guide');
+        if (modal) modal.classList.add('hidden');
+    },
+
     renderHomeOnboarding() {
         const container = document.getElementById('home-onboarding-container');
         if (!container) return;
@@ -2572,18 +2588,20 @@ const app = {
             return;
         }
 
-        // Nieuwe gebruiker: toon de 3-stappen New User Journey
+        // Nieuwe gebruiker: toon de duidelijke 4-stappen New User Journey met de Sessie Gids als detail-stap
         const activePlan = store.getActivePlan();
         const step1Done = hasPlans;
-        const step2Done = hasLogs;
+        const isGuideViewed = (typeof localStorage !== 'undefined' && localStorage.getItem('gof_session_guide_viewed') === '1');
+        const step2Done = isGuideViewed;
         const step3Done = hasLogs;
+        const step4Done = hasLogs;
 
         container.classList.remove('hidden');
         container.innerHTML = `
             <div class="glass-panel mb-4 onboarding-card" style="border: 1px solid var(--border-color); padding: 16px; position: relative;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom: 14px;">
                     <p style="margin: 0; font-size: 0.95rem; line-height: 1.45; color: var(--text-primary); font-weight: 500; flex: 1;">
-                        Kies een schema, log eenvoudig je gewichten en herhalingen, en train op basis van slim spierherstel. Go
+                        Kies een schema, log eenvoudig je gewichten en herhalingen, en train op basis van slim spierherstel.
                     </p>
                     <button class="icon-btn" onclick="app.dismissOnboarding()" title="Verberg introductie" aria-label="Verberg introductie" style="width: 28px; height: 28px; min-width: 28px; padding: 0; color: var(--text-muted);">
                         <span class="material-icons-round" style="font-size: 1.15rem;">close</span>
@@ -2591,7 +2609,7 @@ const app = {
                 </div>
 
                 <div class="onboarding-steps flex-col gap-3">
-                    <!-- Stap 1 -->
+                    <!-- Stap 1: Schema kiezen -->
                     <div class="onboarding-step ${step1Done ? 'done' : 'active'}" style="display: flex; align-items: flex-start; gap: 10px; background: rgba(0,0,0,0.02); padding: 10px 12px; border-radius: 10px; border: 1px solid ${step1Done ? 'rgba(52, 211, 153, 0.2)' : 'var(--border-color)'};">
                         <span class="material-icons-round" style="font-size: 1.25rem; color: ${step1Done ? 'var(--status-green)' : 'var(--accent-color)'}; flex-shrink: 0; margin-top: 1px;">
                             ${step1Done ? 'check_circle' : 'looks_one'}
@@ -2617,32 +2635,54 @@ const app = {
                         </div>
                     </div>
 
-                    <!-- Stap 2 -->
-                    <div class="onboarding-step ${step2Done ? 'done' : (step1Done ? 'active' : 'pending')}" style="display: flex; align-items: flex-start; gap: 10px; background: rgba(0,0,0,0.02); padding: 10px 12px; border-radius: 10px; border: 1px solid ${step2Done ? 'rgba(52, 211, 153, 0.2)' : 'var(--border-color)'}; ${!step1Done ? 'opacity: 0.6;' : ''}">
-                        <span class="material-icons-round" style="font-size: 1.25rem; color: ${step2Done ? 'var(--status-green)' : (step1Done ? 'var(--accent-color)' : 'var(--text-muted)')}; flex-shrink: 0; margin-top: 1px;">
+                    <!-- Stap 2: Bekijk de Sessie Gids (Extra Detail Stap) -->
+                    <div class="onboarding-step ${step2Done ? 'done' : 'active'}" style="display: flex; align-items: flex-start; gap: 10px; background: rgba(0,0,0,0.02); padding: 10px 12px; border-radius: 10px; border: 1px solid ${step2Done ? 'rgba(52, 211, 153, 0.2)' : 'var(--border-color)'};">
+                        <span class="material-icons-round" style="font-size: 1.25rem; color: ${step2Done ? 'var(--status-green)' : 'var(--accent-color)'}; flex-shrink: 0; margin-top: 1px;">
                             ${step2Done ? 'check_circle' : 'looks_two'}
+                        </span>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                                <span>Bekijk hoe een sessie werkt</span>
+                                ${step2Done ? '<span class="status-badge green" style="padding: 1px 6px; font-size: 0.65rem;">Gelezen</span>' : ''}
+                            </div>
+                            <div class="text-sm text-muted" style="font-size: 0.8rem; margin-top: 2px;">
+                                Handige functies tijdens je training: sets loggen, rusttimers, Plate Calculator en oefeningen wisselen.
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <button class="btn-secondary" style="padding: 5px 12px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px;" onclick="app.showSessionGuideModal();">
+                                    <span class="material-icons-round" style="font-size: 1rem;">menu_book</span>
+                                    <span>${step2Done ? 'Gids opnieuw bekijken' : 'Open Sessie Gids'}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stap 3: Doe je eerste training -->
+                    <div class="onboarding-step ${step3Done ? 'done' : (step1Done ? 'active' : 'pending')}" style="display: flex; align-items: flex-start; gap: 10px; background: rgba(0,0,0,0.02); padding: 10px 12px; border-radius: 10px; border: 1px solid ${step3Done ? 'rgba(52, 211, 153, 0.2)' : 'var(--border-color)'}; ${!step1Done ? 'opacity: 0.6;' : ''}">
+                        <span class="material-icons-round" style="font-size: 1.25rem; color: ${step3Done ? 'var(--status-green)' : (step1Done ? 'var(--accent-color)' : 'var(--text-muted)')}; flex-shrink: 0; margin-top: 1px;">
+                            ${step3Done ? 'check_circle' : 'looks_3'}
                         </span>
                         <div style="flex: 1; min-width: 0;">
                             <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">
                                 Doe je eerste training
                             </div>
                             <div class="text-sm text-muted" style="font-size: 0.8rem; margin-top: 2px;">
-                                ${step2Done ? 'Eerste sessie succesvol afgerond! 🎉' : 'Tik hieronder op Start Nu en vul na elke set je gewicht en herhalingen in.'}
+                                ${step3Done ? 'Eerste sessie succesvol afgerond! 🎉' : 'Tik hieronder op Start Nu en vul na elke set je gewicht en herhalingen in.'}
                             </div>
                         </div>
                     </div>
 
-                    <!-- Stap 3 -->
-                    <div class="onboarding-step ${step3Done ? 'done' : 'pending'}" style="display: flex; align-items: flex-start; gap: 10px; background: rgba(0,0,0,0.02); padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-color); ${!step2Done ? 'opacity: 0.6;' : ''}">
-                        <span class="material-icons-round" style="font-size: 1.25rem; color: ${step3Done ? 'var(--status-green)' : 'var(--text-muted)'}; flex-shrink: 0; margin-top: 1px;">
-                            ${step3Done ? 'check_circle' : 'looks_3'}
+                    <!-- Stap 4: Volg je herstel & progressie -->
+                    <div class="onboarding-step ${step4Done ? 'done' : 'pending'}" style="display: flex; align-items: flex-start; gap: 10px; background: rgba(0,0,0,0.02); padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-color); ${!step3Done ? 'opacity: 0.6;' : ''}">
+                        <span class="material-icons-round" style="font-size: 1.25rem; color: ${step4Done ? 'var(--status-green)' : 'var(--text-muted)'}; flex-shrink: 0; margin-top: 1px;">
+                            ${step4Done ? 'check_circle' : 'looks_4'}
                         </span>
                         <div style="flex: 1; min-width: 0;">
                             <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">
-                                Volg je herstel & progressie
+                                Volg je herstel &amp; progressie
                             </div>
                             <div class="text-sm text-muted" style="font-size: 0.8rem; margin-top: 2px;">
-                                ${step3Done ? 'Bekijk het stoplicht bovenaan voor je hersteltijd of check het tabblad Statistieken.' : 'Het stoplicht berekent na je training automatisch wanneer je spieren klaar zijn voor de volgende sessie.'}
+                                ${step4Done ? 'Bekijk het stoplicht bovenaan voor je hersteltijd of check het tabblad Statistieken.' : 'Het stoplicht berekent na je training automatisch wanneer je spieren klaar zijn voor de volgende sessie.'}
                             </div>
                         </div>
                     </div>
