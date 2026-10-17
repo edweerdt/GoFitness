@@ -1085,6 +1085,7 @@ const app = {
 
         this.setupNavigation();
         this.setupKeyboardShortcuts();
+        this.setupModalSheetInteractions();
         this.updateQrScanAvailability();
         this.renderHome();
         this.renderPlans();
@@ -1579,6 +1580,131 @@ const app = {
         if (closeBtn) closeBtn.click();
         else top.classList.add('hidden');
         return true;
+    },
+
+    triggerHaptic(pattern = 15) {
+        try {
+            if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+                navigator.vibrate(pattern);
+            }
+        } catch (e) {
+            // Haptische feedback niet ondersteund of genegeerd door het besturingssysteem
+        }
+    },
+
+    scrollModalInputIntoView(inputEl) {
+        if (!inputEl || typeof inputEl.scrollIntoView !== 'function') return;
+        const scrollFn = () => {
+            try {
+                inputEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            } catch (err) {
+                inputEl.scrollIntoView();
+            }
+        };
+        scrollFn();
+        if (typeof setTimeout === 'function') {
+            setTimeout(scrollFn, 180);
+        }
+    },
+
+    _modalSheetInteractionsBound: false,
+    _sheetTouchState: null,
+
+    setupModalSheetInteractions() {
+        if (typeof document === 'undefined' || this._modalSheetInteractionsBound) return;
+        this._modalSheetInteractionsBound = true;
+
+        // 1. Backdrop-tap sluit de bovenste open modal
+        document.addEventListener('click', (e) => {
+            if (!e || !e.target || !e.target.classList) return;
+            if (e.target.classList.contains('modal-overlay') && !e.target.classList.contains('hidden')) {
+                this.closeTopmostModal();
+            }
+        });
+
+        // 2. Swipe-down op een bottom-sheet (.modal-content) sluit de modal wanneer die bovenaan staat
+        document.addEventListener('touchstart', (e) => {
+            if (!e || !e.target || typeof e.target.closest !== 'function' || !e.touches || e.touches.length !== 1) {
+                this._sheetTouchState = null;
+                return;
+            }
+            const tag = (e.target.tagName || '').toUpperCase();
+            if (tag === 'INPUT' && e.target.type === 'range') {
+                this._sheetTouchState = null;
+                return;
+            }
+            const sheet = e.target.closest('.modal-content');
+            if (!sheet) {
+                this._sheetTouchState = null;
+                return;
+            }
+            const overlay = sheet.closest('.modal-overlay');
+            if (!overlay || overlay.classList.contains('hidden')) {
+                this._sheetTouchState = null;
+                return;
+            }
+
+            let canPullDown = (sheet.scrollTop || 0) <= 0;
+            let node = e.target;
+            while (canPullDown && node && node !== sheet && node !== document.body) {
+                if (node.scrollTop && node.scrollTop > 0) {
+                    canPullDown = false;
+                    break;
+                }
+                node = node.parentElement;
+            }
+            if (!canPullDown) {
+                this._sheetTouchState = null;
+                return;
+            }
+
+            this._sheetTouchState = {
+                sheet,
+                startY: e.touches[0].clientY,
+                startX: e.touches[0].clientX,
+                deltaY: 0,
+                deltaX: 0
+            };
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!this._sheetTouchState || !e.touches || e.touches.length !== 1) return;
+            const deltaY = e.touches[0].clientY - this._sheetTouchState.startY;
+            const deltaX = Math.abs(e.touches[0].clientX - this._sheetTouchState.startX);
+            this._sheetTouchState.deltaY = deltaY;
+            this._sheetTouchState.deltaX = deltaX;
+
+            if (deltaY > 0 && deltaY > deltaX && (this._sheetTouchState.sheet.scrollTop || 0) <= 0) {
+                if (this._sheetTouchState.sheet.style) {
+                    this._sheetTouchState.sheet.style.transform = `translateY(${Math.min(deltaY * 0.55, 160)}px)`;
+                }
+            }
+        }, { passive: true });
+
+        const endSwipe = () => {
+            if (!this._sheetTouchState) return;
+            const state = this._sheetTouchState;
+            this._sheetTouchState = null;
+            if (state.sheet && state.sheet.style) {
+                state.sheet.style.transform = '';
+            }
+            if (state.deltaY > 70 && state.deltaY > state.deltaX && (state.sheet.scrollTop || 0) <= 0) {
+                this.closeTopmostModal();
+            }
+        };
+
+        document.addEventListener('touchend', endSwipe, { passive: true });
+        document.addEventListener('touchcancel', endSwipe, { passive: true });
+
+        // 3. Mobiel toetsenbord ergonomie: scroll gefocuste invoervelden in modals automatisch in beeld
+        document.addEventListener('focusin', (e) => {
+            const target = e && e.target;
+            if (!target || typeof target.closest !== 'function') return;
+            const tag = (target.tagName || '').toUpperCase();
+            if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return;
+            if (!target.closest('.modal-content')) return;
+            this.scrollModalInputIntoView(target);
+        });
     },
 
     // QR scannen leunt op BarcodeDetector (Chromium/Android); iOS Safari heeft die
@@ -6482,6 +6608,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         return 'normal';
     },
 
+    triggerSetCompletedHaptic(ex, setIndex) {
+        const achievement = this.evaluateSetAchievement(ex, setIndex);
+        if (achievement === 'pr' || achievement === 'overload') {
+            this.triggerHaptic([25, 40, 35]);
+        } else {
+            this.triggerHaptic(15);
+        }
+    },
+
     updateWorkoutProgressUI() {
         if (typeof document === 'undefined') return;
         const badgeEl = document.getElementById('workout-sets-badge');
@@ -7152,6 +7287,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 }
                 if (isNonEmpty(fillL)) ex.levels[setIndex] = fillL;
             }
+            this.triggerSetCompletedHaptic(ex, setIndex);
         }
 
         store.saveActiveWorkoutState(this.activeWorkout);
@@ -7486,6 +7622,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         if (hasWeight && hasReps && hasDuration && hasLevel && ex.setsCompleted && !ex.setsCompleted[setIndex]) {
             ex.setsCompleted[setIndex] = true;
+            this.triggerSetCompletedHaptic(ex, setIndex);
             if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
             if (ex.restSeconds) this.startRestTimer(ex.restSeconds);
 
@@ -7589,6 +7726,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (!wasCompleted) {
             if (!ex.setsCompleted) ex.setsCompleted = Array(ex.sets).fill(false);
             ex.setsCompleted[setIndex] = true;
+            this.triggerSetCompletedHaptic(ex, setIndex);
             if (typeof store !== 'undefined') {
                 store.saveActiveWorkoutState(this.activeWorkout);
             }
@@ -7652,6 +7790,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
     finishWorkout() {
         this.hideFinishModal();
+        this.triggerHaptic([30, 50, 60]);
         if (this.holdTimerState) this.stopHoldTimer(false);
         this.stopRestTimer();
         this.stopSessionTimer();
