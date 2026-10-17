@@ -6855,7 +6855,7 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             app.adjustPlateCalculatorWeight(2.5);
             expect(document.getElementById('plate-calc-weight-input').value).toBe('82.5');
             expect(document.getElementById('plate-calc-per-side-pill').textContent).toBe('31.25 kg / kant');
-            expect(document.getElementById('btn-apply-plate-weight-label').textContent).toBe('Gebruik 82.5 kg voor Set 1');
+            expect(document.getElementById('btn-apply-plate-weight-label').textContent).toBe('Gebruik 82.5 kg');
 
             // Pas toe op Set 1
             app.applyPlateCalculatorWeight();
@@ -6863,6 +6863,123 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(app.activeWorkout.exercises[0].weights[0]).toBe('82.5');
             const weightInputDom = document.querySelector('#workout-exercise-list input[data-ex="0"][data-set="0"][data-type="weight"]');
             expect(weightInputDom.value).toBe('82.5');
+        });
+    });
+
+    describe('GOF-61: Workout UX | Fixes Plate Calculator: Preset Pills Sync, Icon Uitlijning & Button Tekst Overflow', () => {
+        beforeEach(() => {
+            app.plateCalculatorState = null;
+            app.preferredBarWeight = 20;
+            document.body.innerHTML = `
+                <div id="modal-plate-calculator" class="modal-overlay hidden">
+                    <div class="modal-content glass-panel plate-calc-modal-content">
+                        <div class="plate-calc-header">
+                            <div class="plate-calc-icon-badge">
+                                <span class="material-icons-round plate-calc-icon" aria-hidden="true">fitness_center</span>
+                            </div>
+                            <div>
+                                <h3 id="plate-calc-title">Schijven-helper</h3>
+                                <p id="plate-calc-subtitle"></p>
+                            </div>
+                        </div>
+                        <div class="plate-bar-selector">
+                            <button type="button" class="plate-bar-btn active" data-bar-weight="20" onclick="app.setPlateCalculatorBarWeight(20)">20 kg Stang</button>
+                            <button type="button" class="plate-bar-btn" data-bar-weight="15" onclick="app.setPlateCalculatorBarWeight(15)">15 kg Stang</button>
+                            <button type="button" class="plate-bar-btn" data-bar-weight="10" onclick="app.setPlateCalculatorBarWeight(10)">10 kg EZ-Bar</button>
+                        </div>
+                        <div class="plate-weight-stepper">
+                            <button type="button" class="plate-step-btn" onclick="app.adjustPlateCalculatorWeight(-2.5)">-2.5 kg</button>
+                            <div class="plate-total-display">
+                                <input type="number" id="plate-calc-weight-input" value="60">
+                                <span id="plate-calc-bar-sub"></span>
+                            </div>
+                            <button type="button" class="plate-step-btn" onclick="app.adjustPlateCalculatorWeight(2.5)">+2.5 kg</button>
+                        </div>
+                        <div class="plate-preset-chips" role="group" aria-label="Snelkeuze gewichten">
+                            <button type="button" class="plate-preset-chip" data-weight="40" onclick="app.setPlateCalculatorWeight(40)">40 kg</button>
+                            <button type="button" class="plate-preset-chip" data-weight="60" onclick="app.setPlateCalculatorWeight(60)">60 kg</button>
+                            <button type="button" class="plate-preset-chip" data-weight="80" onclick="app.setPlateCalculatorWeight(80)">80 kg</button>
+                            <button type="button" class="plate-preset-chip" data-weight="100" onclick="app.setPlateCalculatorWeight(100)">100 kg</button>
+                        </div>
+                        <span id="plate-calc-per-side-pill"></span>
+                        <div id="plate-calc-visual-stack"></div>
+                        <div id="plate-calc-breakdown-badges"></div>
+                        <div id="plate-calc-remainder-warning" class="hidden"></div>
+                        <div class="modal-actions plate-calc-actions">
+                            <button type="button" class="btn-secondary plate-calc-btn-close" onclick="app.hidePlateCalculatorModal()">Sluiten</button>
+                            <button type="button" id="btn-apply-plate-weight" class="btn-primary plate-calc-btn-apply" onclick="app.applyPlateCalculatorWeight()">
+                                <span class="material-icons-round">check_circle</span>
+                                <span id="btn-apply-plate-weight-label"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        it('1. synchroniseert het gewicht in het invoerveld en markeert de actieve pill bij selectie via snelkeuze chips', () => {
+            app.plateCalculatorState = {
+                exIndex: 0,
+                setIndex: 0,
+                exerciseName: 'Barbell Bench Press',
+                targetWeight: 60,
+                barWeight: 20
+            };
+            app.renderPlateCalculator(true);
+
+            const inputEl = document.getElementById('plate-calc-weight-input');
+            const chip60 = document.querySelector('.plate-preset-chip[data-weight="60"]');
+            const chip80 = document.querySelector('.plate-preset-chip[data-weight="80"]');
+
+            expect(inputEl.value).toBe('60');
+            expect(chip60.classList.contains('active')).toBe(true);
+            expect(chip80.classList.contains('active')).toBe(false);
+
+            // Klik op de 80 kg pill
+            app.setPlateCalculatorWeight(80);
+
+            // Zowel invoerveld, berekening als actieve pill moeten direct synchroon lopen
+            expect(inputEl.value).toBe('80');
+            expect(chip60.classList.contains('active')).toBe(false);
+            expect(chip80.classList.contains('active')).toBe(true);
+            expect(document.getElementById('plate-calc-per-side-pill').textContent).toBe('30 kg / kant');
+        });
+
+        it('2. toont een compacte knoptekst zonder overflow en ondersteunt handmatige invoer zonder cursorverschuiving', () => {
+            app.plateCalculatorState = {
+                exIndex: 0,
+                setIndex: 2, // Set 3
+                exerciseName: 'Barbell Squat',
+                targetWeight: 100,
+                barWeight: 20
+            };
+            app.renderPlateCalculator(true);
+
+            const applyLabel = document.getElementById('btn-apply-plate-weight-label');
+            expect(applyLabel.textContent).toBe('Gebruik 100 kg');
+            expect(applyLabel.textContent).not.toContain('voor Set 3'); // Voorkomt overflow op smalle mobiele schermen
+
+            // Bij typen in het invoerveld (syncInput = false) wordt de interne berekening bijgewerkt zonder het invoerveld te overschrijven
+            app.setPlateCalculatorWeight('105', false);
+            expect(app.plateCalculatorState.targetWeight).toBe(105);
+            expect(applyLabel.textContent).toBe('Gebruik 105 kg');
+        });
+
+        it('3. bevat de icon badge en CSS classes voor layout en styling in index.html en style.css', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf-8');
+            const styleCss = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf-8');
+
+            expect(indexHtml).toContain('class="plate-calc-icon-badge"');
+            expect(indexHtml).toContain('data-weight="80"');
+            expect(indexHtml).toContain('plate-calc-actions');
+            expect(indexHtml).toContain('plate-calc-btn-apply');
+
+            expect(styleCss).toContain('.plate-calc-icon-badge');
+            expect(styleCss).toContain('.plate-preset-chip.active');
+            expect(styleCss).toContain('.plate-calc-btn-apply');
+            expect(styleCss).toContain('#btn-apply-plate-weight-label');
         });
     });
 });

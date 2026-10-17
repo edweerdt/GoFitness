@@ -7347,7 +7347,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.renderPlateCalculator(true);
     },
 
-    setPlateCalculatorWeight(weightVal, syncInput = false) {
+    setPlateCalculatorWeight(weightVal, syncInput = true) {
         const parsed = Math.max(0, parseFloat(weightVal) || 0);
         if (!this.plateCalculatorState) {
             this.plateCalculatorState = { exIndex: 0, setIndex: 0, exerciseName: 'Halter Oefening', targetWeight: parsed, barWeight: 20 };
@@ -7381,6 +7381,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (inputEl && syncInput) {
             inputEl.value = String(result.totalWeight);
         }
+
+        const presetChips = document.querySelectorAll('#modal-plate-calculator .plate-preset-chip');
+        presetChips.forEach(chip => {
+            const w = parseFloat(chip.getAttribute('data-weight'));
+            chip.classList.toggle('active', Math.abs(w - result.totalWeight) < 0.001);
+        });
 
         const barSubEl = document.getElementById('plate-calc-bar-sub');
         if (barSubEl) {
@@ -7453,7 +7459,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         const applyLabelEl = document.getElementById('btn-apply-plate-weight-label');
         if (applyLabelEl) {
-            applyLabelEl.textContent = `Gebruik ${result.totalWeight} kg voor Set ${(state.setIndex || 0) + 1}`;
+            applyLabelEl.textContent = `Gebruik ${result.totalWeight} kg`;
         }
     },
 
