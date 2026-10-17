@@ -3602,4 +3602,276 @@ textarea:focus-visible,
     }
 }
 
+/* Workout UX Verbeteringen: Recap Sheet, Slimme Rusttimer, Oefening Volgorde & Sticky Notes (GOF-59) */
+.rest-timer {
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.rest-timer-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rest-timer-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.rest-timer-chip {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    color: #f8f9fa;
+    border-radius: 999px;
+    padding: 4px 10px;
+    min-height: 32px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.rest-timer-chip:hover {
+    background: rgba(56, 189, 248, 0.22);
+}
+
+.rest-timer-chip:active {
+    transform: scale(0.95);
+}
+
+.rest-timer-chip.skip {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.45);
+    color: #fca5a5;
+}
+
+.theme-light .rest-timer-chip {
+    background: rgba(2, 132, 199, 0.1);
+    border-color: rgba(2, 132, 199, 0.3);
+    color: #0f172a;
+}
+
+.theme-light .rest-timer-chip.skip {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #b91c1c;
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not(.theme-dark) .rest-timer-chip {
+        background: rgba(2, 132, 199, 0.1);
+        border-color: rgba(2, 132, 199, 0.3);
+        color: #0f172a;
+    }
+    :root:not(.theme-dark) .rest-timer-chip.skip {
+        background: rgba(239, 68, 68, 0.12);
+        border-color: rgba(239, 68, 68, 0.35);
+        color: #b91c1c;
+    }
+}
+
+/* Persoonlijke Sticky Note & Inline Editor op Oefeningkaart */
+.personal-sticky-note {
+    margin-top: 8px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.personal-sticky-note .sticky-note-icon {
+    color: #f59e0b;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.exercise-note-editor {
+    margin-top: 8px;
+    padding: 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.theme-light .exercise-note-editor {
+    background: rgba(0, 0, 0, 0.025);
+}
+
+.exercise-order-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.exercise-icon-action-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    border-radius: 7px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: var(--transition);
+}
+
+.exercise-icon-action-btn:hover:not(:disabled) {
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+    background: rgba(59, 130, 246, 0.12);
+}
+
+.exercise-icon-action-btn.danger:hover:not(:disabled) {
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.exercise-icon-action-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.theme-light .exercise-icon-action-btn {
+    background: #ffffff;
+    border-color: rgba(0, 0, 0, 0.12);
+    color: #475569;
+}
+
+/* Post-Workout Samenvatting (Workout Recap Sheet) */
+.workout-recap-modal-content {
+    max-width: 440px;
+    text-align: center;
+}
+
+.workout-recap-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.workout-recap-badge-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    margin-bottom: 4px;
+}
+
+.workout-recap-header h3 {
+    text-transform: none;
+    color: var(--text-primary);
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.workout-recap-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.workout-recap-stat-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.theme-light .workout-recap-stat-card {
+    background: rgba(0, 0, 0, 0.025);
+}
+
+.workout-recap-stat-val {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.workout-recap-stat-lbl {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+}
+
+.workout-recap-highlights {
+    margin-top: 14px;
+    text-align: left;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.workout-recap-highlights-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--status-green);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.workout-recap-highlight-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.workout-recap-highlight-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.workout-recap-highlight-badge.pr {
+    background: linear-gradient(135deg, #00e676 0%, #00e5ff 100%);
+    color: #042f2e;
+}
+
+.workout-recap-highlight-badge.overload {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid rgba(16, 185, 129, 0.45);
+    color: var(--status-green);
+}
+
+
 

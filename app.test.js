@@ -6540,5 +6540,216 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(input.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', behavior: 'smooth' });
         });
     });
+
+    describe('GOF-59: Workout UX | Post-Workout Recap Sheet, Slimme Rusttimer, Oefening Volgorde/Verwijderen & Sticky Notes per Oefening', () => {
+        beforeEach(() => {
+            localStorage.clear();
+            store.logs = [];
+            store.plans = [];
+            store.exerciseNotes = {};
+            app.stopRestTimer();
+        });
+
+        it('1. toont de Post-Workout Recap Sheet (#modal-workout-recap) na finishWorkout met duur, sets, volume en PR/Overload highlights', () => {
+            document.body.innerHTML = `
+                <div id="view-home" class="view"></div>
+                <div id="view-workout" class="view active"></div>
+                <div id="modal-finish-workout" class="modal-overlay hidden"></div>
+                <div id="modal-workout-recap" class="modal-overlay hidden">
+                    <div class="modal-content glass-panel workout-recap-sheet">
+                        <div class="workout-recap-hero">
+                            <h3 id="workout-recap-title">Sterke Sessie!</h3>
+                            <p id="workout-recap-subtitle" class="text-muted text-sm"></p>
+                        </div>
+                        <div id="workout-recap-stats" class="workout-recap-stats-grid"></div>
+                        <div id="workout-recap-highlights" class="workout-recap-highlights hidden"></div>
+                        <div class="workout-recap-actions">
+                            <button type="button" class="btn-secondary" onclick="app.shareFromWorkoutRecap()">Delen</button>
+                            <button type="button" class="btn-primary" data-modal-close onclick="app.hideWorkoutRecapModal()">Klaar</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Vorige log met Bench Press 80kg x 8
+            store.logs = [
+                {
+                    id: 'log_old',
+                    date: new Date(Date.now() - 86400000 * 4).toISOString(),
+                    sessionName: 'Upper A',
+                    exercises: [
+                        {
+                            name: 'Bench Press',
+                            setsCompleted: 2,
+                            details: [
+                                { setNumber: 1, weight: '80', reps: '8' },
+                                { setNumber: 2, weight: '80', reps: '8' }
+                            ]
+                        }
+                    ]
+                }
+            ];
+
+            // Actieve workout van 42 minuten met verbetering op Bench Press (85kg x 8 -> 2x85x8 = 1360 kg volume) en nieuwe oefening Squat (100kg x 5 = 500 kg volume)
+            app.activeWorkout = {
+                planId: 'p1',
+                planName: 'Strength Plan',
+                startTime: new Date(Date.now() - 42 * 60000),
+                session: { id: 's_upper', name: 'Upper A' },
+                exercises: [
+                    {
+                        id: 'ex1',
+                        name: 'Bench Press',
+                        sets: 2,
+                        reps: '8',
+                        setsCompleted: [true, true],
+                        weights: ['85', '85'],
+                        actualReps: ['8', '8']
+                    },
+                    {
+                        id: 'ex2',
+                        name: 'Barbell Squat',
+                        sets: 1,
+                        reps: '5',
+                        setsCompleted: [true],
+                        weights: ['100'],
+                        actualReps: ['5']
+                    }
+                ]
+            };
+
+            app.finishWorkout();
+
+            const recapModal = document.getElementById('modal-workout-recap');
+            const statsEl = document.getElementById('workout-recap-stats');
+            const highlightsEl = document.getElementById('workout-recap-highlights');
+
+            expect(recapModal.classList.contains('hidden')).toBe(false);
+            expect(document.getElementById('workout-recap-subtitle').textContent).toContain('Upper A');
+            expect(statsEl.textContent).toContain('42m');
+            expect(statsEl.textContent).toContain('3');
+            // 1360 + 500 = 1860 kg
+            expect(statsEl.textContent).toContain('860 kg');
+
+            expect(highlightsEl.classList.contains('hidden')).toBe(false);
+            expect(highlightsEl.innerHTML).toContain('Bench Press');
+            expect(highlightsEl.innerHTML).toContain('85 kg × 8');
+            expect(highlightsEl.innerHTML).toContain('✦ Nieuw PR');
+
+            app.hideWorkoutRecapModal();
+            expect(recapModal.classList.contains('hidden')).toBe(true);
+        });
+
+        it('2. gebruikt een timestamp-gebaseerde rusttimer en ondersteunt -15s, +30s en Skip knoppen', () => {
+            document.body.innerHTML = `
+                <div id="rest-timer" class="rest-timer hidden" role="button" tabindex="0">
+                    <div class="rest-timer-info">
+                        <span id="rest-timer-label">Rust: 1:00</span>
+                    </div>
+                    <div class="rest-timer-controls">
+                        <button type="button" id="btn-rest-minus" onclick="app.adjustRestTimer(-15)">-15s</button>
+                        <button type="button" id="btn-rest-plus" onclick="app.adjustRestTimer(30)">+30s</button>
+                        <button type="button" id="btn-rest-skip" onclick="app.stopRestTimer()">Skip</button>
+                    </div>
+                </div>
+            `;
+
+            app.startRestTimer(60);
+            const timerEl = document.getElementById('rest-timer');
+            const labelEl = document.getElementById('rest-timer-label');
+
+            expect(timerEl.classList.contains('hidden')).toBe(false);
+            expect(app.restTimerEndTime).toBeGreaterThan(Date.now());
+            expect(labelEl.textContent).toBe('Rust: 1:00');
+
+            // +30s knop -> ~90s (1:30)
+            app.adjustRestTimer(30);
+            const remAfterPlus = Math.ceil((app.restTimerEndTime - Date.now()) / 1000);
+            expect(remAfterPlus).toBeGreaterThanOrEqual(89);
+            expect(remAfterPlus).toBeLessThanOrEqual(90);
+            expect(labelEl.textContent).toBe('Rust: 1:30');
+
+            // -15s knop -> ~75s (1:15)
+            app.adjustRestTimer(-15);
+            const remAfterMinus = Math.ceil((app.restTimerEndTime - Date.now()) / 1000);
+            expect(remAfterMinus).toBeGreaterThanOrEqual(74);
+            expect(remAfterMinus).toBeLessThanOrEqual(75);
+            expect(labelEl.textContent).toBe('Rust: 1:15');
+
+            // Simuleer achtergrond-terugkeer door restTimerEndTime 10s in de toekomst te zetten
+            app.restTimerEndTime = Date.now() + 10000;
+            app.syncRestTimerTick();
+            expect(labelEl.textContent).toBe('Rust: 0:10');
+
+            // Skip / Stop
+            app.stopRestTimer();
+            expect(timerEl.classList.contains('hidden')).toBe(true);
+            expect(app.restTimerEndTime).toBeNull();
+        });
+
+        it('3. laat toe om oefeningen omhoog/omlaag te verplaatsen en te verwijderen tijdens een actieve workout', () => {
+            document.body.innerHTML = `
+                <div id="workout-exercise-list"></div>
+                <span id="workout-sets-badge"></span>
+                <div id="workout-progress-track"><div id="workout-progress-bar"></div></div>
+            `;
+
+            app.activeWorkout = {
+                startTime: new Date(),
+                session: { id: 's_order', name: 'Volgorde Test' },
+                exercises: [
+                    { id: 'ex_a', name: 'Bench Press', sets: 2, reps: '8', setsCompleted: [true, false], weights: ['80', ''], actualReps: ['8', ''] },
+                    { id: 'ex_b', name: 'Incline DB Press', sets: 2, reps: '10', setsCompleted: [false, false], weights: ['', ''], actualReps: ['', ''] },
+                    { id: 'ex_c', name: 'Cable Fly', sets: 2, reps: '12', setsCompleted: [false, false], weights: ['', ''], actualReps: ['', ''] }
+                ]
+            };
+
+            app.renderWorkoutExercises();
+
+            // Verplaats Incline DB Press (index 1) omhoog (-1) -> komt op index 0
+            app.moveWorkoutExercise(1, -1);
+            expect(app.activeWorkout.exercises.map(e => e.name)).toEqual(['Incline DB Press', 'Bench Press', 'Cable Fly']);
+            // De ingevulde set van Bench Press verhuist netjes mee naar index 1
+            expect(app.activeWorkout.exercises[1].weights[0]).toBe('80');
+            expect(app.activeWorkout.exercises[1].setsCompleted[0]).toBe(true);
+
+            // Verwijder Cable Fly (index 2)
+            app.removeWorkoutExercise(2);
+            expect(app.activeWorkout.exercises.map(e => e.name)).toEqual(['Incline DB Press', 'Bench Press']);
+        });
+
+        it('4. slaat een persoonlijke Sticky Note per oefening persistent op in DataStore en toont deze bij volgende sessies', () => {
+            document.body.innerHTML = `<div id="workout-exercise-list"></div>`;
+
+            app.activeWorkout = {
+                startTime: new Date(),
+                session: { id: 's_notes', name: 'Notes Test' },
+                exercises: [
+                    { id: 'ex_lat', name: 'Lat Pulldown', sets: 3, reps: '10', setsCompleted: [false, false, false], weights: ['', '', ''], actualReps: ['', '', ''] }
+                ]
+            };
+
+            app.renderWorkoutExercises();
+            expect(app.getPersonalExerciseNote(app.activeWorkout.exercises[0])).toBe('');
+
+            // Open de notitie-editor en sla een persoonlijke notitie op
+            app.toggleExerciseNoteEditor(0);
+            const editor = document.getElementById('ex-note-editor-0');
+            expect(editor).not.toBeNull();
+
+            app.savePersonalExerciseNote(0, 'Bankje op stand 3, brede stang');
+            expect(app.getPersonalExerciseNote(app.activeWorkout.exercises[0])).toBe('Bankje op stand 3, brede stang');
+            expect(document.getElementById('workout-exercise-list').innerHTML).toContain('Bankje op stand 3, brede stang');
+
+            // Controleer dat de notitie in localStorage bewaard blijft voor latere trainingen
+            const savedNotes = JSON.parse(localStorage.getItem('exerciseNotes') || '{}');
+            expect(Object.values(savedNotes)).toContain('Bankje op stand 3, brede stang');
+
+            // Notitie wissen
+            app.savePersonalExerciseNote(0, '');
+            expect(app.getPersonalExerciseNote(app.activeWorkout.exercises[0])).toBe('');
+        });
+    });
 });
+
 
