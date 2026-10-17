@@ -398,6 +398,7 @@ class DataStore {
             this.holdTimerDelaySeconds = 3;
             this.deleted = { plans: [], logs: [] };
             this.customExercises = [];
+            this.exerciseNotes = {};
             this.smartRecovery = { lastRefeedDate: null, lastDeloadDate: null, lastDietBreakDate: null };
         }
     }
@@ -474,12 +475,30 @@ class DataStore {
         this.palette = localStorage.getItem('palette') || 'blauw';
         this.holdTimerDelaySeconds = (typeof localStorage !== 'undefined' && localStorage.getItem('holdTimerDelaySeconds')) ? (parseInt(localStorage.getItem('holdTimerDelaySeconds'), 10) || 3) : 3;
         this.customExercises = this.safeParse('customExercises', []);
+        this.exerciseNotes = this.safeParse('exerciseNotes', {});
         this.smartRecovery = this.safeParse('smartRecovery', { lastRefeedDate: null, lastDeloadDate: null, lastDietBreakDate: null });
         // Tombstones: ids van verwijderde items, zodat cloud-sync ze niet terugbrengt
         this.deleted = this.safeParse('deleted', { plans: [], logs: [] });
         this.sortLogs();
         this.sanitizeLogPlanIds();
         this.invalidateCache();
+    }
+    getExerciseNote(exerciseKeyOrName) {
+        if (!exerciseKeyOrName || !this.exerciseNotes || typeof this.exerciseNotes !== 'object') return '';
+        const key = String(exerciseKeyOrName).trim().toLowerCase();
+        return this.exerciseNotes[key] || '';
+    }
+    setExerciseNote(exerciseKeyOrName, noteText) {
+        if (!exerciseKeyOrName) return;
+        if (!this.exerciseNotes || typeof this.exerciseNotes !== 'object') this.exerciseNotes = {};
+        const key = String(exerciseKeyOrName).trim().toLowerCase();
+        const trimmed = String(noteText || '').trim();
+        if (trimmed) {
+            this.exerciseNotes[key] = trimmed;
+        } else {
+            delete this.exerciseNotes[key];
+        }
+        this.save();
     }
     setColorPalette(paletteId) {
         const valid = COLOR_PALETTES.some(p => p.id === paletteId);
@@ -575,6 +594,7 @@ class DataStore {
             localStorage.setItem('palette', this.palette || 'blauw');
             localStorage.setItem('holdTimerDelaySeconds', String(this.holdTimerDelaySeconds || 3));
             localStorage.setItem('customExercises', JSON.stringify(this.customExercises || []));
+            localStorage.setItem('exerciseNotes', JSON.stringify(this.exerciseNotes || {}));
             localStorage.setItem('smartRecovery', JSON.stringify(this.smartRecovery || {}));
             localStorage.setItem('deleted', JSON.stringify(this.deleted));
             this.invalidateCache();
@@ -1077,6 +1097,7 @@ const app = {
             if (document.visibilityState === 'visible' && this.activeWorkout && this.currentView === 'workout') {
                 this.requestWakeLock();
                 this.updateSessionTimer();
+                if (this.restTimer) this.syncRestTimerTick();
             }
         });
         if (typeof window !== 'undefined') {
@@ -6728,8 +6749,11 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             return;
         }
 
-        sortedExercises.forEach((ex) => {
-            const exIndex = this.activeWorkout.exercises.findIndex(e => e.id === ex.id);
+        sortedExercises.forEach((ex, sortedIdx) => {
+            const rawIdx = this.activeWorkout.exercises.findIndex(e => e === ex || (ex.id && e.id === ex.id));
+            const exIndex = rawIdx !== -1 ? rawIdx : sortedIdx;
+            const isFirstEx = sortedIdx === 0;
+            const isLastEx = sortedIdx === sortedExercises.length - 1;
             const variations = app.getExerciseVariations(ex);
             const activeExerciseName = app.getActiveExerciseName(ex);
             const prevDetails = this.getPreviousExerciseDetails(activeExerciseName, ex) || [];
@@ -7043,6 +7067,46 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 : `app.openSubstitutionModalForActiveWorkout(${exIndex})`;
             const wisselActiveCls = isSubDrawerOpen ? ' active' : '';
 
+            const personalNote = this.getPersonalExerciseNote(ex);
+            const isNoteEditorOpen = Boolean(this.openNoteEditors && this.openNoteEditors.has(exIndex));
+            const noteBtnActiveCls = (personalNote || isNoteEditorOpen) ? ' active' : '';
+
+            let personalNoteHtml = '';
+            if (personalNote && !isNoteEditorOpen) {
+                personalNoteHtml += `
+                    <div class="personal-sticky-note" onclick="app.toggleExerciseNoteEditor(${exIndex})" title="Tik om persoonlijke notitie te bewerken">
+                        <span class="material-icons-round sticky-note-icon" aria-hidden="true">sticky_note_2</span>
+                        <span>${app.escapeHTML(personalNote)}</span>
+                    </div>
+                `;
+            }
+            if (isNoteEditorOpen) {
+                personalNoteHtml += `
+                    <div id="ex-note-editor-${exIndex}" class="exercise-note-editor">
+                        <input type="text" id="ex-note-input-${exIndex}" class="input-field" style="font-family:inherit; padding:8px 10px;" placeholder="Bijv. Stoel op stand 4, smalle greep..." value="${app.escapeHTML(personalNote)}" onkeydown="if(event.key==='Enter'){event.preventDefault();app.savePersonalExerciseNote(${exIndex}, this.value);}">
+                        <div style="display:flex; justify-content:flex-end; gap:6px;">
+                            ${personalNote ? `<button type="button" class="btn-secondary" style="padding:4px 10px; font-size:0.78rem;" onclick="app.savePersonalExerciseNote(${exIndex}, '')">Wissen</button>` : ''}
+                            <button type="button" class="btn-secondary" style="padding:4px 10px; font-size:0.78rem;" onclick="app.toggleExerciseNoteEditor(${exIndex})">Annuleer</button>
+                            <button type="button" class="btn-primary" style="padding:4px 12px; font-size:0.78rem;" onclick="app.savePersonalExerciseNote(${exIndex}, document.getElementById('ex-note-input-${exIndex}').value)">Opslaan</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const orderControlsHtml = `
+                <div class="exercise-order-controls">
+                    <button type="button" class="exercise-icon-action-btn" id="btn-move-up-${exIndex}" onclick="app.moveWorkoutExercise(${exIndex}, -1)" title="Oefening omhoog verplaatsen" aria-label="Oefening omhoog verplaatsen" ${isFirstEx ? 'disabled' : ''}>
+                        <span class="material-icons-round" style="font-size:0.95rem;" aria-hidden="true">arrow_upward</span>
+                    </button>
+                    <button type="button" class="exercise-icon-action-btn" id="btn-move-down-${exIndex}" onclick="app.moveWorkoutExercise(${exIndex}, 1)" title="Oefening omlaag verplaatsen" aria-label="Oefening omlaag verplaatsen" ${isLastEx ? 'disabled' : ''}>
+                        <span class="material-icons-round" style="font-size:0.95rem;" aria-hidden="true">arrow_downward</span>
+                    </button>
+                    <button type="button" class="exercise-icon-action-btn danger" id="btn-remove-ex-${exIndex}" onclick="app.removeWorkoutExercise(${exIndex})" title="Oefening uit deze sessie verwijderen" aria-label="Oefening uit deze sessie verwijderen">
+                        <span class="material-icons-round" style="font-size:0.95rem;" aria-hidden="true">delete_outline</span>
+                    </button>
+                </div>
+            `;
+
             const card = document.createElement('div');
             card.className = 'glass-panel exercise-card';
             card.innerHTML = `
@@ -7061,9 +7125,14 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                                 <button class="btn-secondary exercise-action-btn" onclick="app.showExerciseHistoryModal(${app.jsArg(activeExerciseName)})" title="Bekijk geschiedenis">
                                     <span class="material-icons-round">history</span> Historie
                                 </button>
+                                <button id="note-btn-${exIndex}" class="btn-secondary exercise-action-btn${noteBtnActiveCls}" onclick="app.toggleExerciseNoteEditor(${exIndex})" title="Persoonlijke notitie voor deze oefening">
+                                    <span class="material-icons-round">sticky_note_2</span> Notitie
+                                </button>
+                                ${orderControlsHtml}
                             </div>
                         </div>
                         ${quickAltsHtml}
+                        ${personalNoteHtml}
                         ${notesHtml}
                         ${delayBarHtml}
                     </div>
@@ -7089,6 +7158,94 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             </button>
         `;
         list.appendChild(addBtnContainer);
+    },
+
+    openNoteEditors: null,
+
+    getPersonalExerciseNote(ex) {
+        if (!ex || typeof store === 'undefined' || !store.getExerciseNote) return '';
+        const activeName = this.getActiveExerciseName ? this.getActiveExerciseName(ex) : (ex.chosenVariation || ex.name || '');
+        const byActiveName = store.getExerciseNote(activeName);
+        if (byActiveName) return byActiveName;
+        if (ex.name && ex.name !== activeName) {
+            const byBaseName = store.getExerciseNote(ex.name);
+            if (byBaseName) return byBaseName;
+        }
+        if (this.getCanonicalExerciseKey) {
+            const cKey = this.getCanonicalExerciseKey(activeName);
+            if (cKey) {
+                const byCanonical = store.getExerciseNote(cKey);
+                if (byCanonical) return byCanonical;
+            }
+        }
+        return '';
+    },
+
+    toggleExerciseNoteEditor(exIndex) {
+        if (!this.openNoteEditors) this.openNoteEditors = new Set();
+        if (this.openNoteEditors.has(exIndex)) {
+            this.openNoteEditors.delete(exIndex);
+        } else {
+            this.openNoteEditors.add(exIndex);
+        }
+        this.renderWorkoutExercises();
+        if (this.openNoteEditors.has(exIndex) && typeof document !== 'undefined') {
+            const input = document.getElementById(`ex-note-input-${exIndex}`);
+            if (input && typeof input.focus === 'function') input.focus();
+        }
+    },
+
+    savePersonalExerciseNote(exIndex, noteVal) {
+        if (!this.activeWorkout || !this.activeWorkout.exercises || !this.activeWorkout.exercises[exIndex]) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+        const activeName = this.getActiveExerciseName ? this.getActiveExerciseName(ex) : (ex.chosenVariation || ex.name || '');
+        if (typeof store !== 'undefined' && store.setExerciseNote) {
+            store.setExerciseNote(activeName, noteVal);
+            if (this.getCanonicalExerciseKey) {
+                const cKey = this.getCanonicalExerciseKey(activeName);
+                if (cKey) store.setExerciseNote(cKey, noteVal);
+            }
+        }
+        if (this.openNoteEditors) this.openNoteEditors.delete(exIndex);
+        this.renderWorkoutExercises();
+    },
+
+    moveWorkoutExercise(exIndex, direction) {
+        if (!this.activeWorkout || !Array.isArray(this.activeWorkout.exercises)) return;
+        const sorted = [...this.activeWorkout.exercises].sort((a, b) => (a.order || 99) - (b.order || 99));
+        const targetEx = this.activeWorkout.exercises[exIndex];
+        const currentPos = sorted.indexOf(targetEx);
+        if (currentPos === -1) return;
+        const newPos = currentPos + direction;
+        if (newPos < 0 || newPos >= sorted.length) return;
+
+        const temp = sorted[currentPos];
+        sorted[currentPos] = sorted[newPos];
+        sorted[newPos] = temp;
+        sorted.forEach((item, idx) => {
+            if (item && typeof item === 'object') item.order = idx + 1;
+        });
+        this.activeWorkout.exercises = sorted;
+        if (this.openSubDrawers) this.openSubDrawers.clear();
+        if (this.openNoteEditors) this.openNoteEditors.clear();
+        if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+        this.renderWorkoutExercises();
+    },
+
+    removeWorkoutExercise(exIndex) {
+        if (!this.activeWorkout || !Array.isArray(this.activeWorkout.exercises)) return;
+        if (exIndex < 0 || exIndex >= this.activeWorkout.exercises.length) return;
+        if (this.holdTimerState && this.holdTimerState.exIndex === exIndex) {
+            this.stopHoldTimer(false);
+        }
+        this.activeWorkout.exercises.splice(exIndex, 1);
+        this.activeWorkout.exercises.forEach((item, idx) => {
+            if (item && typeof item === 'object') item.order = idx + 1;
+        });
+        if (this.openSubDrawers) this.openSubDrawers.clear();
+        if (this.openNoteEditors) this.openNoteEditors.clear();
+        if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
+        this.renderWorkoutExercises();
     },
 
     getExerciseMuscleLabel(ex) {
@@ -7373,6 +7530,25 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     // --- RUSTTIMER ---
 
     restTimer: null,
+    restTimerEndTime: null,
+
+    formatRestRemaining(seconds) {
+        const rem = Math.max(0, Math.round(seconds || 0));
+        return `Rust: ${Math.floor(rem / 60)}:${String(rem % 60).padStart(2, '0')}`;
+    },
+
+    syncRestTimerTick() {
+        if (!this.restTimerEndTime) return;
+        const label = document.getElementById('rest-timer-label');
+        const remaining = Math.ceil((this.restTimerEndTime - Date.now()) / 1000);
+        if (remaining <= 0) {
+            this.stopRestTimer();
+            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            this.showToast('Rust voorbij, tijd voor je volgende set!', 'success');
+        } else if (label) {
+            label.textContent = this.formatRestRemaining(remaining);
+        }
+    },
 
     startRestTimer(seconds) {
         this.stopRestTimer();
@@ -7380,23 +7556,26 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const label = document.getElementById('rest-timer-label');
         if (!el || !label) return;
 
-        let remaining = Math.round(seconds);
-        const update = () => {
-            label.textContent = `Rust: ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
-        };
-        update();
+        const initialSeconds = Math.max(0, Math.round(seconds));
+        this.restTimerEndTime = Date.now() + initialSeconds * 1000;
+        label.textContent = this.formatRestRemaining(initialSeconds);
         el.classList.remove('hidden');
 
         this.restTimer = setInterval(() => {
-            remaining--;
-            if (remaining <= 0) {
-                this.stopRestTimer();
-                if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                this.showToast('Rust voorbij, tijd voor je volgende set!', 'success');
-            } else {
-                update();
-            }
+            this.syncRestTimerTick();
         }, 1000);
+    },
+
+    adjustRestTimer(deltaSeconds) {
+        if (!this.restTimer || !this.restTimerEndTime) return;
+        this.restTimerEndTime += Math.round(deltaSeconds || 0) * 1000;
+        const remaining = Math.ceil((this.restTimerEndTime - Date.now()) / 1000);
+        if (remaining <= 0) {
+            this.stopRestTimer();
+        } else {
+            const label = document.getElementById('rest-timer-label');
+            if (label) label.textContent = this.formatRestRemaining(remaining);
+        }
     },
 
     stopRestTimer() {
@@ -7404,6 +7583,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             clearInterval(this.restTimer);
             this.restTimer = null;
         }
+        this.restTimerEndTime = null;
         const el = document.getElementById('rest-timer');
         if (el) el.classList.add('hidden');
     },
@@ -7814,6 +7994,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const isNonEmpty = val => val !== null && val !== undefined && String(val).trim() !== '';
 
         let totalExercisesCompleted = 0;
+        let totalSetsCompleted = 0;
+        let totalVolumeKg = 0;
+        const recapHighlights = [];
         
         const exerciseLogs = [];
 
@@ -7834,6 +8017,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             }
 
             const setDetails = [];
+            let bestExAchievement = null;
+
             for (let i = 0; i < ex.sets; i++) {
                 if (ex.setsCompleted[i]) {
                     // Resolve weight with fallbacks
@@ -7879,10 +8064,34 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         levelVal = prevDetails[i].level;
                     }
 
+                    const resolvedWeightStr = weightVal != null ? String(weightVal) : '';
+                    const resolvedRepsStr = repsVal != null ? String(repsVal) : '';
+                    ex.weights[i] = resolvedWeightStr;
+                    ex.actualReps[i] = resolvedRepsStr;
+
+                    const numW = parseFloat(resolvedWeightStr) || 0;
+                    const numR = parseInt(resolvedRepsStr, 10) || 0;
+                    if (numW > 0 && numR > 0) {
+                        totalVolumeKg += numW * numR;
+                    }
+
+                    const ach = this.evaluateSetAchievement ? this.evaluateSetAchievement(ex, i) : 'normal';
+                    if (ach === 'pr' || ach === 'overload') {
+                        if (!bestExAchievement || (ach === 'pr' && bestExAchievement.type !== 'pr') || numW > bestExAchievement.numW) {
+                            bestExAchievement = {
+                                exerciseName: activeExerciseName,
+                                type: ach,
+                                weight: resolvedWeightStr,
+                                reps: resolvedRepsStr,
+                                numW
+                            };
+                        }
+                    }
+
                     const detail = {
                         setNumber: i + 1,
-                        weight: weightVal != null ? String(weightVal) : '',
-                        reps: repsVal != null ? String(repsVal) : ''
+                        weight: resolvedWeightStr,
+                        reps: resolvedRepsStr
                     };
                     if (isNonEmpty(levelVal)) {
                         detail.level = String(levelVal);
@@ -7893,6 +8102,10 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
             if (setDetails.length > 0) {
                 totalExercisesCompleted++;
+                totalSetsCompleted += setDetails.length;
+                if (bestExAchievement) {
+                    recapHighlights.push(bestExAchievement);
+                }
                 exerciseLogs.push({
                     name: this.getActiveExerciseName(ex),
                     originalName: ex.name,
@@ -7910,14 +8123,16 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const snapshotPlanId = this.activeWorkout ? this.activeWorkout.planId : undefined;
         const snapshotPlanName = this.activeWorkout ? this.activeWorkout.planName : undefined;
         const fallbackPlan = (snapshotPlanId === undefined) ? store.getActivePlan() : null;
+        const resolvedPlanName = snapshotPlanName !== undefined ? snapshotPlanName : (fallbackPlan ? fallbackPlan.name : 'Overige Sessies');
+        const resolvedSessionName = (this.activeWorkout && this.activeWorkout.session) ? this.activeWorkout.session.name : 'Sessie';
         const endTime = new Date();
         const startTime = (this.activeWorkout && this.activeWorkout.startTime) ? this.activeWorkout.startTime : new Date(endTime.getTime() - duration * 60000);
 
         store.saveWorkoutLog({
             planId: snapshotPlanId !== undefined ? snapshotPlanId : (fallbackPlan ? fallbackPlan.id : null),
-            planName: snapshotPlanName !== undefined ? snapshotPlanName : (fallbackPlan ? fallbackPlan.name : 'Overige Sessies'),
+            planName: resolvedPlanName,
             sessionId: (this.activeWorkout && this.activeWorkout.session) ? this.activeWorkout.session.id : null,
-            sessionName: (this.activeWorkout && this.activeWorkout.session) ? this.activeWorkout.session.name : 'Sessie',
+            sessionName: resolvedSessionName,
             startTime: startTime instanceof Date ? startTime.toISOString() : startTime,
             endTime: endTime.toISOString(),
             duration: duration,
@@ -7933,6 +8148,103 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const bottomNavEl = document.getElementById('bottom-nav');
         if (bottomNavEl) bottomNavEl.classList.remove('hidden');
         this.navigate('home');
+
+        const recapData = {
+            sessionName: resolvedSessionName,
+            planName: resolvedPlanName,
+            duration,
+            exercisesCompleted: totalExercisesCompleted,
+            setsCompleted: totalSetsCompleted,
+            totalVolumeKg: Math.round(totalVolumeKg),
+            highlights: recapHighlights
+        };
+        this.lastWorkoutRecap = recapData;
+        if (totalSetsCompleted > 0) {
+            this.showWorkoutRecapModal(recapData);
+        }
+    },
+
+    lastWorkoutRecap: null,
+
+    showWorkoutRecapModal(recap = null) {
+        const data = recap || this.lastWorkoutRecap;
+        if (!data || typeof document === 'undefined') return;
+        const modal = document.getElementById('modal-workout-recap');
+        if (!modal) return;
+
+        const subtitleEl = document.getElementById('workout-recap-subtitle');
+        if (subtitleEl) {
+            subtitleEl.textContent = data.planName ? `${data.sessionName} • ${data.planName}` : data.sessionName;
+        }
+
+        const statsEl = document.getElementById('workout-recap-stats');
+        if (statsEl) {
+            const volText = data.totalVolumeKg > 0 ? `${data.totalVolumeKg.toLocaleString('nl-NL')} kg` : `${data.exercisesCompleted}`;
+            const volLabel = data.totalVolumeKg > 0 ? 'Volume' : 'Oefeningen';
+            const safeDuration = this.escapeHTML(String(data.duration));
+            const safeSetsCompleted = this.escapeHTML(String(data.setsCompleted));
+            const safeVolLabel = this.escapeHTML(String(volLabel));
+            statsEl.innerHTML = `
+                <div class="workout-recap-stat-card">
+                    <span class="workout-recap-stat-val">${safeDuration}m</span>
+                    <span class="workout-recap-stat-lbl">Duur</span>
+                </div>
+                <div class="workout-recap-stat-card">
+                    <span class="workout-recap-stat-val">${safeSetsCompleted}</span>
+                    <span class="workout-recap-stat-lbl">Sets</span>
+                </div>
+                <div class="workout-recap-stat-card">
+                    <span class="workout-recap-stat-val">${this.escapeHTML(String(volText))}</span>
+                    <span class="workout-recap-stat-lbl">${safeVolLabel}</span>
+                </div>
+            `;
+        }
+
+        const highlightsEl = document.getElementById('workout-recap-highlights');
+        if (highlightsEl) {
+            if (Array.isArray(data.highlights) && data.highlights.length > 0) {
+                highlightsEl.classList.remove('hidden');
+                const itemsHtml = data.highlights.map(h => {
+                    const isPr = h.type === 'pr';
+                    const badgeText = isPr ? '✦ Nieuw PR' : '↑ Overload';
+                    const metricText = h.weight ? `${this.escapeHTML(String(h.weight))} kg × ${this.escapeHTML(String(h.reps))}` : `${this.escapeHTML(String(h.reps))} reps`;
+                    return `
+                        <div class="workout-recap-highlight-item">
+                            <div style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                <strong>${this.escapeHTML(h.exerciseName)}</strong> <span class="text-muted">(${metricText})</span>
+                            </div>
+                            <span class="workout-recap-highlight-badge ${isPr ? 'pr' : 'overload'}">${badgeText}</span>
+                        </div>
+                    `;
+                }).join('');
+                highlightsEl.innerHTML = `
+                    <div class="workout-recap-highlights-title">
+                        <span class="material-icons-round" style="font-size:1rem;">emoji_events</span>
+                        <span>Behaalde mijlpalen (${data.highlights.length})</span>
+                    </div>
+                    ${itemsHtml}
+                `;
+            } else {
+                highlightsEl.innerHTML = '';
+                highlightsEl.classList.add('hidden');
+            }
+        }
+
+        modal.classList.remove('hidden');
+    },
+
+    hideWorkoutRecapModal() {
+        if (typeof document === 'undefined') return;
+        const modal = document.getElementById('modal-workout-recap');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    shareFromWorkoutRecap() {
+        this.hideWorkoutRecapModal();
+        this.navigate('progress');
+        if (typeof this.openShareStatsModal === 'function') {
+            this.openShareStatsModal();
+        }
     },
 
 

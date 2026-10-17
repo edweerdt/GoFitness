@@ -5,7 +5,7 @@
     <!-- Zoomen niet blokkeren (WCAG 1.4.4); viewport-fit voor de iPhone-notch -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Go Fitness</title>
-    <link rel="stylesheet" href="style.css?v=34">
+    <link rel="stylesheet" href="style.css?v=35">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -110,10 +110,16 @@
                     <div id="workout-progress-track" class="workout-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Trainingsvoortgang">
                         <div id="workout-progress-bar" class="workout-progress-bar" style="width: 0%;"></div>
                     </div>
-                    <div id="rest-timer" class="rest-timer glass-panel hidden" role="button" tabindex="0" aria-label="Rusttimer, tik om over te slaan" onclick="app.stopRestTimer()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" title="Tik om over te slaan">
-                        <span class="material-icons-round">timer</span>
-                        <span id="rest-timer-label">Rust: 0:00</span>
-                        <span class="text-sm text-muted">tik om over te slaan</span>
+                    <div id="rest-timer" class="rest-timer glass-panel hidden" role="button" tabindex="0" aria-label="Rusttimer, gebruik de knoppen om de rusttijd aan te passen of over te slaan" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();app.stopRestTimer();}">
+                        <div class="rest-timer-main">
+                            <span class="material-icons-round" aria-hidden="true">timer</span>
+                            <span id="rest-timer-label">Rust: 0:00</span>
+                        </div>
+                        <div class="rest-timer-controls">
+                            <button type="button" id="btn-rest-minus" class="rest-timer-chip" onclick="event.stopPropagation(); app.adjustRestTimer(-15)" aria-label="15 seconden korter rusten">-15s</button>
+                            <button type="button" id="btn-rest-plus" class="rest-timer-chip" onclick="event.stopPropagation(); app.adjustRestTimer(30)" aria-label="30 seconden langer rusten">+30s</button>
+                            <button type="button" id="btn-rest-skip" class="rest-timer-chip skip" onclick="event.stopPropagation(); app.stopRestTimer()" aria-label="Rusttimer overslaan">Skip</button>
+                        </div>
                     </div>
                 </div>
                 <div class="content-padded pb-32 flex-col gap-3" id="workout-exercise-list">
@@ -838,6 +844,27 @@
                 <div class="modal-actions smart-recovery-actions">
                     <button id="btn-mark-recovery-applied" class="btn-primary" onclick="app.markSmartRecoveryApplied()">✓ Check</button>
                     <button class="btn-secondary" onclick="app.hideSmartRecoveryModal()">Sluiten</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Post-Workout Samenvatting (Workout Recap Sheet, GOF-59) -->
+        <div id="modal-workout-recap" class="modal-overlay hidden">
+            <div class="modal-content glass-panel workout-recap-modal-content">
+                <div class="workout-recap-header">
+                    <div class="workout-recap-badge-icon" aria-hidden="true">🏆</div>
+                    <h3 id="workout-recap-title">Training Voltooid!</h3>
+                    <p id="workout-recap-subtitle" class="text-sm text-muted"></p>
+                </div>
+                <div id="workout-recap-stats" class="workout-recap-stats-grid"></div>
+                <div id="workout-recap-highlights" class="workout-recap-highlights hidden"></div>
+                <div class="modal-actions mt-4">
+                    <button type="button" id="btn-recap-share" class="btn-secondary" onclick="app.shareFromWorkoutRecap()">
+                        <span class="material-icons-round" aria-hidden="true">share</span> Delen
+                    </button>
+                    <button type="button" id="btn-recap-close" class="btn-primary" data-modal-close onclick="app.hideWorkoutRecapModal()">
+                        <span class="material-icons-round" aria-hidden="true">check</span> Klaar
+                    </button>
                 </div>
             </div>
         </div>
