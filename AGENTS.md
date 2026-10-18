@@ -27,8 +27,9 @@ Voor ELKE taak, bugfix of feature in dit project doorloopt de AI assistent autom
    - Maak een duidelijke commit (`git commit -m "<type>(<scope>): <beschrijving> (GOF-XX)"`).
    - Push direct naar remote (`git push -u origin <branch>`).
 
-5. **Pull Request Link & Ticket Update**:
-   - Deel direct de GitHub PR link in de chat (`https://github.com/edweerdt/GoFitness/compare/main...<branch>?expand=1`).
+5. **Pull Request Aanmaken & Ticket Update**:
+   - Maak direct de Pull Request aan op GitHub (via GitHub API met token uit git credential helper).
+   - Deel direct de definitieve GitHub PR link in de chat (`https://github.com/edweerdt/GoFitness/pull/<nummer>`).
    - Plaats een samenvattend comment met de PR-link op het Linear ticket.
 
 6. **Acceptatie, Done & Chat Titel Update**:
