@@ -3022,12 +3022,16 @@ const app = {
         this.isHomeSessionPreviewOpen = !this.isHomeSessionPreviewOpen;
         const listEl = document.getElementById('home-snapshot-list');
         const btnEl = document.getElementById('btn-toggle-session-snapshot');
+        const arrowEl = document.getElementById('home-snapshot-arrow');
         const toggleLabelEl = document.getElementById('home-snapshot-toggle-label');
         if (listEl) {
             listEl.classList.toggle('hidden', !this.isHomeSessionPreviewOpen);
         }
         if (btnEl) {
             btnEl.setAttribute('aria-expanded', this.isHomeSessionPreviewOpen ? 'true' : 'false');
+        }
+        if (arrowEl) {
+            arrowEl.textContent = this.isHomeSessionPreviewOpen ? 'expand_less' : 'expand_more';
         }
         if (toggleLabelEl) {
             toggleLabelEl.innerHTML = this.isHomeSessionPreviewOpen
@@ -3078,15 +3082,30 @@ const app = {
             }
         });
 
+        const exCountText = `${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}`;
+        const durationText = `~${estMins} min`;
+        const musclesText = uniqueMuscles.slice(0, 4).join(', ');
+
         if (metaEl) {
-            const parts = [
-                `${exCount} ${exCount === 1 ? 'oefening' : 'oefeningen'}`,
-                `~${estMins} min`
-            ];
-            if (uniqueMuscles.length > 0) {
-                parts.push(uniqueMuscles.slice(0, 4).join(', '));
+            if (btnEl && btnEl.contains(metaEl)) {
+                // Legacy / Unit test DOM format where button wraps meta span
+                const parts = [exCountText, durationText];
+                if (musclesText) parts.push(musclesText);
+                metaEl.textContent = parts.join(' • ');
+            } else {
+                // Option 2 v3 interactive chips format
+                metaEl.innerHTML = `
+                    <button type="button" id="btn-toggle-session-snapshot" class="chip-pill-interactive" onclick="app.toggleHomeSessionPreview()" aria-expanded="${this.isHomeSessionPreviewOpen ? 'true' : 'false'}" title="Klik om oefeningen te bekijken of verbergen">
+                        <span class="material-icons-round chip-icon" style="font-size:14px;" aria-hidden="true">fitness_center</span>
+                        <span id="home-snapshot-count">${exCountText}</span>
+                        <span class="material-icons-round chip-arrow" id="home-snapshot-arrow" style="font-size:15px; margin-left:2px;" aria-hidden="true">${this.isHomeSessionPreviewOpen ? 'expand_less' : 'expand_more'}</span>
+                    </button>
+                    <span class="chip-pill">
+                        <span class="material-icons-round chip-icon" style="font-size:14px;" aria-hidden="true">schedule</span> ${durationText}
+                    </span>
+                    ${musclesText ? `<span class="chip-pill">${this.escapeHTML(musclesText)}</span>` : ''}
+                `;
             }
-            metaEl.textContent = parts.join(' • ');
         }
 
         if (listEl) {
@@ -3120,8 +3139,9 @@ const app = {
             listEl.classList.toggle('hidden', !this.isHomeSessionPreviewOpen);
         }
 
-        if (btnEl) {
-            btnEl.setAttribute('aria-expanded', this.isHomeSessionPreviewOpen ? 'true' : 'false');
+        const currentBtnEl = document.getElementById('btn-toggle-session-snapshot');
+        if (currentBtnEl) {
+            currentBtnEl.setAttribute('aria-expanded', this.isHomeSessionPreviewOpen ? 'true' : 'false');
         }
         if (toggleLabelEl) {
             toggleLabelEl.innerHTML = this.isHomeSessionPreviewOpen
@@ -3191,20 +3211,32 @@ const app = {
         const btnStart = document.getElementById('btn-start-session');
         const pickerWrapper = document.getElementById('session-picker-wrapper');
         const sessionSelect = document.getElementById('home-session-select');
+        const planNameEl = document.getElementById('home-plan-name');
+        const cardTitleEl = document.getElementById('recommended-card-title');
+        const sessionNameEl = document.getElementById('recommended-session-name');
+        const reasonEl = document.getElementById('recommended-reason');
+        const quickAdaptBar = document.getElementById('home-quick-adapt-bar');
 
         const setCardText = (title, name, reason) => {
-            const titleEl = document.getElementById('recommended-card-title');
-            if (titleEl) titleEl.textContent = title;
-            const nameEl = document.getElementById('recommended-session-name');
-            if (nameEl) nameEl.textContent = name;
-            const reasonEl = document.getElementById('recommended-reason');
+            if (cardTitleEl) cardTitleEl.textContent = title;
+            if (sessionNameEl) sessionNameEl.textContent = name;
             if (reasonEl) reasonEl.textContent = reason;
         };
 
         if (this.activeWorkout && this.activeWorkout.session) {
             if (pickerWrapper) pickerWrapper.classList.add('hidden');
+            if (quickAdaptBar) quickAdaptBar.classList.add('hidden');
             const choosePresetsBtn = document.getElementById('btn-home-presets');
             if (choosePresetsBtn) choosePresetsBtn.classList.add('hidden');
+
+            const activePlan = store.getActivePlan();
+            if (planNameEl) {
+                planNameEl.textContent = (activePlan && activePlan.name) ? activePlan.name : "Vrije Training";
+                planNameEl.classList.remove('hidden');
+            }
+            if (sessionNameEl) sessionNameEl.classList.remove('hidden');
+            if (reasonEl) reasonEl.classList.remove('hidden');
+
             setCardText("Sessie in uitvoering", this.activeWorkout.session.name, "Je was al bezig met deze sessie. Pak hem weer op!");
             const activeSessionPreview = {
                 ...this.activeWorkout.session,
@@ -3224,6 +3256,14 @@ const app = {
 
             if (!activePlan && store.plans.length === 0) {
                 if (pickerWrapper) pickerWrapper.classList.add('hidden');
+                if (quickAdaptBar) quickAdaptBar.classList.add('hidden');
+                if (planNameEl) {
+                    planNameEl.textContent = "Geen schema actief";
+                    planNameEl.classList.remove('hidden');
+                }
+                if (sessionNameEl) sessionNameEl.classList.remove('hidden');
+                if (reasonEl) reasonEl.classList.remove('hidden');
+
                 setCardText(
                     "⚡ Direct Starten",
                     "Beginner Gym + Lichaamsgewicht Mix",
@@ -3264,6 +3304,10 @@ const app = {
 
                 if (pickerWrapper && sessionSelect) {
                     pickerWrapper.classList.remove('hidden');
+                    if (planNameEl) {
+                        planNameEl.textContent = activePlan ? activePlan.name : "Schema";
+                        planNameEl.classList.remove('hidden');
+                    }
 
                     let optionsHtml = '';
                     if (activePlan && activePlan.sessions && activePlan.sessions.length > 0) {
@@ -3283,6 +3327,8 @@ const app = {
                         if (chosenVal === 'custom_session') {
                             updateRecoveryBadge(null);
                             setCardText("Vrije Sessie", "Vrije Sessie", "Start een blanco training zonder vaste oefeningen. Voeg tijdens het trainen oefeningen toe.");
+                            if (sessionNameEl) sessionNameEl.classList.add('hidden');
+                            if (reasonEl) reasonEl.classList.add('hidden');
                             this.renderHomeSessionSnapshot(null);
                             if (btnStart) {
                                 btnStart.textContent = "Start Vrije Sessie";
@@ -3301,6 +3347,8 @@ const app = {
                                 chosenSession.name,
                                 isRecChoice ? recSession.reason : `Handmatig gekozen uit schema (${activePlan.name}).`
                             );
+                            if (sessionNameEl) sessionNameEl.classList.add('hidden');
+                            if (reasonEl) reasonEl.classList.add('hidden');
                             this.renderHomeSessionSnapshot(chosenSession);
                             if (btnStart) {
                                 btnStart.textContent = "Start Nu";
@@ -3308,22 +3356,22 @@ const app = {
                                 btnStart.onclick = () => this.startWorkout(chosenSession, activePlan);
                             }
 
-                            let quickAdaptBar = document.getElementById('home-quick-adapt-bar');
-                            if (!quickAdaptBar && btnStart && btnStart.parentNode) {
-                                quickAdaptBar = document.createElement('div');
-                                quickAdaptBar.id = 'home-quick-adapt-bar';
-                                quickAdaptBar.className = 'quick-adapt-bar';
-                                quickAdaptBar.innerHTML = `
+                            let bar = document.getElementById('home-quick-adapt-bar');
+                            if (!bar && btnStart && btnStart.parentNode) {
+                                bar = document.createElement('div');
+                                bar.id = 'home-quick-adapt-bar';
+                                bar.className = 'quick-adapt-bar';
+                                bar.innerHTML = `
                                     <button class="quick-adapt-btn" onclick="app.quickConvertAndStartSession('home')" title="Vervang apparaten automatisch door thuis-geschikte oefeningen">
-                                        <span class="material-icons-round" style="font-size:1rem; color:#60a5fa;">home</span> Thuis omzetten
+                                        <span class="material-icons-round" style="font-size:1rem; color:#60a5fa;" aria-hidden="true">home</span> Thuis omzetten
                                     </button>
                                     <button class="quick-adapt-btn" onclick="app.quickConvertAndStartSession('axial')" title="Vervang zware rugbelasting automatisch door rugsparende alternatieven">
-                                        <span class="material-icons-round" style="font-size:1rem; color:#34d399;">shield</span> Rug ontlasten
+                                        <span class="material-icons-round" style="font-size:1rem; color:#34d399;" aria-hidden="true">shield</span> Rug ontlasten
                                     </button>
                                 `;
-                                btnStart.parentNode.insertBefore(quickAdaptBar, btnStart.nextSibling);
-                            } else if (quickAdaptBar) {
-                                quickAdaptBar.classList.remove('hidden');
+                                btnStart.parentNode.insertBefore(bar, btnStart.nextSibling);
+                            } else if (bar) {
+                                bar.classList.remove('hidden');
                             }
                         }
                     };
@@ -3338,6 +3386,8 @@ const app = {
                         btnStart.disabled = false;
                         btnStart.onclick = () => this.startCustomWorkout();
                     }
+                    const bar = document.getElementById('home-quick-adapt-bar');
+                    if (bar) bar.classList.add('hidden');
                 }
             }
         }

@@ -7131,4 +7131,198 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(styleCss).toContain('#btn-apply-plate-weight-label');
         });
     });
+
+    describe('GOF-63: Home UX | Rustigere en overzichtelijke Recommended Session kaart', () => {
+        beforeEach(() => {
+            document.body.innerHTML = `
+                <div class="home-header">
+                    <h1 id="home-date">Vandaag</h1>
+                    <div id="recovery-status" class="status-badge green">
+                        <span id="recovery-text">Klaar om te trainen</span>
+                        <span id="recovery-hours" class="recovery-hours-text"></span>
+                        <button type="button" id="recovery-suggestion" class="status-badge-secondary hidden">
+                            <span id="recovery-suggestion-text"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="recommended-card glass-panel">
+                    <div class="home-plan-header">
+                        <div id="home-plan-name" class="home-plan-name"></div>
+                        <div>
+                            <span id="recommended-card-title" class="home-recommended-badge"></span>
+                        </div>
+                    </div>
+                    <h2 id="recommended-session-name" class="hidden"></h2>
+                    <p id="recommended-reason" class="hidden"></p>
+                    <div id="session-picker-wrapper" class="session-picker-wrapper hidden">
+                        <select id="home-session-select" class="home-session-select"></select>
+                    </div>
+                    <div id="home-session-snapshot" class="home-session-snapshot hidden">
+                        <div id="home-snapshot-meta" class="home-snapshot-chips"></div>
+                        <div id="home-snapshot-list" class="home-snapshot-list hidden"></div>
+                    </div>
+                    <button id="btn-start-session" class="btn-primary w-full mt-3" disabled>Start Nu</button>
+                    <div id="home-quick-adapt-bar" class="quick-adapt-bar hidden">
+                        <button type="button" class="quick-adapt-btn" onclick="app.quickConvertAndStartSession('home')">Thuis omzetten</button>
+                        <button type="button" class="quick-adapt-btn" onclick="app.quickConvertAndStartSession('axial')">Rug ontlasten</button>
+                    </div>
+                </div>
+                <div class="stats-mini">
+                    <span id="stat-completed">0</span>
+                    <span id="stat-streak">0</span>
+                </div>
+            `;
+            app.activeWorkout = null;
+            app.isHomeSessionPreviewOpen = false;
+        });
+
+        it('1. toont schemanaam (#home-plan-name) boven de badge (#recommended-card-title) en verbergt dubbele sessietitel', () => {
+            const plan = {
+                id: 'plan_gof63',
+                name: 'Beginner Gym + Lichaamsgewicht Mix',
+                sessions: [
+                    { id: 'sess_1', name: 'Full Body A', exercises: [{ name: 'Squat', sets: 3, reps: '10' }] },
+                    { id: 'sess_2', name: 'Full Body B', exercises: [{ name: 'Bench Press', sets: 3, reps: '8' }] }
+                ]
+            };
+            store.plans = [plan];
+            store.activePlanId = 'plan_gof63';
+            store.logs = [];
+
+            app.renderHome();
+
+            const planNameEl = document.getElementById('home-plan-name');
+            const cardTitleEl = document.getElementById('recommended-card-title');
+            const sessionNameEl = document.getElementById('recommended-session-name');
+            const reasonEl = document.getElementById('recommended-reason');
+            const selectEl = document.getElementById('home-session-select');
+            const pickerWrapper = document.getElementById('session-picker-wrapper');
+            const adaptBar = document.getElementById('home-quick-adapt-bar');
+
+            // Schemanaam zichtbaar
+            expect(planNameEl.textContent).toBe('Beginner Gym + Lichaamsgewicht Mix');
+            expect(planNameEl.classList.contains('hidden')).toBe(false);
+
+            // Badge toont Aanbevolen Sessie
+            expect(cardTitleEl.textContent).toBe('Aanbevolen Sessie');
+
+            // Dubbele titels verborgen omdat selector actief is
+            expect(sessionNameEl.classList.contains('hidden')).toBe(true);
+            expect(reasonEl.classList.contains('hidden')).toBe(true);
+            expect(pickerWrapper.classList.contains('hidden')).toBe(false);
+
+            // Selector bevat de sessies met Aanbevolen
+            expect(selectEl.options.length).toBe(3); // 2 sessies + Vrije Sessie
+            expect(selectEl.options[0].text).toContain('Full Body A (Aanbevolen)');
+
+            // Quick adapt bar direct zichtbaar onder de knop
+            expect(adaptBar.classList.contains('hidden')).toBe(false);
+        });
+
+        it('2. rendert interactieve uitklapbare oefeningen-pill die de snapshotlijst opent en sluit', () => {
+            const plan = {
+                id: 'plan_gof63_b',
+                name: 'Hypertrofie Schema',
+                sessions: [
+                    {
+                        id: 'sess_hyp',
+                        name: 'Upper Body',
+                        estimatedMinutes: 45,
+                        exercises: [
+                            { name: 'Incline Bench Press', sets: 3, repsMin: 8, repsMax: 10, muscleGroups: ['chest'] },
+                            { name: 'Barbell Row', sets: 4, reps: '8', muscleGroups: ['back'] },
+                            { name: 'Overhead Press', sets: 3, reps: '10', muscleGroups: ['shoulders'] }
+                        ]
+                    }
+                ]
+            };
+            store.plans = [plan];
+            store.activePlanId = 'plan_gof63_b';
+            store.logs = [];
+
+            app.renderHome();
+
+            const metaEl = document.getElementById('home-snapshot-meta');
+            const listEl = document.getElementById('home-snapshot-list');
+            const toggleBtn = document.getElementById('btn-toggle-session-snapshot');
+            const countEl = document.getElementById('home-snapshot-count');
+            const arrowEl = document.getElementById('home-snapshot-arrow');
+
+            expect(toggleBtn).not.toBeNull();
+            expect(countEl.textContent).toBe('3 oefeningen');
+            expect(metaEl.textContent).toContain('~45 min');
+            expect(metaEl.textContent).toContain('Borst, Rug, Schouders');
+
+            // Standaard gesloten
+            expect(listEl.classList.contains('hidden')).toBe(true);
+            expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+            expect(arrowEl.textContent).toBe('expand_more');
+
+            // Klikken op de interactieve pill klapt uit
+            toggleBtn.click();
+            expect(listEl.classList.contains('hidden')).toBe(false);
+            expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
+            expect(arrowEl.textContent).toBe('expand_less');
+
+            // Nogmaals klikken sluit weer
+            toggleBtn.click();
+            expect(listEl.classList.contains('hidden')).toBe(true);
+            expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+            expect(arrowEl.textContent).toBe('expand_more');
+        });
+
+        it('3. verbergt quick-adapt-bar en snapshot bij Vrije Sessie keuze', () => {
+            const plan = {
+                id: 'plan_gof63_c',
+                name: 'Full Body Schema',
+                sessions: [
+                    { id: 'sess_fb', name: 'Full Body', exercises: [{ name: 'Squat', sets: 3, reps: '10' }] }
+                ]
+            };
+            store.plans = [plan];
+            store.activePlanId = 'plan_gof63_c';
+            store.logs = [];
+
+            app.renderHome();
+
+            const selectEl = document.getElementById('home-session-select');
+            const adaptBar = document.getElementById('home-quick-adapt-bar');
+            const snapshotEl = document.getElementById('home-session-snapshot');
+            const btnStart = document.getElementById('btn-start-session');
+
+            expect(adaptBar.classList.contains('hidden')).toBe(false);
+            expect(snapshotEl.classList.contains('hidden')).toBe(false);
+            expect(btnStart.textContent).toBe('Start Nu');
+
+            // Kies Vrije Sessie
+            selectEl.value = 'custom_session';
+            selectEl.onchange();
+
+            expect(adaptBar.classList.contains('hidden')).toBe(true);
+            expect(snapshotEl.classList.contains('hidden')).toBe(true);
+            expect(btnStart.textContent).toBe('Start Vrije Sessie');
+        });
+
+        it('4. bevat de vereiste CSS classes en structuur in index.html en style.css voor GOF-63', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf-8');
+            const styleCss = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf-8');
+
+            expect(indexHtml).toContain('class="home-plan-header"');
+            expect(indexHtml).toContain('id="home-plan-name"');
+            expect(indexHtml).toContain('class="home-recommended-badge"');
+            expect(indexHtml).toContain('class="home-session-select"');
+            expect(indexHtml).toContain('class="home-snapshot-chips"');
+            expect(indexHtml).toContain('id="home-quick-adapt-bar"');
+
+            expect(styleCss).toContain('.home-plan-header');
+            expect(styleCss).toContain('.home-plan-name');
+            expect(styleCss).toContain('.home-recommended-badge');
+            expect(styleCss).toContain('.home-session-select');
+            expect(styleCss).toContain('.chip-pill-interactive');
+            expect(styleCss).toContain('.chip-pill');
+            expect(styleCss).toContain('.home-snapshot-chips');
+        });
+    });
 });

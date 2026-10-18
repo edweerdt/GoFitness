@@ -53,21 +53,39 @@
                 <div class="content-padded pb-32">
                     <div id="home-onboarding-container" class="hidden"></div>
                     <div class="recommended-card glass-panel">
-                        <h3 id="recommended-card-title">⚡ Direct Starten</h3>
-                        <h2 id="recommended-session-name">Beginner Gym + Lichaamsgewicht Mix</h2>
-                        <p id="recommended-reason" class="text-muted">Start direct met een beginnersschema of kies een schema uit de preset bibliotheek op het tabblad Schema's.</p>
+                        <!-- Schemanaam & Aanbevolen Sessie badge -->
+                        <div class="home-plan-header">
+                            <div id="home-plan-name" class="home-plan-name">Beginner Gym + Lichaamsgewicht Mix</div>
+                            <div>
+                                <span id="recommended-card-title" class="home-recommended-badge">⚡ Direct Starten</span>
+                            </div>
+                        </div>
+
+                        <!-- Fallback/niet-picker titels voor actieve workout of no-plan toestand -->
+                        <h2 id="recommended-session-name" class="home-session-title hidden">Beginner Gym + Lichaamsgewicht Mix</h2>
+                        <p id="recommended-reason" class="home-session-reason hidden">Start direct met een beginnersschema of kies een schema uit de preset bibliotheek op het tabblad Schema's.</p>
+
+                        <!-- Sessie Selector direct onder de badge -->
+                        <div id="session-picker-wrapper" class="session-picker-wrapper hidden">
+                            <select id="home-session-select" class="home-session-select" aria-label="Kies een sessie uit je schema"></select>
+                        </div>
+
+                        <!-- Oefeningen & Metadata chips met direct uitklapbare oefeningen pill -->
                         <div id="home-session-snapshot" class="home-session-snapshot hidden">
-                            <button type="button" id="btn-toggle-session-snapshot" class="home-snapshot-header" onclick="app.toggleHomeSessionPreview()" aria-expanded="false">
-                                <span id="home-snapshot-meta" class="home-snapshot-meta"></span>
-                                <span id="home-snapshot-toggle-label" class="home-snapshot-toggle-label">Oefeningen <span class="material-icons-round" style="font-size:16px; vertical-align:middle;" aria-hidden="true">expand_more</span></span>
-                            </button>
+                            <div id="home-snapshot-meta" class="home-snapshot-chips"></div>
                             <div id="home-snapshot-list" class="home-snapshot-list hidden"></div>
                         </div>
-                        <div id="session-picker-wrapper" class="hidden mt-3">
-                            <label for="home-session-select" class="text-sm text-muted" style="display:block; margin-bottom:4px;">Kies een andere sessie uit je schema:</label>
-                            <select id="home-session-select" class="input-field" style="font-family:inherit; font-size:1rem; padding:8px 12px;"></select>
+
+                        <button id="btn-start-session" class="btn-primary w-full mt-3" disabled>Start Nu</button>
+
+                        <div id="home-quick-adapt-bar" class="quick-adapt-bar hidden">
+                            <button type="button" class="quick-adapt-btn" onclick="app.quickConvertAndStartSession('home')" title="Vervang apparaten automatisch door thuis-geschikte oefeningen">
+                                <span class="material-icons-round" style="font-size:1rem; color:#60a5fa;" aria-hidden="true">home</span> Thuis omzetten
+                            </button>
+                            <button type="button" class="quick-adapt-btn" onclick="app.quickConvertAndStartSession('axial')" title="Vervang zware rugbelasting automatisch door rugsparende alternatieven">
+                                <span class="material-icons-round" style="font-size:1rem; color:#34d399;" aria-hidden="true">shield</span> Rug ontlasten
+                            </button>
                         </div>
-                        <button id="btn-start-session" class="btn-primary w-full mt-4" disabled>Start Nu</button>
                     </div>
                     
                     <div class="stats-mini mt-4">
