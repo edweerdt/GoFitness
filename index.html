@@ -118,8 +118,10 @@
                         <button class="icon-btn" onclick="app.showCancelWorkoutModal()" title="Training annuleren" aria-label="Training annuleren"><span class="material-icons-round" aria-hidden="true">close</span></button>
                         <div class="workout-title-container">
                             <h2 id="workout-title">Training</h2>
-                            <span id="workout-session-timer" class="workout-session-timer" title="Totale sessieduur" aria-label="Totale sessieduur">00:00</span>
-                            <span id="workout-sets-badge" class="workout-sets-badge" title="Voltooide sets" aria-label="Voltooide sets">0 / 0 sets</span>
+                            <div class="workout-meta-row">
+                                <span id="workout-session-timer" class="workout-session-timer" title="Totale sessieduur" aria-label="Totale sessieduur">00:00</span>
+                                <span id="workout-sets-badge" class="workout-sets-badge" title="Voltooide sets" aria-label="Voltooide sets">0 / 0 sets</span>
+                            </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:6px;">
                             <button class="icon-btn" onclick="app.openSessionGuide('workout')" title="Sessie Gids &amp; Uitleg" aria-label="Sessie Gids &amp; Uitleg">

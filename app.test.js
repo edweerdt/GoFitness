@@ -7325,4 +7325,122 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(styleCss).toContain('.home-snapshot-chips');
         });
     });
+
+    describe('GOF-64: Workout UX | Rustigere header actieve sessie met timer en sets onder sessienaam', () => {
+        it('1. bevat in index.html een 2-regelige structuur met #workout-title op regel 1 en .workout-meta-row op regel 2', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const htmlContent = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+
+            expect(htmlContent).toContain('<div class="workout-title-container">');
+            expect(htmlContent).toContain('<h2 id="workout-title">Training</h2>');
+            expect(htmlContent).toContain('<div class="workout-meta-row">');
+            expect(htmlContent).toContain('<span id="workout-session-timer" class="workout-session-timer"');
+            expect(htmlContent).toContain('<span id="workout-sets-badge" class="workout-sets-badge"');
+
+            const titleIdx = htmlContent.indexOf('id="workout-title"');
+            const metaRowIdx = htmlContent.indexOf('class="workout-meta-row"');
+            const timerIdx = htmlContent.indexOf('id="workout-session-timer"');
+            const setsIdx = htmlContent.indexOf('id="workout-sets-badge"');
+
+            expect(titleIdx).toBeGreaterThan(-1);
+            expect(metaRowIdx).toBeGreaterThan(titleIdx);
+            expect(timerIdx).toBeGreaterThan(metaRowIdx);
+            expect(setsIdx).toBeGreaterThan(timerIdx);
+        });
+
+        it('2. bevat in style.css de flex-direction: column voor .workout-title-container en flex styling voor .workout-meta-row', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const cssContent = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8');
+
+            expect(cssContent).toMatch(/\.workout-title-container\s*\{[^}]*flex-direction:\s*column;/);
+            expect(cssContent).toMatch(/\.workout-title-container\s*\{[^}]*text-align:\s*center;/);
+            expect(cssContent).toMatch(/\.workout-meta-row\s*\{[^}]*display:\s*flex;/);
+            expect(cssContent).toMatch(/\.workout-meta-row\s*\{[^}]*justify-content:\s*center;/);
+            expect(cssContent).toMatch(/\.workout-header #workout-title\s*\{[^}]*text-overflow:\s*ellipsis;/);
+        });
+
+        it('3. behoudt de positie van het kruis links en help + thema knoppen rechts in de header', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const htmlContent = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+
+            const headerStartIdx = htmlContent.indexOf('<header class="workout-header">');
+            const headerEndIdx = htmlContent.indexOf('</header>', headerStartIdx);
+            const headerHtml = htmlContent.substring(headerStartIdx, headerEndIdx);
+
+            const cancelBtnIdx = headerHtml.indexOf('app.showCancelWorkoutModal()');
+            const titleContainerIdx = headerHtml.indexOf('class="workout-title-container"');
+            const guideBtnIdx = headerHtml.indexOf("app.openSessionGuide('workout')");
+            const themeBtnIdx = headerHtml.indexOf('app.showThemeModal()');
+
+            expect(cancelBtnIdx).toBeGreaterThan(-1);
+            expect(titleContainerIdx).toBeGreaterThan(cancelBtnIdx);
+            expect(guideBtnIdx).toBeGreaterThan(titleContainerIdx);
+            expect(themeBtnIdx).toBeGreaterThan(guideBtnIdx);
+        });
+
+        it('4. werkt live sessietitel, timer en sets-badge bij binnen de nieuwe 2-regelige container', () => {
+            document.body.innerHTML = `
+                <div class="workout-sticky-header">
+                    <header class="workout-header">
+                        <button class="icon-btn" onclick="app.showCancelWorkoutModal()" title="Training annuleren"><span class="material-icons-round">close</span></button>
+                        <div class="workout-title-container">
+                            <h2 id="workout-title">Training</h2>
+                            <div class="workout-meta-row">
+                                <span id="workout-session-timer" class="workout-session-timer">00:00</span>
+                                <span id="workout-sets-badge" class="workout-sets-badge">0 / 0 sets</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <button class="icon-btn" onclick="app.openSessionGuide('workout')"><span class="material-icons-round">help_outline</span></button>
+                            <button class="icon-btn theme-toggle-btn" onclick="app.showThemeModal()"><span class="material-icons-round">palette</span></button>
+                        </div>
+                    </header>
+                    <div id="workout-progress-track" class="workout-progress-track"><div id="workout-progress-bar"></div></div>
+                </div>
+                <div id="workout-exercise-list"></div>
+                <div id="bottom-nav"></div>
+                <div id="view-workout" class="view"><div class="sticky-footer"></div></div>
+            `;
+
+            app.activeWorkout = {
+                planId: 'plan-1',
+                session: { id: 's1', name: 'Full Body Krachttraining' },
+                exercises: [
+                    {
+                        id: 'ex1',
+                        name: 'Goblet Squat',
+                        sets: 2,
+                        reps: '10',
+                        setsCompleted: [false, false],
+                        weights: ['', ''],
+                        actualReps: ['', '']
+                    }
+                ],
+                startTime: new Date(Date.now() - 65 * 1000) // 1 min 5 sec ago
+            };
+
+            const titleEl = document.getElementById('workout-title');
+            const timerEl = document.getElementById('workout-session-timer');
+            const badgeEl = document.getElementById('workout-sets-badge');
+
+            app.openWorkoutView();
+
+            expect(titleEl.textContent).toBe('Full Body Krachttraining');
+            expect(timerEl.textContent).toBe('01:05');
+            expect(badgeEl.textContent).toBe('0 / 2 sets');
+
+            // Set voltooien
+            app.toggleSet(0, 0);
+            expect(badgeEl.textContent).toBe('1 / 2 sets');
+
+            app.toggleSet(0, 1);
+            expect(badgeEl.textContent).toBe('2 / 2 sets');
+            expect(badgeEl.classList.contains('all-done')).toBe(true);
+
+            if (app.sessionTimerInterval) app.stopSessionTimer();
+        });
+    });
 });
