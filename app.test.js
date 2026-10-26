@@ -1,4 +1,4 @@
-const { DataStore, app, store, html, rawHtml, PRESET_PLANS, COLOR_PALETTES } = require('./app');
+const { DataStore, app, store, html, rawHtml, PRESET_PLANS, DEFAULT_EXERCISES, COLOR_PALETTES } = require('./app');
 
 describe('DataStore', () => {
     let mockLocalStorage;
@@ -379,8 +379,7 @@ describe('app logic', () => {
         it('should return green when hours since last log is greater than min recovery hours', () => {
             store.plans = [{ id: 'plan_1', minRecoveryHours: 48 }];
             store.activePlanId = 'plan_1';
-            const logDate = new Date();
-            logDate.setHours(logDate.getHours() - 50); // 50 hours ago (> 48)
+            const logDate = new Date(Date.now() - 50 * 3600 * 1000); // 50 hours ago (> 48)
             store.logs = [{ date: logDate.toISOString() }];
 
             const status = app.getRecoveryStatus();
@@ -439,8 +438,7 @@ describe('app logic', () => {
         });
 
         it('should follow schema recovery settings and not remain orange after 71h when minRecoveryHours is 48 (GOF-53)', () => {
-            const seventyOneHoursAgo = new Date();
-            seventyOneHoursAgo.setHours(seventyOneHoursAgo.getHours() - 71);
+            const seventyOneHoursAgo = new Date(Date.now() - 71 * 3600 * 1000);
 
             store.plans = [{
                 id: 'plan_fb',
@@ -7441,6 +7439,158 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(badgeEl.classList.contains('all-done')).toBe(true);
 
             if (app.sessionTimerInterval) app.stopSessionTimer();
+        });
+    });
+
+    describe('GOF-65: Oefeningen | Nieuwe oefening toevoegen: Tongue Twister', () => {
+        test('1. DEFAULT_EXERCISES bevat Tongue Twister met correcte configuratie (bodyweight_reps, reps-only, 3 sets, 80 reps)', () => {
+            const tt = DEFAULT_EXERCISES.find(e => e.name === 'Tongue Twister' || e.id === 'def_tongue_twister');
+            expect(tt).toBeDefined();
+            expect(tt.name).toBe('Tongue Twister');
+            expect(tt.exerciseType).toBe('bodyweight_reps');
+            expect(tt.category).toBe('bodyweight');
+            expect(tt.trackMetrics).toEqual(['reps']);
+            expect(tt.defaultSets).toBe(3);
+            expect(tt.defaultReps).toBe(80);
+            expect(tt.alternatives).toContain('Tong Twister');
+        });
+
+        test('2. store.getExerciseLibrary() bevat Tongue Twister', () => {
+            const library = store.getExerciseLibrary();
+            const tt = library.find(e => e.name === 'Tongue Twister' || e.id === 'def_tongue_twister');
+            expect(tt).toBeDefined();
+            expect(tt.exerciseType).toBe('bodyweight_reps');
+            expect(tt.trackMetrics).toEqual(['reps']);
+            expect(tt.defaultSets).toBe(3);
+            expect(tt.defaultReps).toBe(80);
+        });
+
+        test('3. detectExerciseType herkent Tong Twister en Tongue Twister als bodyweight_reps en bodyweight', () => {
+            expect(app.detectExerciseType('Tong Twister')).toEqual({
+                exerciseType: 'bodyweight_reps',
+                category: 'bodyweight'
+            });
+            expect(app.detectExerciseType('tongue twister')).toEqual({
+                exerciseType: 'bodyweight_reps',
+                category: 'bodyweight'
+            });
+        });
+
+        test('4. selectExerciseForWorkout vult 3 sets en 80 default reps in bij Tongue Twister', () => {
+            document.body.innerHTML = `
+                <div id="workout-ex-configure" class="hidden">
+                    <span id="selected-ex-name-display"></span>
+                    <label id="workout-ex-reps-label"></label>
+                    <input type="number" id="workout-ex-sets" value="3" />
+                    <input type="text" id="workout-ex-reps" value="10" />
+                </div>
+                <div id="workout-ex-select-list"></div>
+            `;
+
+            app.selectExerciseForWorkout('def_tongue_twister');
+
+            const nameEl = document.getElementById('selected-ex-name-display');
+            const setsInput = document.getElementById('workout-ex-sets');
+            const repsInput = document.getElementById('workout-ex-reps');
+
+            expect(nameEl.textContent).toBe('Tongue Twister');
+            expect(setsInput.value).toBe('3');
+            expect(repsInput.value).toBe('80');
+        });
+
+        test('5. addExerciseToActiveWorkout maakt 3 sets aan met reps 80 en trackMetrics [reps]', () => {
+            app.activeWorkout = {
+                planId: 'custom_plan',
+                exercises: []
+            };
+
+            const tt = DEFAULT_EXERCISES.find(e => e.id === 'def_tongue_twister');
+            app.addExerciseToActiveWorkout(tt);
+
+            expect(app.activeWorkout.exercises.length).toBe(1);
+            const added = app.activeWorkout.exercises[0];
+            expect(added.name).toBe('Tongue Twister');
+            expect(added.sets).toBe(3);
+            expect(added.reps).toBe('80');
+            expect(added.exerciseType).toBe('bodyweight_reps');
+            expect(added.trackMetrics).toEqual(['reps']);
+            expect(added.weights.length).toBe(3);
+            expect(added.actualReps.length).toBe(3);
+        });
+
+        test('6. renderWorkoutExercises toont enkel reps invoerveld en GEEN gewichtsinvoerveld of plate-calc voor Tong Twister', () => {
+            document.body.innerHTML = `
+                <div id="workout-exercise-list"></div>
+                <div id="workout-sets-badge"></div>
+                <div id="workout-progress-fill" style="width:0%"></div>
+            `;
+
+            app.activeWorkout = {
+                planId: 'custom_plan',
+                exercises: [
+                    {
+                        id: 'ex_tt',
+                        name: 'Tongue Twister',
+                        exerciseType: 'bodyweight_reps',
+                        trackMetrics: ['reps'],
+                        category: 'bodyweight',
+                        sets: 3,
+                        reps: '80',
+                        setsCompleted: [false, false, false],
+                        weights: ['', '', ''],
+                        actualReps: ['', '', ''],
+                        levels: ['', '', '']
+                    }
+                ]
+            };
+
+            app.renderWorkoutExercises();
+
+            const list = document.getElementById('workout-exercise-list');
+            const weightInputs = list.querySelectorAll('input[data-type="weight"]');
+            const repsInputs = list.querySelectorAll('input[data-type="reps"]');
+            const plateBtns = list.querySelectorAll('.plate-calc-trigger-btn');
+
+            // Enkel reps loggen
+            expect(weightInputs.length).toBe(0);
+            expect(plateBtns.length).toBe(0);
+            expect(repsInputs.length).toBe(3);
+            // Reps placeholder toont 80
+            expect(repsInputs[0].placeholder).toBe('80');
+        });
+
+        test('7. addExerciseToPlanSession voegt Tong Twister toe met 3 sets en 80 reps', () => {
+            app.editingPlan = {
+                id: 'plan_test',
+                sessions: [{ id: 's1', name: 'Sessie 1', exercises: [] }]
+            };
+
+            const tt = DEFAULT_EXERCISES.find(e => e.id === 'def_tongue_twister');
+            app.addExerciseToPlanSession(0, tt);
+
+            const added = app.editingPlan.sessions[0].exercises[0];
+            expect(added.name).toBe('Tongue Twister');
+            expect(added.sets).toBe(3);
+            expect(added.reps).toBe('80');
+            expect(added.exerciseType).toBe('bodyweight_reps');
+            expect(added.trackMetrics).toEqual(['reps']);
+        });
+
+        test('8. addExerciseToEditLog voegt Tong Twister toe met 3 sets en 80 reps', () => {
+            app.logToEdit = {
+                id: 'log_test',
+                exercises: []
+            };
+
+            const tt = DEFAULT_EXERCISES.find(e => e.id === 'def_tongue_twister');
+            app.addExerciseToEditLog(tt);
+
+            expect(app.logToEdit.exercises.length).toBe(1);
+            const added = app.logToEdit.exercises[0];
+            expect(added.name).toBe('Tongue Twister');
+            expect(added.details.length).toBe(3);
+            expect(added.details[0].reps).toBe('80');
+            expect(added.details[0].weight).toBe('');
         });
     });
 });

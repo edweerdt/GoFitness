@@ -53,7 +53,8 @@ const DEFAULT_EXERCISES = [
     { id: 'def_kb_wrist_flip', name: 'Kettlebell Wrist Flip', muscleGroups: ['arms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_hand_gripper', name: 'Hand Gripper (Handknijper)', muscleGroups: ['arms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_bent_over_tricep_ext', name: 'Bent-Over Triceps Extension', muscleGroups: ['triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
-    { id: 'def_squat_clean', name: 'Barbell Squat Clean', muscleGroups: ['legs', 'glutes', 'shoulders', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' }
+    { id: 'def_squat_clean', name: 'Barbell Squat Clean', muscleGroups: ['legs', 'glutes', 'shoulders', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
+    { id: 'def_tongue_twister', name: 'Tongue Twister', muscleGroups: ['overig'], exerciseType: 'bodyweight_reps', trackMetrics: ['reps'], category: 'bodyweight', defaultSets: 3, defaultReps: 80, alternatives: ['Tong Twister', 'Tongtwister'] }
 ];
 
 function normalizeExerciseName(str) {
@@ -4014,12 +4015,17 @@ const app = {
         this.renderPlanEditorSessions();
     },
 
-    addExerciseToPlanSession(sessionIdx, exerciseData, setsCount = 3, defaultReps = '10') {
+    addExerciseToPlanSession(sessionIdx, exerciseData, setsCount = null, defaultReps = null) {
         if (!this.editingPlan || !this.editingPlan.sessions || !this.editingPlan.sessions[sessionIdx]) return;
         const session = this.editingPlan.sessions[sessionIdx];
         if (!Array.isArray(session.exercises)) session.exercises = [];
 
-        const sets = Math.max(1, parseInt(setsCount, 10) || 3);
+        const sets = (setsCount !== null && setsCount !== undefined)
+            ? Math.max(1, parseInt(setsCount, 10) || 3)
+            : ((exerciseData && exerciseData.defaultSets !== undefined && exerciseData.defaultSets !== null) ? exerciseData.defaultSets : 3);
+        const resolvedReps = (defaultReps !== null && defaultReps !== undefined && String(defaultReps).trim() !== '')
+            ? String(defaultReps).trim()
+            : ((exerciseData && exerciseData.defaultReps !== undefined && exerciseData.defaultReps !== null) ? String(exerciseData.defaultReps) : (exerciseData.reps || '8-12'));
         const exObj = {
             id: 'ex_' + Math.random().toString(36).slice(2, 11),
             order: session.exercises.length + 1,
@@ -4030,7 +4036,7 @@ const app = {
             category: exerciseData.category || 'compound',
             alternatives: exerciseData.alternatives || [],
             sets: sets,
-            reps: defaultReps || '8-12',
+            reps: resolvedReps,
             restSeconds: (exerciseData.category === 'isolation' ? 60 : 90)
         };
 
@@ -6031,7 +6037,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (n.includes('hardlopen') || n.includes('running') || n.includes('fietsen') || n.includes('roeien') || n.includes('treadmill') || n.includes('crosstrainer') || n.includes('wandelen')) {
             return { exerciseType: 'duration', category: 'cardio' };
         }
-        if (n.includes('pull-up') || n.includes('chin-up') || n.includes('push-up') || n.includes('dip') || n.includes('crunch') || n.includes('leg raise') || n.includes('bodyweight')) {
+        if (n.includes('pull-up') || n.includes('chin-up') || n.includes('push-up') || n.includes('dip') || n.includes('crunch') || n.includes('leg raise') || n.includes('bodyweight') || n.includes('tong twister') || n.includes('tongue twister')) {
             return { exerciseType: 'bodyweight_reps', category: 'bodyweight' };
         }
         if (n.includes('curl') || n.includes('raise') || n.includes('fly') || n.includes('extension') || n.includes('kickback') || n.includes('pushdown')) {
@@ -6347,10 +6353,10 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         if (ex.exerciseType === 'duration') {
             if (repsLabel) repsLabel.textContent = "Standaard Duur (sec)";
-            if (repsInput) repsInput.value = "300";
+            if (repsInput) repsInput.value = (ex.defaultReps !== undefined && ex.defaultReps !== null) ? String(ex.defaultReps) : "300";
         } else {
             if (repsLabel) repsLabel.textContent = "Standaard Reps";
-            if (repsInput) repsInput.value = "10";
+            if (repsInput) repsInput.value = (ex.defaultReps !== undefined && ex.defaultReps !== null) ? String(ex.defaultReps) : "10";
         }
 
         if (configPanel) configPanel.classList.remove('hidden');
@@ -6366,7 +6372,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         const defaultSets = (this.selectedWorkoutEx.defaultSets !== undefined && this.selectedWorkoutEx.defaultSets !== null) ? this.selectedWorkoutEx.defaultSets : (this.selectedWorkoutEx.name && this.selectedWorkoutEx.name.toLowerCase().includes('row machine') ? 1 : 3);
         const setsCount = Math.max(1, parseInt(setsInput ? setsInput.value : String(defaultSets), 10) || defaultSets);
-        const defaultReps = repsInput ? repsInput.value.trim() : '10';
+        const fallbackReps = (this.selectedWorkoutEx.defaultReps !== undefined && this.selectedWorkoutEx.defaultReps !== null) ? String(this.selectedWorkoutEx.defaultReps) : '10';
+        const defaultReps = (repsInput && repsInput.value.trim()) ? repsInput.value.trim() : fallbackReps;
 
         if (this.exerciseSelectTarget === 'editLog') {
             this.addExerciseToEditLog(this.selectedWorkoutEx, setsCount, defaultReps);
@@ -6379,7 +6386,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.hideSelectExerciseForWorkoutModal();
     },
 
-    addExerciseToActiveWorkout(exerciseData, setsCount = null, defaultReps = '10') {
+    addExerciseToActiveWorkout(exerciseData, setsCount = null, defaultReps = null) {
         if (!this.activeWorkout) return;
         if (!this.activeWorkout.exercises) this.activeWorkout.exercises = [];
 
@@ -6405,7 +6412,11 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             category: exerciseData.category || 'custom',
             alternatives: exerciseData.alternatives || exerciseData.optionalAlternatives || [],
             sets: determinedSets,
-            reps: defaultReps,
+            reps: (defaultReps !== null && defaultReps !== undefined && String(defaultReps).trim() !== '')
+                ? String(defaultReps).trim()
+                : ((exerciseData && exerciseData.defaultReps !== undefined && exerciseData.defaultReps !== null)
+                    ? String(exerciseData.defaultReps)
+                    : '10'),
             setsCompleted: Array(determinedSets).fill(false),
             weights: Array(determinedSets).fill(''),
             actualReps: Array(determinedSets).fill(''),
@@ -7276,7 +7287,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 
                 const prevSet = app.getPreviousSetDetails(activeExerciseName, i, ex);
                 const weightPlaceholder = (prevSet && prevSet.weight) ? prevSet.weight : 'kg';
-                const repsPlaceholder = (prevSet && prevSet.reps) ? prevSet.reps : 'reps';
+                const repsPlaceholder = (prevSet && prevSet.reps) ? prevSet.reps : (ex.reps || 'reps');
 
                 // TrackMetrics check for dynamic inputs
                 const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
@@ -9121,7 +9132,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.renderEditLogModal();
     },
 
-    addExerciseToEditLog(exData, setsCount = 3, defaultReps = '10') {
+    addExerciseToEditLog(exData, setsCount = null, defaultReps = null) {
         if (!this.logToEdit) return;
         if (!this.logToEdit.exercises) this.logToEdit.exercises = [];
 
@@ -9136,7 +9147,11 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             details.push({
                 setNumber: i,
                 weight: '',
-                reps: defaultReps || '10',
+                reps: (defaultReps !== null && defaultReps !== undefined && String(defaultReps).trim() !== '')
+                    ? String(defaultReps).trim()
+                    : ((exData && exData.defaultReps !== undefined && exData.defaultReps !== null)
+                        ? String(exData.defaultReps)
+                        : '10'),
                 level: ''
             });
         }
