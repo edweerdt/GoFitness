@@ -7442,22 +7442,22 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
         });
     });
 
-    describe('GOF-65: Oefeningen | Nieuwe oefening toevoegen: Tong Twister', () => {
-        test('1. DEFAULT_EXERCISES bevat Tong Twister met correcte configuratie (bodyweight_reps, reps-only, 3 sets, 80 reps)', () => {
-            const tt = DEFAULT_EXERCISES.find(e => e.name === 'Tong Twister' || e.id === 'def_tong_twister');
+    describe('GOF-65: Oefeningen | Nieuwe oefening toevoegen: Tongue Twister', () => {
+        test('1. DEFAULT_EXERCISES bevat Tongue Twister met correcte configuratie (bodyweight_reps, reps-only, 3 sets, 80 reps)', () => {
+            const tt = DEFAULT_EXERCISES.find(e => e.name === 'Tongue Twister' || e.id === 'def_tongue_twister');
             expect(tt).toBeDefined();
-            expect(tt.name).toBe('Tong Twister');
+            expect(tt.name).toBe('Tongue Twister');
             expect(tt.exerciseType).toBe('bodyweight_reps');
             expect(tt.category).toBe('bodyweight');
             expect(tt.trackMetrics).toEqual(['reps']);
             expect(tt.defaultSets).toBe(3);
             expect(tt.defaultReps).toBe(80);
-            expect(tt.alternatives).toContain('Tongue Twister');
+            expect(tt.alternatives).toContain('Tong Twister');
         });
 
-        test('2. store.getExerciseLibrary() bevat Tong Twister', () => {
+        test('2. store.getExerciseLibrary() bevat Tongue Twister', () => {
             const library = store.getExerciseLibrary();
-            const tt = library.find(e => e.name === 'Tong Twister' || e.id === 'def_tong_twister');
+            const tt = library.find(e => e.name === 'Tongue Twister' || e.id === 'def_tongue_twister');
             expect(tt).toBeDefined();
             expect(tt.exerciseType).toBe('bodyweight_reps');
             expect(tt.trackMetrics).toEqual(['reps']);
@@ -7476,7 +7476,7 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             });
         });
 
-        test('4. selectExerciseForWorkout vult 3 sets en 80 default reps in bij Tong Twister', () => {
+        test('4. selectExerciseForWorkout vult 3 sets en 80 default reps in bij Tongue Twister', () => {
             document.body.innerHTML = `
                 <div id="workout-ex-configure" class="hidden">
                     <span id="selected-ex-name-display"></span>
@@ -7487,13 +7487,13 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
                 <div id="workout-ex-select-list"></div>
             `;
 
-            app.selectExerciseForWorkout('def_tong_twister');
+            app.selectExerciseForWorkout('def_tongue_twister');
 
             const nameEl = document.getElementById('selected-ex-name-display');
             const setsInput = document.getElementById('workout-ex-sets');
             const repsInput = document.getElementById('workout-ex-reps');
 
-            expect(nameEl.textContent).toBe('Tong Twister');
+            expect(nameEl.textContent).toBe('Tongue Twister');
             expect(setsInput.value).toBe('3');
             expect(repsInput.value).toBe('80');
         });
@@ -7504,12 +7504,12 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
                 exercises: []
             };
 
-            const tt = DEFAULT_EXERCISES.find(e => e.id === 'def_tong_twister');
+            const tt = DEFAULT_EXERCISES.find(e => e.id === 'def_tongue_twister');
             app.addExerciseToActiveWorkout(tt);
 
             expect(app.activeWorkout.exercises.length).toBe(1);
             const added = app.activeWorkout.exercises[0];
-            expect(added.name).toBe('Tong Twister');
+            expect(added.name).toBe('Tongue Twister');
             expect(added.sets).toBe(3);
             expect(added.reps).toBe('80');
             expect(added.exerciseType).toBe('bodyweight_reps');
@@ -7530,7 +7530,7 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
                 exercises: [
                     {
                         id: 'ex_tt',
-                        name: 'Tong Twister',
+                        name: 'Tongue Twister',
                         exerciseType: 'bodyweight_reps',
                         trackMetrics: ['reps'],
                         category: 'bodyweight',
@@ -7565,11 +7565,11 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
                 sessions: [{ id: 's1', name: 'Sessie 1', exercises: [] }]
             };
 
-            const tt = DEFAULT_EXERCISES.find(e => e.id === 'def_tong_twister');
+            const tt = DEFAULT_EXERCISES.find(e => e.id === 'def_tongue_twister');
             app.addExerciseToPlanSession(0, tt);
 
             const added = app.editingPlan.sessions[0].exercises[0];
-            expect(added.name).toBe('Tong Twister');
+            expect(added.name).toBe('Tongue Twister');
             expect(added.sets).toBe(3);
             expect(added.reps).toBe('80');
             expect(added.exerciseType).toBe('bodyweight_reps');
@@ -7582,12 +7582,12 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
                 exercises: []
             };
 
-            const tt = DEFAULT_EXERCISES.find(e => e.id === 'def_tong_twister');
+            const tt = DEFAULT_EXERCISES.find(e => e.id === 'def_tongue_twister');
             app.addExerciseToEditLog(tt);
 
             expect(app.logToEdit.exercises.length).toBe(1);
             const added = app.logToEdit.exercises[0];
-            expect(added.name).toBe('Tong Twister');
+            expect(added.name).toBe('Tongue Twister');
             expect(added.details.length).toBe(3);
             expect(added.details[0].reps).toBe('80');
             expect(added.details[0].weight).toBe('');

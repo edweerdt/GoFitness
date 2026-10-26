@@ -54,7 +54,7 @@ const DEFAULT_EXERCISES = [
     { id: 'def_hand_gripper', name: 'Hand Gripper (Handknijper)', muscleGroups: ['arms'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_bent_over_tricep_ext', name: 'Bent-Over Triceps Extension', muscleGroups: ['triceps'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'isolation' },
     { id: 'def_squat_clean', name: 'Barbell Squat Clean', muscleGroups: ['legs', 'glutes', 'shoulders', 'back'], exerciseType: 'weight_reps', trackMetrics: ['weight', 'reps'], category: 'compound' },
-    { id: 'def_tong_twister', name: 'Tong Twister', muscleGroups: ['overig'], exerciseType: 'bodyweight_reps', trackMetrics: ['reps'], category: 'bodyweight', defaultSets: 3, defaultReps: 80, alternatives: ['Tongue Twister', 'Tongtwister'] }
+    { id: 'def_tongue_twister', name: 'Tongue Twister', muscleGroups: ['overig'], exerciseType: 'bodyweight_reps', trackMetrics: ['reps'], category: 'bodyweight', defaultSets: 3, defaultReps: 80, alternatives: ['Tong Twister', 'Tongtwister'] }
 ];
 
 function normalizeExerciseName(str) {
