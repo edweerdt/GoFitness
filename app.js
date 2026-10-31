@@ -8980,14 +8980,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const ctx = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
         if (!ctx) return;
 
-        const canvasW = 600;
-        const outerMarginX = 20;
-        const outerMarginY = 24;
-        const cardW = canvasW - (outerMarginX * 2); // 560px
-        const cardPaddingX = 24;
-        const cardContentW = cardW - (cardPaddingX * 2); // 512px
-        const cardCenterX = outerMarginX + cardW / 2;
-        const cardContentX = outerMarginX + cardPaddingX;
+        // Narrower format conforming directly to mobile bottom sheet modal card (GOF-68)
+        const canvasW = 440;
+        const outerMarginX = 16;
+        const outerMarginY = 20;
+        const cardW = canvasW - (outerMarginX * 2); // 408px
+        const cardPaddingX = 18;
+        const cardContentW = cardW - (cardPaddingX * 2); // 372px
+        const cardCenterX = outerMarginX + cardW / 2; // 220px
+        const cardContentX = outerMarginX + cardPaddingX; // 34px
 
         const sessionName = data.sessionName || 'Workout';
         const subtitleText = data.planName ? `${sessionName} • ${data.planName}` : sessionName;
@@ -9014,9 +9015,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             return lines.length > 0 ? lines : [text];
         };
 
-        const subtitleFont = '500 14px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        const subtitleFont = '500 13px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         const subtitleLines = wrapText(subtitleText, cardContentW - 16, subtitleFont);
-        const subtitleLineH = 20;
+        const subtitleLineH = 19;
         const subtitleTotalH = subtitleLines.length * subtitleLineH;
 
         const highlights = Array.isArray(data.highlights) ? data.highlights : [];
@@ -9025,12 +9026,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         let highlightsBoxH = 0;
         if (visibleHighlights.length > 0) {
-            highlightsBoxH = 14 + 18 + 10 + (visibleHighlights.length * 36) + (remainingCount > 0 ? 24 : 0) + 6;
+            highlightsBoxH = 12 + 18 + 8 + (visibleHighlights.length * 36) + (remainingCount > 0 ? 22 : 0) + 4;
         }
 
-        const cardH = 16 + 4 + 18 + 58 + 14 + 28 + 6 + subtitleTotalH + 20 + 76 +
-                      (visibleHighlights.length > 0 ? (16 + highlightsBoxH) : 0) +
-                      20 + 14 + 20;
+        const cardH = 22 + 56 + 14 + 26 + 6 + subtitleTotalH + 18 + 72 +
+                      (visibleHighlights.length > 0 ? (14 + highlightsBoxH) : 0) +
+                      18 + 14 + 18;
 
         const totalH = cardH + (outerMarginY * 2);
 
@@ -9069,22 +9070,21 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
         ctx.shadowBlur = 24;
         ctx.shadowOffsetY = 8;
-        const cardBgGrad = ctx.createLinearGradient(outerMarginX, outerMarginY, outerMarginX, outerMarginY + cardH);
-        cardBgGrad.addColorStop(0, '#171f2d');
-        cardBgGrad.addColorStop(1, '#121824');
-        drawRoundedRect(outerMarginX, outerMarginY, cardW, cardH, 24, cardBgGrad, 'rgba(255, 255, 255, 0.08)');
+        const cardBgGrad = typeof ctx.createLinearGradient === 'function'
+            ? ctx.createLinearGradient(outerMarginX, outerMarginY, outerMarginX, outerMarginY + cardH)
+            : null;
+        if (cardBgGrad) {
+            cardBgGrad.addColorStop(0, '#171f2d');
+            cardBgGrad.addColorStop(1, '#121824');
+        }
+        drawRoundedRect(outerMarginX, outerMarginY, cardW, cardH, 20, cardBgGrad || '#171f2d', 'rgba(255, 255, 255, 0.08)');
         if (typeof ctx.restore === 'function') ctx.restore();
 
-        let curY = outerMarginY + 16;
+        // 3. Notch removed - start directly at top card padding
+        let curY = outerMarginY + 22;
 
-        // 3. Drag Notch / Pill Handle
-        const notchW = 44;
-        const notchH = 4;
-        drawRoundedRect(cardCenterX - notchW / 2, curY, notchW, notchH, 2, 'rgba(255, 255, 255, 0.25)', null);
-        curY += notchH + 18;
-
-        // 4. Centered Trophy Circle Badge
-        const trophyRadius = 29;
+        // 4. Centered Trophy Circle Badge (56px diameter like in modal)
+        const trophyRadius = 28;
         const trophyCenterY = curY + trophyRadius;
         ctx.beginPath();
         if (typeof ctx.arc === 'function') ctx.arc(cardCenterX, trophyCenterY, trophyRadius, 0, Math.PI * 2);
@@ -9094,7 +9094,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        ctx.font = '28px system-ui, -apple-system, sans-serif';
+        // Reset fillStyle to white so emoji is never tinted or washed out by translucent fill
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '28px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('🏆', cardCenterX, trophyCenterY + 1);
@@ -9104,10 +9106,10 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         // 5. Title: "Training Voltooid!"
         ctx.fillStyle = '#ffffff';
-        ctx.font = '700 24px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.font = '700 22px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('Training Voltooid!', cardCenterX, curY + 22);
-        curY += 28 + 6;
+        ctx.fillText('Training Voltooid!', cardCenterX, curY + 20);
+        curY += 26 + 6;
 
         // 6. Subtitle (session + plan)
         ctx.fillStyle = '#94a3b8';
@@ -9115,12 +9117,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         subtitleLines.forEach((line, idx) => {
             ctx.fillText(line, cardCenterX, curY + 14 + idx * subtitleLineH);
         });
-        curY += subtitleTotalH + 20;
+        curY += subtitleTotalH + 18;
 
         // 7. Stat Cards Grid (3 cards: DUUR, SETS, VOLUME)
-        const cardGap = 10;
-        const statCardW = Math.floor((cardContentW - (cardGap * 2)) / 3);
-        const statCardH = 76;
+        const cardGap = 8;
+        const statCardW = Math.floor((cardContentW - (cardGap * 2)) / 3); // 118px
+        const statCardH = 72;
 
         const volText = data.totalVolumeKg > 0 ? `${(data.totalVolumeKg || 0).toLocaleString('nl-NL')} kg` : `${data.exercisesCompleted || 0}`;
         const volLabel = data.totalVolumeKg > 0 ? 'VOLUME' : 'OEFENINGEN';
@@ -9136,87 +9138,111 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             drawRoundedRect(cardX, curY, statCardW, statCardH, 12, 'rgba(255, 255, 255, 0.04)', 'rgba(255, 255, 255, 0.08)');
 
             ctx.fillStyle = '#ffffff';
-            ctx.font = '700 20px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.font = '700 18px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(card.val, cardX + statCardW / 2, curY + 34);
+            ctx.fillText(card.val, cardX + statCardW / 2, curY + 32);
 
             ctx.fillStyle = '#94a3b8';
-            ctx.font = '600 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-            ctx.fillText(card.lbl, cardX + statCardW / 2, curY + 54);
+            ctx.font = '600 10.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.fillText(card.lbl, cardX + statCardW / 2, curY + 52);
         });
 
         curY += statCardH;
 
         // 8. Highlights Box (🏆 BEHAALDE MIJLPALEN)
         if (visibleHighlights.length > 0) {
-            curY += 16;
+            curY += 14;
             drawRoundedRect(cardContentX, curY, cardContentW, highlightsBoxH, 12, 'rgba(16, 185, 129, 0.08)', 'rgba(16, 185, 129, 0.25)');
 
             ctx.fillStyle = '#10b981';
-            ctx.font = '700 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.font = '700 11.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
             ctx.textAlign = 'left';
-            ctx.fillText(`🏆 BEHAALDE MIJLPALEN (${highlights.length})`, cardContentX + 14, curY + 22);
+            ctx.fillText(`🏆 BEHAALDE MIJLPALEN (${highlights.length})`, cardContentX + 12, curY + 20);
 
             visibleHighlights.forEach((h, idx) => {
-                const rowY = curY + 34 + idx * 36;
+                const rowY = curY + 32 + idx * 36;
 
-                // Exercise Name
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '700 13px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-                ctx.textAlign = 'left';
-                ctx.fillText(h.exerciseName || 'Oefening', cardContentX + 14, rowY + 16);
-
-                // Metric text
-                const metricText = h.weight ? ` (${h.weight} kg × ${h.reps})` : ` (${h.reps} reps)`;
-                let nameW = 120;
-                try {
-                    nameW = ctx.measureText(h.exerciseName || 'Oefening').width;
-                } catch (e) {}
-                ctx.fillStyle = '#94a3b8';
-                ctx.font = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-                ctx.fillText(metricText, cardContentX + 14 + nameW + 6, rowY + 16);
-
-                // Badge on right
+                // Badge measurements on right
                 const isPr = h.type === 'pr';
                 const badgeText = isPr ? '✦ Nieuw PR' : '↑ Overload';
-                const badgeW = isPr ? 92 : 84;
-                const badgeH = 24;
-                const badgeX = cardContentX + cardContentW - 14 - badgeW;
-                const badgeY = rowY + 2;
+                const badgeW = isPr ? 86 : 78;
+                const badgeH = 22;
+                const badgeX = cardContentX + cardContentW - 12 - badgeW;
+                const badgeY = rowY + 1;
+
+                // Exercise Name & Metric text
+                const maxTextW = badgeX - (cardContentX + 12) - 8;
+                const metricText = h.weight ? ` (${h.weight} kg × ${h.reps})` : ` (${h.reps} reps)`;
+
+                ctx.font = '500 11.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                let metricW = 0;
+                try {
+                    metricW = ctx.measureText(metricText).width;
+                } catch (e) {}
+
+                let exName = h.exerciseName || 'Oefening';
+                ctx.font = '700 12.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                let nameW = 0;
+                try {
+                    nameW = ctx.measureText(exName).width;
+                } catch (e) {}
+
+                if (nameW + metricW > maxTextW) {
+                    while (exName.length > 3 && (nameW + metricW) > maxTextW) {
+                        exName = exName.slice(0, -1);
+                        try {
+                            nameW = ctx.measureText(exName + '…').width;
+                        } catch (e) {}
+                    }
+                    exName += '…';
+                }
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '700 12.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(exName, cardContentX + 12, rowY + 16);
+
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '500 11.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.fillText(metricText, cardContentX + 12 + nameW + 5, rowY + 16);
 
                 if (isPr) {
-                    const badgeGrad = ctx.createLinearGradient(badgeX, 0, badgeX + badgeW, 0);
-                    badgeGrad.addColorStop(0, '#00e676');
-                    badgeGrad.addColorStop(1, '#00e5ff');
-                    drawRoundedRect(badgeX, badgeY, badgeW, badgeH, 12, badgeGrad, null);
+                    const badgeGrad = typeof ctx.createLinearGradient === 'function'
+                        ? ctx.createLinearGradient(badgeX, 0, badgeX + badgeW, 0)
+                        : null;
+                    if (badgeGrad) {
+                        badgeGrad.addColorStop(0, '#00e676');
+                        badgeGrad.addColorStop(1, '#00e5ff');
+                    }
+                    drawRoundedRect(badgeX, badgeY, badgeW, badgeH, 11, badgeGrad || '#00e676', null);
 
                     ctx.fillStyle = '#042f2e';
-                    ctx.font = '700 11px system-ui, -apple-system, sans-serif';
+                    ctx.font = '700 10.5px system-ui, -apple-system, sans-serif';
                     ctx.textAlign = 'center';
-                    ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + 16);
+                    ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + 15);
                 } else {
-                    drawRoundedRect(badgeX, badgeY, badgeW, badgeH, 12, 'rgba(16, 185, 129, 0.2)', 'rgba(16, 185, 129, 0.45)');
+                    drawRoundedRect(badgeX, badgeY, badgeW, badgeH, 11, 'rgba(16, 185, 129, 0.2)', 'rgba(16, 185, 129, 0.45)');
 
                     ctx.fillStyle = '#10b981';
-                    ctx.font = '700 11px system-ui, -apple-system, sans-serif';
+                    ctx.font = '700 10.5px system-ui, -apple-system, sans-serif';
                     ctx.textAlign = 'center';
-                    ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + 16);
+                    ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + 15);
                 }
             });
 
             if (remainingCount > 0) {
-                const moreY = curY + 34 + visibleHighlights.length * 36;
+                const moreY = curY + 32 + visibleHighlights.length * 36;
                 ctx.fillStyle = '#94a3b8';
-                ctx.font = '600 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.font = '600 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
                 ctx.textAlign = 'left';
-                ctx.fillText(`+ ${remainingCount} overige mijlpalen`, cardContentX + 14, moreY + 14);
+                ctx.fillText(`+ ${remainingCount} overige mijlpalen`, cardContentX + 12, moreY + 14);
             }
 
             curY += highlightsBoxH;
         }
 
         // 9. Card Footer Branding: ⚡ GOFITNESS
-        curY += 20;
+        curY += 18;
         ctx.fillStyle = '#64748b';
         ctx.font = '700 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'center';

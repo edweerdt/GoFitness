@@ -7661,7 +7661,7 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
 
             app.generateWorkoutRecapCanvas(canvas, app.lastWorkoutRecap);
 
-            expect(canvas.width).toBe(600);
+            expect(canvas.width).toBe(440);
             expect(canvas.height).toBeGreaterThan(400);
             expect(mockCtx.fillRect).toHaveBeenCalled();
             expect(filledTexts).toContain('🏆');
