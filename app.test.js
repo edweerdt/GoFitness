@@ -7637,7 +7637,7 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             app.showToast = origShowToast;
         });
 
-        test('1. generateWorkoutRecapCanvas berekent afmetingen en tekent titel, statistieken en mijlpalen', () => {
+        test('1. generateWorkoutRecapCanvas berekent afmetingen en tekent titel, statistieken en mijlpalen conform modal card', () => {
             const canvas = document.createElement('canvas');
             const filledTexts = [];
             const mockCtx = {
@@ -7646,6 +7646,9 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
                 lineTo: jest.fn(),
                 quadraticCurveTo: jest.fn(),
                 closePath: jest.fn(),
+                arc: jest.fn(),
+                save: jest.fn(),
+                restore: jest.fn(),
                 fill: jest.fn(),
                 stroke: jest.fn(),
                 fillRect: jest.fn(),
@@ -7658,19 +7661,23 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
 
             app.generateWorkoutRecapCanvas(canvas, app.lastWorkoutRecap);
 
-            expect(canvas.width).toBe(1000);
+            expect(canvas.width).toBe(600);
             expect(canvas.height).toBeGreaterThan(400);
             expect(mockCtx.fillRect).toHaveBeenCalled();
-            expect(filledTexts).toContain('Training Voltooid! 🎉');
-            expect(filledTexts).toContain('Upper Body Blast  •  Hypertrofie 4-Dagen');
+            expect(filledTexts).toContain('🏆');
+            expect(filledTexts).toContain('Training Voltooid!');
+            expect(filledTexts).toContain('Upper Body Blast • Hypertrofie 4-Dagen');
             expect(filledTexts).toContain('45m');
+            expect(filledTexts).toContain('DUUR');
             expect(filledTexts).toContain('16');
+            expect(filledTexts).toContain('SETS');
             expect(filledTexts).toContain('3.450 kg');
+            expect(filledTexts).toContain('VOLUME');
             expect(filledTexts).toContain('Barbell Bench Press');
             expect(filledTexts).toContain('✦ Nieuw PR');
             expect(filledTexts).toContain('Incline Dumbbell Press');
             expect(filledTexts).toContain('↑ Overload');
-            expect(filledTexts).toContain('GoFitness • Smart Strength Coach');
+            expect(filledTexts).toContain('⚡ GOFITNESS');
         });
 
         test('2. generateWorkoutRecapCanvas vangt null/lege parameters veilig op', () => {
@@ -7688,6 +7695,9 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
                 lineTo: jest.fn(),
                 quadraticCurveTo: jest.fn(),
                 closePath: jest.fn(),
+                arc: jest.fn(),
+                save: jest.fn(),
+                restore: jest.fn(),
                 fill: jest.fn(),
                 stroke: jest.fn(),
                 fillRect: jest.fn(),
@@ -7733,6 +7743,9 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
                 lineTo: jest.fn(),
                 quadraticCurveTo: jest.fn(),
                 closePath: jest.fn(),
+                arc: jest.fn(),
+                save: jest.fn(),
+                restore: jest.fn(),
                 fill: jest.fn(),
                 stroke: jest.fn(),
                 fillRect: jest.fn(),
