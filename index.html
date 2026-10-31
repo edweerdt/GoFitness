@@ -885,13 +885,15 @@
                 </div>
                 <h3>Sessie Afronden?</h3>
                 <p class="text-sm text-muted mt-2">Weet je zeker dat je klaar bent met je training? Je prestaties worden opgeslagen in je logboek.</p>
-                <div class="modal-actions mt-6">
-                    <button class="btn-secondary flex-1" onclick="app.hideFinishModal()" data-modal-close>Annuleren</button>
-                    <button class="btn-primary flex-1" onclick="app.finishWorkout()">Afronden</button>
+                <div class="finish-modal-actions mt-6" style="display:flex; flex-direction:column; gap:10px; width:100%;">
+                    <div class="modal-actions" style="margin-top:0;">
+                        <button type="button" class="btn-secondary flex-1" onclick="app.hideFinishModal()" data-modal-close>Annuleren</button>
+                        <button type="button" class="btn-primary flex-1" onclick="app.finishWorkout()">Afronden</button>
+                    </div>
+                    <button type="button" class="btn-secondary w-full" onclick="app.openSaveSessionAsPlanModal(); app.hideFinishModal();" style="display:flex; align-items:center; justify-content:center; gap:6px; font-size:0.9rem; min-height:44px; padding:12px 10px; box-sizing:border-box;">
+                        <span class="material-icons-round" style="font-size:1.15rem;">bookmark_add</span> Opslaan als nieuw schema
+                    </button>
                 </div>
-                <button type="button" class="btn-secondary w-full mt-3" onclick="app.openSaveSessionAsPlanModal(); app.hideFinishModal();" style="display:flex; align-items:center; justify-content:center; gap:6px; font-size:0.85rem;">
-                    <span class="material-icons-round" style="font-size:1.1rem;">bookmark_add</span> Opslaan als nieuw schema
-                </button>
             </div>
         </div>
         <!-- Cancel Workout Modal -->

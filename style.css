@@ -86,6 +86,7 @@ h3 { font-size: 1rem; color: var(--text-muted); font-weight: 500; text-transform
 /* Spacing & Utilities */
 .content-padded { padding: 20px; }
 .mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
 .mt-4 { margin-top: 16px; }
 .mt-6 { margin-top: 24px; }
 .pb-32 { padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important; }
