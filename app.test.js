@@ -7666,6 +7666,7 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(mockCtx.fillRect).toHaveBeenCalled();
             expect(filledTexts).toContain('🏆');
             expect(filledTexts).toContain('Training Voltooid!');
+            expect(filledTexts.some(t => t && t.includes('oktober 2026'))).toBe(true);
             expect(filledTexts).toContain('Upper Body Blast • Hypertrofie 4-Dagen');
             expect(filledTexts).toContain('45m');
             expect(filledTexts).toContain('DUUR');

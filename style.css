@@ -3949,6 +3949,12 @@ textarea:focus-visible,
     font-weight: 700;
 }
 
+.workout-recap-date {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
 .workout-recap-stats-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

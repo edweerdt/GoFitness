@@ -8906,6 +8906,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const modal = document.getElementById('modal-workout-recap');
         if (!modal) return;
 
+        const dateEl = document.getElementById('workout-recap-date');
+        if (dateEl) {
+            const rawDate = data.date ? new Date(data.date) : new Date();
+            const dateStr = !isNaN(rawDate.getTime())
+                ? rawDate.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                : '';
+            dateEl.textContent = dateStr ? (dateStr.charAt(0).toUpperCase() + dateStr.slice(1)) : '';
+        }
+
         const subtitleEl = document.getElementById('workout-recap-subtitle');
         if (subtitleEl) {
             subtitleEl.textContent = data.planName ? `${data.sessionName} • ${data.planName}` : data.sessionName;
@@ -9015,10 +9024,19 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             return lines.length > 0 ? lines : [text];
         };
 
+        const sessionDate = data.date ? new Date(data.date) : new Date();
+        const dateStr = !isNaN(sessionDate.getTime())
+            ? sessionDate.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+            : '';
+        const formattedDate = dateStr ? (dateStr.charAt(0).toUpperCase() + dateStr.slice(1)) : '';
+
         const subtitleFont = '500 13px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         const subtitleLines = wrapText(subtitleText, cardContentW - 16, subtitleFont);
         const subtitleLineH = 19;
         const subtitleTotalH = subtitleLines.length * subtitleLineH;
+
+        const dateFont = '500 12.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        const dateH = formattedDate ? 22 : 0;
 
         const highlights = Array.isArray(data.highlights) ? data.highlights : [];
         const visibleHighlights = highlights.slice(0, 5);
@@ -9029,7 +9047,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             highlightsBoxH = 12 + 18 + 8 + (visibleHighlights.length * 36) + (remainingCount > 0 ? 22 : 0) + 4;
         }
 
-        const cardH = 22 + 56 + 14 + 26 + 6 + subtitleTotalH + 18 + 72 +
+        const cardH = 22 + 56 + 14 + 26 + 4 + dateH + subtitleTotalH + 18 + 72 +
                       (visibleHighlights.length > 0 ? (14 + highlightsBoxH) : 0) +
                       18 + 14 + 18;
 
@@ -9109,7 +9127,16 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         ctx.font = '700 22px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('Training Voltooid!', cardCenterX, curY + 20);
-        curY += 26 + 6;
+        curY += 26 + 4;
+
+        // Date (Onder de titel)
+        if (formattedDate) {
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = dateFont;
+            ctx.textAlign = 'center';
+            ctx.fillText(formattedDate, cardCenterX, curY + 12);
+            curY += dateH;
+        }
 
         // 6. Subtitle (session + plan)
         ctx.fillStyle = '#94a3b8';
