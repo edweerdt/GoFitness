@@ -7593,4 +7593,198 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(added.details[0].weight).toBe('');
         });
     });
+
+    describe('GOF-66: Workout UX | Post-workout samenvatting delen als grafische card', () => {
+        let origCanShare, origShare, origClipboard, origShowToast;
+
+        beforeEach(() => {
+            origCanShare = navigator.canShare;
+            origShare = navigator.share;
+            origClipboard = navigator.clipboard;
+            origShowToast = app.showToast;
+
+            document.body.innerHTML = `
+                <div id="view-home" class="view active"></div>
+                <div id="view-progress" class="view"></div>
+                <div id="modal-workout-recap" class="modal-overlay">
+                    <button type="button" id="btn-recap-share" class="btn-secondary" onclick="app.shareFromWorkoutRecap()">
+                        <span class="material-icons-round">share</span> Delen
+                    </button>
+                    <canvas id="share-workout-recap-canvas" style="display:none;"></canvas>
+                </div>
+            `;
+            app.activeView = 'home';
+            app.showToast = jest.fn();
+            app.lastWorkoutRecap = {
+                sessionName: 'Upper Body Blast',
+                planName: 'Hypertrofie 4-Dagen',
+                duration: 45,
+                exercisesCompleted: 5,
+                setsCompleted: 16,
+                totalVolumeKg: 3450,
+                highlights: [
+                    { exerciseName: 'Barbell Bench Press', type: 'pr', weight: '90', reps: '6' },
+                    { exerciseName: 'Incline Dumbbell Press', type: 'overload', weight: '32', reps: '10' }
+                ],
+                date: '2026-10-31T10:00:00.000Z'
+            };
+        });
+
+        afterEach(() => {
+            if (origCanShare !== undefined) navigator.canShare = origCanShare; else delete navigator.canShare;
+            if (origShare !== undefined) navigator.share = origShare; else delete navigator.share;
+            if (origClipboard !== undefined) Object.defineProperty(navigator, 'clipboard', { value: origClipboard, configurable: true });
+            app.showToast = origShowToast;
+        });
+
+        test('1. generateWorkoutRecapCanvas berekent afmetingen en tekent titel, statistieken en mijlpalen', () => {
+            const canvas = document.createElement('canvas');
+            const filledTexts = [];
+            const mockCtx = {
+                beginPath: jest.fn(),
+                moveTo: jest.fn(),
+                lineTo: jest.fn(),
+                quadraticCurveTo: jest.fn(),
+                closePath: jest.fn(),
+                fill: jest.fn(),
+                stroke: jest.fn(),
+                fillRect: jest.fn(),
+                strokeRect: jest.fn(),
+                fillText: jest.fn((text, x, y) => filledTexts.push(text)),
+                measureText: jest.fn(() => ({ width: 100 })),
+                createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() }))
+            };
+            canvas.getContext = jest.fn(() => mockCtx);
+
+            app.generateWorkoutRecapCanvas(canvas, app.lastWorkoutRecap);
+
+            expect(canvas.width).toBe(1000);
+            expect(canvas.height).toBeGreaterThan(400);
+            expect(mockCtx.fillRect).toHaveBeenCalled();
+            expect(filledTexts).toContain('Training Voltooid! 🎉');
+            expect(filledTexts).toContain('Upper Body Blast  •  Hypertrofie 4-Dagen');
+            expect(filledTexts).toContain('45m');
+            expect(filledTexts).toContain('16');
+            expect(filledTexts).toContain('3.450 kg');
+            expect(filledTexts).toContain('Barbell Bench Press');
+            expect(filledTexts).toContain('✦ Nieuw PR');
+            expect(filledTexts).toContain('Incline Dumbbell Press');
+            expect(filledTexts).toContain('↑ Overload');
+            expect(filledTexts).toContain('GoFitness • Smart Strength Coach');
+        });
+
+        test('2. generateWorkoutRecapCanvas vangt null/lege parameters veilig op', () => {
+            expect(() => app.generateWorkoutRecapCanvas(null, null)).not.toThrow();
+            const canvas = document.createElement('canvas');
+            canvas.getContext = jest.fn(() => null);
+            expect(() => app.generateWorkoutRecapCanvas(canvas, null)).not.toThrow();
+        });
+
+        test('3. shareFromWorkoutRecap navigeert NIET naar progress en deelt direct via Web Share API', async () => {
+            const canvas = document.getElementById('share-workout-recap-canvas');
+            canvas.getContext = jest.fn(() => ({
+                beginPath: jest.fn(),
+                moveTo: jest.fn(),
+                lineTo: jest.fn(),
+                quadraticCurveTo: jest.fn(),
+                closePath: jest.fn(),
+                fill: jest.fn(),
+                stroke: jest.fn(),
+                fillRect: jest.fn(),
+                strokeRect: jest.fn(),
+                fillText: jest.fn(),
+                measureText: jest.fn(() => ({ width: 100 })),
+                createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() }))
+            }));
+            canvas.toBlob = jest.fn((callback) => {
+                const blob = new Blob(['sample-img'], { type: 'image/png' });
+                callback(blob);
+            });
+
+            const shareSpy = jest.fn().mockResolvedValue(true);
+            const canShareSpy = jest.fn(() => true);
+            navigator.share = shareSpy;
+            navigator.canShare = canShareSpy;
+
+            const navigateSpy = jest.spyOn(app, 'navigate');
+
+            await app.shareFromWorkoutRecap();
+
+            expect(navigateSpy).not.toHaveBeenCalledWith('progress');
+            expect(document.getElementById('modal-workout-recap').classList.contains('hidden')).toBe(false);
+            expect(shareSpy).toHaveBeenCalledWith(expect.objectContaining({
+                title: expect.stringContaining('Upper Body Blast'),
+                text: expect.stringContaining('Training voltooid: Upper Body Blast')
+            }));
+            expect(app.showToast).toHaveBeenCalledWith('Samenvatting gedeeld!', 'success');
+
+            const btn = document.getElementById('btn-recap-share');
+            expect(btn.disabled).toBe(false);
+            expect(btn.textContent).toContain('Delen');
+
+            navigateSpy.mockRestore();
+        });
+
+        test('4. shareFromWorkoutRecap valt soepel terug naar klembord als Web Share ontbreekt', async () => {
+            const canvas = document.getElementById('share-workout-recap-canvas');
+            canvas.getContext = jest.fn(() => ({
+                beginPath: jest.fn(),
+                moveTo: jest.fn(),
+                lineTo: jest.fn(),
+                quadraticCurveTo: jest.fn(),
+                closePath: jest.fn(),
+                fill: jest.fn(),
+                stroke: jest.fn(),
+                fillRect: jest.fn(),
+                strokeRect: jest.fn(),
+                fillText: jest.fn(),
+                measureText: jest.fn(() => ({ width: 100 })),
+                createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() }))
+            }));
+            canvas.toBlob = jest.fn((callback) => {
+                const blob = new Blob(['sample-img'], { type: 'image/png' });
+                callback(blob);
+            });
+
+            navigator.canShare = jest.fn(() => false);
+            const writeSpy = jest.fn().mockResolvedValue(true);
+            Object.defineProperty(navigator, 'clipboard', {
+                value: { write: writeSpy },
+                configurable: true
+            });
+            global.ClipboardItem = function(obj) { return obj; };
+
+            await app.shareFromWorkoutRecap();
+
+            expect(writeSpy).toHaveBeenCalled();
+            expect(app.showToast).toHaveBeenCalledWith('Samenvatting gekopieerd naar klembord!', 'success');
+        });
+
+        test('5. downloadWorkoutRecapImage downloadt PNG met geformatteerde bestandsnaam', () => {
+            const canvas = document.createElement('canvas');
+            canvas.toDataURL = jest.fn(() => 'data:image/png;base64,mockpngdata');
+
+            let clicked = false;
+            let downloadAttr = '';
+            const origCreateElement = document.createElement.bind(document);
+            jest.spyOn(document, 'createElement').mockImplementation((tag) => {
+                const el = origCreateElement(tag);
+                if (tag === 'a') {
+                    el.click = () => {
+                        clicked = true;
+                        downloadAttr = el.download;
+                    };
+                }
+                return el;
+            });
+
+            app.downloadWorkoutRecapImage(canvas, app.lastWorkoutRecap);
+
+            expect(clicked).toBe(true);
+            expect(downloadAttr).toBe('upper-body-blast-samenvatting.png');
+            expect(app.showToast).toHaveBeenCalledWith('Samenvatting gedownload!', 'success');
+
+            document.createElement.mockRestore();
+        });
+    });
 });
