@@ -5682,9 +5682,11 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     </div>
                     ${strip.length > 0 ? html`<div class="set-strip" aria-hidden="true">${strip}</div>` : ''}
                 </div>
-                <button type="button" class="icon-btn history-share-btn" aria-label="Sessie delen" title="Sessie delen" onclick="event.stopPropagation(); app.openShareLogModal(${idArg})"><span class="material-icons-round" aria-hidden="true">share</span></button>
-                ${menu}
-                <span class="material-icons-round text-muted history-chevron" aria-hidden="true">expand_more</span>
+                <div class="history-card-actions">
+                    <button type="button" class="icon-btn history-share-btn" aria-label="Sessie delen" title="Sessie delen" onclick="event.stopPropagation(); app.openShareLogModal(${idArg})"><span class="material-icons-round" aria-hidden="true">share</span></button>
+                    ${menu}
+                    <span class="material-icons-round text-muted history-chevron" aria-hidden="true">expand_more</span>
+                </div>
             </div>
             <div class="hidden history-details">
                 ${ann.volume > 0 ? html`<div class="history-volume text-sm text-muted">Volume <strong>${this.formatVolume(ann.volume)} kg</strong> (gewicht x herhalingen, opgeteld)${ann.prevVolume ? ` · vorige keer ${this.formatVolume(ann.prevVolume)} kg` : ''}</div>` : ''}
