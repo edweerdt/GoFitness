@@ -5658,6 +5658,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 <div class="history-menu hidden" role="menu">
                     ${exercises.length > 0 ? html`<button type="button" role="menuitem" class="history-menu-item" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.showEditLogModal(${idArg})"><span class="material-icons-round" aria-hidden="true">edit_note</span><span class="history-menu-label">Bewerken</span></button>` : ''}
                     ${exercises.length > 0 ? html`<button type="button" role="menuitem" class="history-menu-item" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.repeatLoggedSession(${idArg})"><span class="material-icons-round" aria-hidden="true">replay</span><span class="history-menu-label">Herhalen</span></button>` : ''}
+                    <button type="button" role="menuitem" class="history-menu-item" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.openShareLogModal(${idArg})"><span class="material-icons-round" aria-hidden="true">share</span><span>Delen</span></button>
                     <button type="button" role="menuitem" class="history-menu-item danger" onclick="event.stopPropagation(); app.closeHistoryMenus(); app.deleteLogWithUndo(${idArg})"><span class="material-icons-round" aria-hidden="true">delete_outline</span><span class="history-menu-label">Verwijderen</span></button>
                 </div>
             </div>`;
@@ -5681,6 +5682,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                     </div>
                     ${strip.length > 0 ? html`<div class="set-strip" aria-hidden="true">${strip}</div>` : ''}
                 </div>
+                <button type="button" class="icon-btn history-share-btn" aria-label="Sessie delen" title="Sessie delen" onclick="event.stopPropagation(); app.openShareLogModal(${idArg})"><span class="material-icons-round" aria-hidden="true">share</span></button>
                 ${menu}
                 <span class="material-icons-round text-muted history-chevron" aria-hidden="true">expand_more</span>
             </div>
@@ -8974,6 +8976,533 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         }
 
         modal.classList.remove('hidden');
+    },
+
+
+    // --- GOF-69: LOGBOEK SESSIE DELEN (KEUZE TUSSEN OPTIE 1 EN 3) ---
+    activeShareLog: null,
+    activeShareLogStyle: 'recap', // 'recap' (Optie 1) of 'breakdown' (Optie 3)
+
+    buildRecapDataFromLog(log) {
+        if (!log) return null;
+        const annotations = typeof this.buildHistoryAnnotations === 'function' ? this.buildHistoryAnnotations() : new Map();
+        const ann = annotations.get(log.id) || { volume: 0, prCount: 0, exercises: [] };
+
+        const exercises = log.exercises || [];
+        const totalSetsCompleted = exercises.reduce((n, ex) => n + ((ex.details || []).length || ex.setsCompleted || 0), 0);
+        const totalVolumeKg = ann.volume || 0;
+
+        // Collect highlights (PRs & overloads)
+        const highlights = [];
+        exercises.forEach((ex, exIdx) => {
+            const exAnn = (ann.exercises && ann.exercises[exIdx]) ? ann.exercises[exIdx] : { prSets: new Set(), deltas: [] };
+            const details = ex.details || [];
+
+            if (exAnn.prSets && exAnn.prSets.size > 0) {
+                let bestPrSet = null;
+                exAnn.prSets.forEach(setIdx => {
+                    const d = details[setIdx];
+                    if (d && (!bestPrSet || (Number(d.weight) || 0) >= (Number(bestPrSet.weight) || 0))) {
+                        bestPrSet = d;
+                    }
+                });
+                if (bestPrSet) {
+                    highlights.push({
+                        exerciseName: ex.name,
+                        type: 'pr',
+                        weight: bestPrSet.weight,
+                        reps: bestPrSet.reps
+                    });
+                }
+            } else if (exAnn.trend && exAnn.trend.value > 0) {
+                const bestSet = details.reduce((best, cur) => {
+                    return (!best || (Number(cur.weight) || 0) > (Number(best.weight) || 0)) ? cur : best;
+                }, null);
+                highlights.push({
+                    exerciseName: ex.name,
+                    type: 'overload',
+                    weight: bestSet ? bestSet.weight : null,
+                    reps: bestSet ? bestSet.reps : null
+                });
+            }
+        });
+
+        return {
+            id: log.id,
+            sessionName: log.sessionName || 'Workout',
+            planName: log.planName || 'Overige Sessies',
+            duration: log.duration != null ? log.duration : 45,
+            exercisesCompleted: exercises.length || log.exercisesCompleted || 0,
+            setsCompleted: totalSetsCompleted,
+            totalVolumeKg: Math.round(totalVolumeKg),
+            highlights: highlights,
+            date: log.date || log.startTime || new Date().toISOString()
+        };
+    },
+
+    buildBreakdownDataFromLog(log) {
+        if (!log) return null;
+        const annotations = typeof this.buildHistoryAnnotations === 'function' ? this.buildHistoryAnnotations() : new Map();
+        const ann = annotations.get(log.id) || { volume: 0, prCount: 0, exercises: [] };
+        const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+
+        const exercises = (log.exercises || []).map((ex, exIdx) => {
+            const exAnn = (ann.exercises && ann.exercises[exIdx]) ? ann.exercises[exIdx] : { prSets: new Set(), deltas: [] };
+            const details = ex.details || [];
+            const isDuration = typeof this.isDurationLogExercise === 'function' ? this.isDurationLogExercise(ex) : false;
+
+            let exVolume = 0;
+            let topWeight = 0;
+            let topReps = 0;
+
+            details.forEach(d => {
+                const w = num(d && d.weight);
+                const r = num(d && d.reps);
+                if (!isDuration && w > 0 && r > 0) exVolume += w * r;
+                if (w > topWeight || (w === topWeight && r > topReps)) {
+                    topWeight = w;
+                    topReps = r;
+                }
+            });
+
+            if (topWeight === 0 && details.length > 0) {
+                details.forEach(d => {
+                    const r = num(d && d.reps);
+                    if (r > topReps) topReps = r;
+                });
+            }
+
+            const isPr = Boolean(exAnn.prSets && exAnn.prSets.size > 0);
+            const isOverload = !isPr && Boolean(exAnn.trend && exAnn.trend.value > 0);
+
+            return {
+                name: ex.name || 'Oefening',
+                setsCount: details.length || ex.setsCompleted || 0,
+                topWeight: topWeight,
+                topReps: topReps,
+                volume: Math.round(exVolume),
+                isPr: isPr,
+                isOverload: isOverload,
+                trendText: exAnn.trend && exAnn.trend.value > 0 ? (exAnn.trend.kind === 'kg' ? `+${exAnn.trend.value}kg` : `+${exAnn.trend.value}r`) : ''
+            };
+        });
+
+        const totalSetsCompleted = exercises.reduce((sum, e) => sum + e.setsCount, 0);
+
+        return {
+            id: log.id,
+            sessionName: log.sessionName || 'Workout',
+            planName: log.planName || 'Overige Sessies',
+            date: log.date || log.startTime || new Date().toISOString(),
+            duration: log.duration != null ? log.duration : 45,
+            setsCompleted: totalSetsCompleted,
+            totalVolumeKg: Math.round(ann.volume || 0),
+            exercisesCompleted: exercises.length || log.exercisesCompleted || 0,
+            exercises: exercises
+        };
+    },
+
+    openShareLogModal(logId) {
+        if (!store || !store.logs) return;
+        const log = store.logs.find(l => String(l.id) === String(logId));
+        if (!log) {
+            this.showToast('Sessie niet gevonden.', 'error');
+            return;
+        }
+
+        this.activeShareLog = log;
+        this.activeShareLogStyle = 'recap';
+
+        if (typeof document !== 'undefined') {
+            const modal = document.getElementById('modal-share-log');
+            if (modal) modal.classList.remove('hidden');
+
+            const btnRecap = document.getElementById('btn-share-style-recap');
+            const btnBreakdown = document.getElementById('btn-share-style-breakdown');
+            if (btnRecap) btnRecap.classList.add('active');
+            if (btnBreakdown) btnBreakdown.classList.remove('active');
+
+            this.renderShareLogPreview();
+        }
+    },
+
+    hideShareLogModal() {
+        if (typeof document !== 'undefined') {
+            const modal = document.getElementById('modal-share-log');
+            if (modal) modal.classList.add('hidden');
+        }
+        this.activeShareLog = null;
+    },
+
+    setShareLogStyle(style) {
+        this.activeShareLogStyle = style === 'breakdown' ? 'breakdown' : 'recap';
+        if (typeof document !== 'undefined') {
+            const btnRecap = document.getElementById('btn-share-style-recap');
+            const btnBreakdown = document.getElementById('btn-share-style-breakdown');
+            if (btnRecap) {
+                if (this.activeShareLogStyle === 'recap') btnRecap.classList.add('active');
+                else btnRecap.classList.remove('active');
+            }
+            if (btnBreakdown) {
+                if (this.activeShareLogStyle === 'breakdown') btnBreakdown.classList.add('active');
+                else btnBreakdown.classList.remove('active');
+            }
+            this.renderShareLogPreview();
+        }
+    },
+
+    renderShareLogPreview() {
+        if (!this.activeShareLog || typeof document === 'undefined') return;
+        const canvas = document.getElementById('share-log-canvas');
+        const imgPreview = document.getElementById('share-log-img-preview');
+        if (!canvas) return;
+
+        if (this.activeShareLogStyle === 'breakdown') {
+            const data = this.buildBreakdownDataFromLog(this.activeShareLog);
+            this.generateWorkoutBreakdownCanvas(canvas, data);
+        } else {
+            const data = this.buildRecapDataFromLog(this.activeShareLog);
+            this.generateWorkoutRecapCanvas(canvas, data);
+        }
+
+        if (imgPreview && typeof canvas.toDataURL === 'function') {
+            try {
+                imgPreview.src = canvas.toDataURL('image/png');
+                imgPreview.style.display = 'block';
+            } catch (e) {}
+        }
+    },
+
+    generateWorkoutBreakdownCanvas(canvas, logData) {
+        if (!canvas || !logData) return;
+        const ctx = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
+        if (!ctx) return;
+
+        // Proportioneel mobile card formaat (440px breed) conform Optie 1
+        const canvasW = 440;
+        const outerMarginX = 16;
+        const outerMarginY = 20;
+        const cardW = canvasW - (outerMarginX * 2); // 408px
+        const cardPaddingX = 18;
+        const cardContentW = cardW - (cardPaddingX * 2); // 372px
+        const cardCenterX = outerMarginX + cardW / 2; // 220px
+        const cardContentX = outerMarginX + cardPaddingX; // 34px
+
+        const sessionDate = logData.date ? new Date(logData.date) : new Date();
+        const dateStr = !isNaN(sessionDate.getTime())
+            ? sessionDate.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+            : '';
+        const formattedDate = dateStr ? (dateStr.charAt(0).toUpperCase() + dateStr.slice(1)) : '';
+
+        const exercises = Array.isArray(logData.exercises) ? logData.exercises : [];
+        const maxExercises = 8;
+        const visibleExercises = exercises.slice(0, maxExercises);
+        const remainingCount = exercises.length - visibleExercises.length;
+
+        // Hoogteberekening:
+        // Top badge: 24px + 12px
+        // Titel: 28px
+        // Plan: 18px
+        // Datum: 18px + 14px gap
+        // Stat bar: 54px + 16px gap
+        // Oefening header: 18px + 10px gap
+        // Oefeningen: visibleExercises.length * 52px + (remainingCount > 0 ? 24px : 0)
+        // Footer: 36px
+        const exerciseListH = (visibleExercises.length * 52) + (remainingCount > 0 ? 26 : 0);
+        const cardH = 22 + 24 + 10 + 26 + 18 + 18 + 14 + 56 + 16 + 22 + 10 + exerciseListH + 20 + 16 + 18;
+        const totalH = cardH + (outerMarginY * 2);
+
+        canvas.width = canvasW;
+        canvas.height = totalH;
+
+        const drawRoundedRect = (x, y, w, h, r = 16, fillColor = null, strokeColor = null) => {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            if (fillColor) {
+                ctx.fillStyle = fillColor;
+                ctx.fill();
+            }
+            if (strokeColor) {
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        };
+
+        // 1. Achtergrond
+        ctx.fillStyle = '#0a0e14';
+        ctx.fillRect(0, 0, canvasW, totalH);
+
+        // 2. Kaart container
+        if (typeof ctx.save === 'function') ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+        ctx.shadowBlur = 24;
+        ctx.shadowOffsetY = 8;
+        const cardBgGrad = typeof ctx.createLinearGradient === 'function'
+            ? ctx.createLinearGradient(outerMarginX, outerMarginY, outerMarginX, outerMarginY + cardH)
+            : null;
+        if (cardBgGrad) {
+            cardBgGrad.addColorStop(0, '#171f2d');
+            cardBgGrad.addColorStop(1, '#121824');
+        }
+        drawRoundedRect(outerMarginX, outerMarginY, cardW, cardH, 20, cardBgGrad || '#171f2d', 'rgba(255, 255, 255, 0.08)');
+        if (typeof ctx.restore === 'function') ctx.restore();
+
+        let curY = outerMarginY + 22;
+
+        // 3. Mini Top Tag (⚡ GOFITNESS LOGBOEK)
+        const tagText = '⚡ GOFITNESS LOGBOEK';
+        ctx.font = '700 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        const tagW = 142;
+        drawRoundedRect(cardCenterX - tagW / 2, curY, tagW, 22, 11, 'rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.35)');
+        ctx.fillStyle = '#10b981';
+        ctx.textAlign = 'center';
+        ctx.fillText(tagText, cardCenterX, curY + 15);
+        curY += 22 + 12;
+
+        // 4. Sessienaam (Titel)
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 22px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(logData.sessionName || 'Workout', cardCenterX, curY + 18);
+        curY += 24 + 4;
+
+        // 5. Schema naam
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '500 13px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.fillText(logData.planName || 'Overige Sessies', cardCenterX, curY + 14);
+        curY += 18;
+
+        // 6. Datum & Duur
+        if (formattedDate) {
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = '600 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.fillText(`${formattedDate} • ${logData.duration || 45} min`, cardCenterX, curY + 12);
+            curY += 16 + 14;
+        } else {
+            curY += 10;
+        }
+
+        // 7. Stat Bar (Duur, Sets, Volume)
+        const statBarH = 56;
+        drawRoundedRect(cardContentX, curY, cardContentW, statBarH, 12, 'rgba(255, 255, 255, 0.035)', 'rgba(255, 255, 255, 0.08)');
+        const statColW = cardContentW / 3;
+
+        const volText = logData.totalVolumeKg > 0 ? `${(logData.totalVolumeKg || 0).toLocaleString('nl-NL')} kg` : `${logData.exercisesCompleted || 0}`;
+        const volLabel = logData.totalVolumeKg > 0 ? 'VOLUME' : 'OEFENINGEN';
+
+        const summaryStats = [
+            { val: `${logData.duration || 0}m`, lbl: 'DUUR' },
+            { val: `${logData.setsCompleted || 0}`, lbl: 'SETS' },
+            { val: volText, lbl: volLabel }
+        ];
+
+        summaryStats.forEach((s, idx) => {
+            const colX = cardContentX + idx * statColW + statColW / 2;
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '700 16px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(s.val, colX, curY + 26);
+
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '600 10.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.fillText(s.lbl, colX, curY + 44);
+        });
+        curY += statBarH + 16;
+
+        // 8. Oefeningen lijst
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '700 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`OEFENINGEN (${exercises.length})`, cardContentX + 4, curY + 12);
+        curY += 18 + 6;
+
+        visibleExercises.forEach((ex, idx) => {
+            const rowY = curY + idx * 52;
+            const rowH = 46;
+            drawRoundedRect(cardContentX, rowY, cardContentW, rowH, 10, 'rgba(255, 255, 255, 0.035)', 'rgba(255, 255, 255, 0.07)');
+
+            // Oefening naam & badges
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '700 12.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.textAlign = 'left';
+
+            let exName = ex.name || 'Oefening';
+            let nameW = 0;
+            try { nameW = ctx.measureText(exName).width; } catch (e) {}
+
+            const maxExW = 180;
+            if (nameW > maxExW) {
+                while (exName.length > 3 && nameW > maxExW) {
+                    exName = exName.slice(0, -1);
+                    try { nameW = ctx.measureText(exName + '…').width; } catch (e) {}
+                }
+                exName += '…';
+            }
+            ctx.fillText(exName, cardContentX + 12, rowY + 18);
+
+            // Badge if PR or Overload
+            if (ex.isPr) {
+                const bX = cardContentX + 12 + nameW + 6;
+                drawRoundedRect(bX, rowY + 6, 32, 16, 4, '#f59e0b', null);
+                ctx.fillStyle = '#042f2e';
+                ctx.font = '700 9.5px system-ui, -apple-system, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('PR', bX + 16, rowY + 17);
+            } else if (ex.isOverload) {
+                const bX = cardContentX + 12 + nameW + 6;
+                drawRoundedRect(bX, rowY + 6, 36, 16, 4, 'rgba(16, 185, 129, 0.2)', 'rgba(16, 185, 129, 0.45)');
+                ctx.fillStyle = '#10b981';
+                ctx.font = '700 9px system-ui, -apple-system, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(ex.trendText || '↑ +1r', bX + 18, rowY + 17);
+            }
+
+            // Sub regel: Sets & Topset
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '500 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.textAlign = 'left';
+            const topStr = ex.topWeight > 0 ? `Top: ${ex.topWeight} kg × ${ex.topReps}` : (ex.topReps > 0 ? `Top: ${ex.topReps} reps` : 'Afgevinkt');
+            ctx.fillText(`${ex.setsCount} sets • ${topStr}`, cardContentX + 12, rowY + 35);
+
+            // Rechts: Volume van oefening
+            if (ex.volume > 0) {
+                ctx.fillStyle = '#10b981';
+                ctx.font = '700 12.5px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(`${ex.volume.toLocaleString('nl-NL')} kg`, cardContentX + cardContentW - 12, rowY + 27);
+            }
+        });
+
+        curY += (visibleExercises.length * 52);
+
+        if (remainingCount > 0) {
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '600 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(`+ ${remainingCount} overige oefeningen in deze sessie`, cardContentX + 12, curY + 14);
+            curY += 26;
+        }
+
+        // 9. Footer Branding: ⚡ GOFITNESS
+        curY += 18;
+        ctx.fillStyle = '#64748b';
+        ctx.font = '700 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚡ GOFITNESS', cardCenterX, curY + 10);
+        ctx.textAlign = 'left';
+    },
+
+    async executeShareLog() {
+        if (!this.activeShareLog) return;
+        const btnShare = document.getElementById('btn-action-share-log');
+        const origBtnHtml = btnShare ? btnShare.innerHTML : '';
+        if (btnShare) {
+            btnShare.disabled = true;
+            btnShare.innerHTML = '<span class="material-icons-round spinning" aria-hidden="true">sync</span> Delen...';
+        }
+
+        const canvas = document.getElementById('share-log-canvas');
+        if (!canvas) {
+            if (btnShare) {
+                btnShare.disabled = false;
+                btnShare.innerHTML = origBtnHtml;
+            }
+            return;
+        }
+
+        try {
+            const data = this.activeShareLogStyle === 'breakdown'
+                ? this.buildBreakdownDataFromLog(this.activeShareLog)
+                : this.buildRecapDataFromLog(this.activeShareLog);
+
+            if (this.activeShareLogStyle === 'breakdown') {
+                this.generateWorkoutBreakdownCanvas(canvas, data);
+            } else {
+                this.generateWorkoutRecapCanvas(canvas, data);
+            }
+
+            if (canvas && typeof canvas.toBlob === 'function') {
+                await new Promise((resolve) => {
+                    canvas.toBlob(async (blob) => {
+                        try {
+                            if (!blob) {
+                                this.downloadWorkoutRecapImage(canvas, data);
+                                resolve();
+                                return;
+                            }
+
+                            let file = null;
+                            try {
+                                if (typeof File !== 'undefined') {
+                                    const safeName = (data.sessionName || 'workout')
+                                        .toLowerCase()
+                                        .replace(/[^a-z0-9]/g, '-')
+                                        .replace(/-+/g, '-')
+                                        .replace(/^-|-$/g, '');
+                                    const styleSuffix = this.activeShareLogStyle === 'breakdown' ? 'overzicht' : 'samenvatting';
+                                    file = new File([blob], `${safeName || 'workout'}-${styleSuffix}.png`, { type: 'image/png' });
+                                }
+                            } catch (fe) {}
+
+                            if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+                                await navigator.share({
+                                    title: `${data.sessionName || 'Workout'} - GoFitness`,
+                                    text: `Mijn ${data.sessionName || 'workout'} (${data.duration || 45}m, ${(data.totalVolumeKg || 0).toLocaleString('nl-NL')} kg) via GoFitness!`,
+                                    files: [file]
+                                });
+                                this.showToast('Sessie succesvol gedeeld!', 'success');
+                                this.hideShareLogModal();
+                                resolve();
+                                return;
+                            }
+
+                            if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+                                await navigator.clipboard.write([
+                                    new ClipboardItem({ 'image/png': blob })
+                                ]);
+                                this.showToast('Afbeelding gekopieerd naar klembord!', 'success');
+                                this.hideShareLogModal();
+                                resolve();
+                                return;
+                            }
+
+                            this.downloadWorkoutRecapImage(canvas, data);
+                            this.hideShareLogModal();
+                            resolve();
+                        } catch (err) {
+                            if (err && err.name === 'AbortError') {
+                                resolve();
+                                return;
+                            }
+                            this.downloadWorkoutRecapImage(canvas, data);
+                            this.hideShareLogModal();
+                            resolve();
+                        }
+                    }, 'image/png');
+                });
+            } else {
+                this.downloadWorkoutRecapImage(canvas, data);
+                this.hideShareLogModal();
+            }
+        } catch (e) {
+            console.error('Fout bij delen sessie:', e);
+            this.showToast('Fout bij het genereren van de deelkaart.', 'error');
+        } finally {
+            if (btnShare) {
+                btnShare.disabled = false;
+                btnShare.innerHTML = origBtnHtml;
+            }
+        }
     },
 
     hideWorkoutRecapModal() {

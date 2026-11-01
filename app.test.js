@@ -7801,4 +7801,165 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             document.createElement.mockRestore();
         });
     });
+    describe('GOF-69: Logboek | Voltooide sessies delen met keuze tussen 1 (Recap) en 3 (Breakdown)', () => {
+        let sampleLog;
+
+        beforeEach(() => {
+            sampleLog = {
+                id: 'log-test-69',
+                sessionName: 'Upper Body Blast',
+                planName: 'Hypertrofie 4-Dagen',
+                date: '2026-10-31T10:00:00.000Z',
+                duration: 45,
+                exercisesCompleted: 2,
+                exercises: [
+                    {
+                        name: 'Barbell Bench Press',
+                        setsCompleted: 3,
+                        details: [
+                            { setNumber: 1, weight: 80, reps: 8 },
+                            { setNumber: 2, weight: 85, reps: 6 },
+                            { setNumber: 3, weight: 90, reps: 6 }
+                        ]
+                    },
+                    {
+                        name: 'Incline Dumbbell Press',
+                        setsCompleted: 2,
+                        details: [
+                            { setNumber: 1, weight: 30, reps: 10 },
+                            { setNumber: 2, weight: 32, reps: 10 }
+                        ]
+                    }
+                ]
+            };
+
+            store.logs = [sampleLog];
+            app.showToast = jest.fn();
+
+            document.body.innerHTML += `
+                <div id="modal-share-log" class="hidden">
+                    <button id="btn-share-style-recap" class="share-style-btn active"></button>
+                    <button id="btn-share-style-breakdown" class="share-style-btn"></button>
+                    <img id="share-log-img-preview" />
+                    <canvas id="share-log-canvas"></canvas>
+                    <button id="btn-action-share-log">Delen</button>
+                </div>
+            `;
+        });
+
+        afterEach(() => {
+            const m = document.getElementById('modal-share-log');
+            if (m) m.remove();
+        });
+
+        test('1. buildRecapDataFromLog en buildBreakdownDataFromLog transformeren log correct', () => {
+            const recapData = app.buildRecapDataFromLog(sampleLog);
+            expect(recapData.sessionName).toBe('Upper Body Blast');
+            expect(recapData.planName).toBe('Hypertrofie 4-Dagen');
+            expect(recapData.duration).toBe(45);
+            expect(recapData.setsCompleted).toBe(5);
+            expect(recapData.totalVolumeKg).toBeGreaterThan(0);
+
+            const breakdownData = app.buildBreakdownDataFromLog(sampleLog);
+            expect(breakdownData.exercises.length).toBe(2);
+            expect(breakdownData.exercises[0].name).toBe('Barbell Bench Press');
+            expect(breakdownData.exercises[0].topWeight).toBe(90);
+            expect(breakdownData.exercises[0].topReps).toBe(6);
+            expect(breakdownData.exercises[0].setsCount).toBe(3);
+        });
+
+        test('2. openShareLogModal opent modal en initialiseert stijl op recap (Optie 1)', () => {
+            app.openShareLogModal('log-test-69');
+            const modal = document.getElementById('modal-share-log');
+            expect(modal.classList.contains('hidden')).toBe(false);
+            expect(app.activeShareLog).toBe(sampleLog);
+            expect(app.activeShareLogStyle).toBe('recap');
+        });
+
+        test('3. setShareLogStyle schakelt tussen recap en breakdown (Optie 1 en 3)', () => {
+            app.activeShareLog = sampleLog;
+            app.setShareLogStyle('breakdown');
+            expect(app.activeShareLogStyle).toBe('breakdown');
+            const btnBreakdown = document.getElementById('btn-share-style-breakdown');
+            expect(btnBreakdown.classList.contains('active')).toBe(true);
+
+            app.setShareLogStyle('recap');
+            expect(app.activeShareLogStyle).toBe('recap');
+            const btnRecap = document.getElementById('btn-share-style-recap');
+            expect(btnRecap.classList.contains('active')).toBe(true);
+        });
+
+        test('4. generateWorkoutBreakdownCanvas tekent oefeningen overzicht op canvas', () => {
+            const canvas = document.createElement('canvas');
+            const filledTexts = [];
+            const mockCtx = {
+                beginPath: jest.fn(),
+                moveTo: jest.fn(),
+                lineTo: jest.fn(),
+                quadraticCurveTo: jest.fn(),
+                closePath: jest.fn(),
+                arc: jest.fn(),
+                save: jest.fn(),
+                restore: jest.fn(),
+                fill: jest.fn(),
+                stroke: jest.fn(),
+                fillRect: jest.fn(),
+                strokeRect: jest.fn(),
+                fillText: jest.fn((text) => filledTexts.push(text)),
+                measureText: jest.fn(() => ({ width: 80 })),
+                createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() }))
+            };
+            canvas.getContext = jest.fn(() => mockCtx);
+
+            const breakdownData = app.buildBreakdownDataFromLog(sampleLog);
+            app.generateWorkoutBreakdownCanvas(canvas, breakdownData);
+
+            expect(canvas.width).toBe(440);
+            expect(canvas.height).toBeGreaterThan(300);
+            expect(filledTexts).toContain('⚡ GOFITNESS LOGBOEK');
+            expect(filledTexts).toContain('Upper Body Blast');
+            expect(filledTexts).toContain('Hypertrofie 4-Dagen');
+            expect(filledTexts).toContain('Barbell Bench Press');
+            expect(filledTexts).toContain('Incline Dumbbell Press');
+            expect(filledTexts).toContain('⚡ GOFITNESS');
+        });
+
+        test('5. executeShareLog deelt via Web Share API indien ondersteund', async () => {
+            app.activeShareLog = sampleLog;
+            app.activeShareLogStyle = 'recap';
+
+            const canvas = document.getElementById('share-log-canvas');
+            canvas.getContext = jest.fn(() => ({
+                beginPath: jest.fn(),
+                moveTo: jest.fn(),
+                lineTo: jest.fn(),
+                quadraticCurveTo: jest.fn(),
+                closePath: jest.fn(),
+                arc: jest.fn(),
+                save: jest.fn(),
+                restore: jest.fn(),
+                fill: jest.fn(),
+                stroke: jest.fn(),
+                fillRect: jest.fn(),
+                strokeRect: jest.fn(),
+                fillText: jest.fn(),
+                measureText: jest.fn(() => ({ width: 80 })),
+                createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() }))
+            }));
+
+            canvas.toBlob = jest.fn((callback) => {
+                callback(new Blob(['img'], { type: 'image/png' }));
+            });
+
+            const shareSpy = jest.fn().mockResolvedValue(true);
+            navigator.share = shareSpy;
+            navigator.canShare = jest.fn(() => true);
+
+            await app.executeShareLog();
+
+            expect(shareSpy).toHaveBeenCalled();
+            expect(app.showToast).toHaveBeenCalledWith('Sessie succesvol gedeeld!', 'success');
+        });
+    });
+
 });
