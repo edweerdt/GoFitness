@@ -877,6 +877,54 @@
                 </div>
             </div>
         </div>
+                <!-- Modal: Deel Logboek Sessie (GOF-69) -->
+        <div id="modal-share-log" class="modal-overlay hidden">
+            <div class="modal-content glass-panel" style="max-width: 480px; width: 100%;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="material-icons-round" style="color:var(--accent-color); font-size:1.3rem;">share</span>
+                        <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.15rem; font-weight:700;">Sessie Delen</h3>
+                    </div>
+                    <button type="button" class="icon-btn" onclick="app.hideShareLogModal()" aria-label="Sluiten" data-modal-close>
+                        <span class="material-icons-round" aria-hidden="true">close</span>
+                    </button>
+                </div>
+
+                <p class="text-sm text-muted" style="margin-bottom:12px;">Kies het gewenste formaat voor de deelkaart:</p>
+
+                <!-- Keuze tussen Optie 1 (Recap) en Optie 3 (Oefeningen Breakdown) -->
+                <div class="share-style-selector" role="radiogroup" aria-label="Kies deelkaart stijl" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
+                    <button type="button" id="btn-share-style-recap" class="share-style-btn active" onclick="app.setShareLogStyle('recap')">
+                        <span class="material-icons-round" style="font-size:1.25rem;">emoji_events</span>
+                        <div style="text-align:left; min-width:0;">
+                            <div style="font-weight:700; font-size:0.875rem;">1. Samenvatting</div>
+                            <div class="text-xs text-muted" style="font-size:0.75rem;">Beker & kerncijfers</div>
+                        </div>
+                    </button>
+                    <button type="button" id="btn-share-style-breakdown" class="share-style-btn" onclick="app.setShareLogStyle('breakdown')">
+                        <span class="material-icons-round" style="font-size:1.25rem;">format_list_bulleted</span>
+                        <div style="text-align:left; min-width:0;">
+                            <div style="font-weight:700; font-size:0.875rem;">3. Oefeningen</div>
+                            <div class="text-xs text-muted" style="font-size:0.75rem;">Sets & gewichten</div>
+                        </div>
+                    </button>
+                </div>
+
+                <!-- Live Preview Container -->
+                <div id="share-log-preview-container" class="glass-panel" style="background: rgba(0,0,0,0.35); border-radius:14px; padding:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; max-height:45vh; overflow-y:auto; margin-bottom:16px;">
+                    <img id="share-log-img-preview" alt="Voorbeeld van deelkaart" style="max-width:100%; height:auto; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.4);" />
+                    <canvas id="share-log-canvas" style="display:none;"></canvas>
+                </div>
+
+                <div class="modal-actions" style="margin-top:0;">
+                    <button type="button" class="btn-secondary flex-1" onclick="app.hideShareLogModal()" data-modal-close>Annuleren</button>
+                    <button type="button" id="btn-action-share-log" class="btn-primary flex-1" onclick="app.executeShareLog()">
+                        <span class="material-icons-round" aria-hidden="true">share</span> Delen
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Finish Workout Modal -->
         <div id="modal-finish-workout" class="modal-overlay hidden">
             <div class="modal-content glass-panel" style="text-align: center;">
@@ -1415,6 +1463,7 @@
                 <div class="workout-recap-header">
                     <div class="workout-recap-badge-icon" aria-hidden="true">🏆</div>
                     <h3 id="workout-recap-title">Training Voltooid!</h3>
+                    <p id="workout-recap-date" class="workout-recap-date text-xs text-muted"></p>
                     <p id="workout-recap-subtitle" class="text-sm text-muted"></p>
                 </div>
                 <div id="workout-recap-stats" class="workout-recap-stats-grid"></div>

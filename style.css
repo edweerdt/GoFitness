@@ -3949,6 +3949,12 @@ textarea:focus-visible,
     font-weight: 700;
 }
 
+.workout-recap-date {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
 .workout-recap-stats-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -4763,3 +4769,41 @@ textarea:focus-visible,
 
 
 
+
+/* --- GOF-69: Logboek Sessie Delen (Keuze tussen Optie 1 en 3) --- */
+.share-style-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.share-style-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.share-style-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.share-style-btn.active {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.theme-light .share-style-btn.active {
+    background: rgba(37, 99, 235, 0.1);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
