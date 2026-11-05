@@ -21,6 +21,10 @@
     --border-radius: 16px;
     --border-radius-sm: 8px;
     --transition: all 0.2s ease;
+    --border-color: rgba(255, 255, 255, 0.09);
+    --subtle-bg: rgba(255, 255, 255, 0.04);
+    --inset-bg: rgba(15, 23, 42, 0.55);
+    --control-bg: rgba(15, 23, 42, 0.8);
 }
 
 * {
@@ -1419,6 +1423,10 @@ button:disabled {
     --text-muted: #6b7280;
     --accent-color: #2563eb;
     --accent-hover: #1d4ed8;
+    --border-color: rgba(15, 23, 42, 0.1);
+    --subtle-bg: rgba(15, 23, 42, 0.04);
+    --inset-bg: #f8fafc;
+    --control-bg: #ffffff;
 }
 .theme-light .glass-panel {
     border: 1px solid rgba(0, 0, 0, 0.05);
@@ -1469,6 +1477,10 @@ button:disabled {
         --accent-hover: #1d4ed8;
         --accent-text: #ffffff;
         --accent-rgb: 37, 99, 235;
+        --border-color: rgba(15, 23, 42, 0.1);
+        --subtle-bg: rgba(15, 23, 42, 0.04);
+        --inset-bg: #f8fafc;
+        --control-bg: #ffffff;
     }
     :root:not(.theme-dark) .glass-panel {
         border: 1px solid rgba(0, 0, 0, 0.05);
@@ -2568,27 +2580,33 @@ button:disabled {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-    margin-top: 10px;
+    margin-top: 2px;
+}
+
+.home-adapt-drawer .session-picker-wrapper {
+    margin-bottom: 0;
 }
 
 .quick-adapt-btn {
     flex: 1;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--control-bg, rgba(255, 255, 255, 0.05));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
     border-radius: 10px;
-    padding: 8px 10px;
-    font-size: 0.8rem;
+    padding: 8px 8px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    white-space: nowrap;
     color: var(--text-primary);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 5px;
     cursor: pointer;
     transition: var(--transition);
 }
 
 .quick-adapt-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--subtle-bg, rgba(255, 255, 255, 0.1));
     border-color: var(--accent-color);
 }
 
@@ -3530,7 +3548,7 @@ textarea:focus-visible,
     font-weight: 700;
     font-family: inherit;
     color: var(--text-primary);
-    background-color: rgba(15, 23, 42, 0.8);
+    background-color: var(--control-bg, rgba(15, 23, 42, 0.8));
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 10px 14px;
@@ -3547,8 +3565,8 @@ textarea:focus-visible,
 
 .home-session-select:focus {
     outline: none;
-    border-color: #34d399;
-    box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.2);
+    border-color: var(--accent-color, #2563eb);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
 .theme-light .home-session-select {
@@ -3671,20 +3689,18 @@ textarea:focus-visible,
 }
 
 .home-snapshot-list {
-    margin-top: 10px;
+    margin-top: 8px;
     padding: 10px 12px;
     border-radius: 12px;
-    background: rgba(15, 23, 42, 0.85);
+    background: var(--inset-bg, rgba(15, 23, 42, 0.85));
     border: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
     gap: 6px;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 .theme-light .home-snapshot-list {
-    background: rgba(248, 250, 252, 0.95);
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+    background: #f8fafc;
 }
 
 .home-snapshot-item {
@@ -4874,12 +4890,12 @@ textarea:focus-visible,
 
 .home-status-grid {
     display: grid;
-    grid-template-columns: 1.25fr 1fr 0.78fr;
+    grid-template-columns: 1.48fr 1.02fr 0.66fr;
     align-items: stretch;
 }
 
 .home-status-cell {
-    padding: 12px 12px;
+    padding: 10px 8px;
     display: flex;
     align-items: center;
     min-width: 0;
@@ -4891,19 +4907,19 @@ textarea:focus-visible,
 }
 
 .home-status-cell + .home-status-cell {
-    border-left: 1px solid var(--border-color, rgba(255, 255, 255, 0.08)) !important;
+    border-left: 1px solid var(--border-color, rgba(255, 255, 255, 0.09)) !important;
 }
 
 #recovery-status.home-status-cell .status-badge-primary {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     width: 100%;
     min-width: 0;
 }
 
 #recovery-status.home-status-cell .material-icons-round {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     flex-shrink: 0;
 }
 
@@ -4916,7 +4932,7 @@ textarea:focus-visible,
 }
 
 .home-status-main {
-    font-size: 0.82rem;
+    font-size: 0.76rem;
     font-weight: 700;
     color: var(--text-primary);
     white-space: nowrap;
@@ -4927,21 +4943,21 @@ textarea:focus-visible,
 
 #recovery-status.green .home-status-main,
 #recovery-status.green > .status-badge-primary > .material-icons-round {
-    color: #34d399;
+    color: #10b981;
 }
 
 #recovery-status.orange .home-status-main,
 #recovery-status.orange > .status-badge-primary > .material-icons-round {
-    color: #fbbf24;
+    color: #f59e0b;
 }
 
 #recovery-status.red .home-status-main,
 #recovery-status.red > .status-badge-primary > .material-icons-round {
-    color: #f87171;
+    color: #ef4444;
 }
 
 .home-status-sub {
-    font-size: 0.7rem;
+    font-size: 0.67rem;
     color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
@@ -4954,9 +4970,9 @@ textarea:focus-visible,
     margin: 0 !important;
     border-radius: 0 !important;
     border: none !important;
-    border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08)) !important;
+    border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.09)) !important;
     padding: 9px 14px !important;
-    background: rgba(255, 255, 255, 0.025) !important;
+    background: var(--subtle-bg, rgba(255, 255, 255, 0.03)) !important;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -4964,21 +4980,25 @@ textarea:focus-visible,
 }
 
 .home-status-onboarding {
-    border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+    border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.09));
 }
 
-.home-status-onboarding .onboarding-banner {
+.home-status-onboarding .onboarding-banner,
+.home-status-onboarding .onboarding-card {
     margin-bottom: 0 !important;
     border-radius: 0 !important;
     border: none !important;
-    background: rgba(37, 99, 235, 0.06) !important;
+    box-shadow: none !important;
+    background: transparent !important;
 }
 
 /* Home Hero Card & Aanpassen-lade */
 .home-plan-header-actions {
-    display: inline-flex;
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 6px;
+    width: 100%;
+    gap: 8px;
     flex-shrink: 0;
 }
 
@@ -4991,7 +5011,7 @@ textarea:focus-visible,
     font-size: 0.74rem;
     font-weight: 600;
     color: var(--text-muted);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--subtle-bg, rgba(255, 255, 255, 0.05));
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
     cursor: pointer;
     transition: all 0.2s ease;
@@ -5008,15 +5028,15 @@ textarea:focus-visible,
     margin-top: 12px;
     padding: 12px;
     border-radius: 12px;
-    background: rgba(15, 23, 42, 0.45);
-    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+    background: var(--inset-bg, rgba(15, 23, 42, 0.45));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.09));
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
 .theme-light .home-adapt-drawer {
-    background: rgba(15, 23, 42, 0.04);
+    background: #f8fafc;
 }
 
 .home-adapt-drawer-label {
@@ -5032,7 +5052,17 @@ textarea:focus-visible,
     color: var(--text-muted);
     font-weight: 500;
     width: 100%;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.home-snapshot-meta-line .chip-pill {
+    display: inline;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    font-size: inherit;
+    color: inherit;
 }
 
 .home-exercises-toggle-btn {
@@ -5040,7 +5070,17 @@ textarea:focus-visible,
     justify-content: space-between !important;
     padding: 9px 12px !important;
     border-radius: 10px !important;
-    font-size: 0.8rem !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    background: var(--subtle-bg, rgba(255, 255, 255, 0.04)) !important;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1)) !important;
+    color: var(--text-primary) !important;
+}
+
+.home-exercises-toggle-btn:hover,
+.home-exercises-toggle-btn:focus-visible {
+    border-color: var(--accent-color) !important;
+    background: rgba(37, 99, 235, 0.08) !important;
 }
 
 /* --- 2. Gedeelde Segmented Sub-tabs (Statistieken & Schema's) --- */
@@ -5050,8 +5090,8 @@ textarea:focus-visible,
     gap: 4px;
     padding: 4px;
     border-radius: 12px;
-    background: rgba(15, 23, 42, 0.55);
-    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+    background: var(--inset-bg, rgba(15, 23, 42, 0.55));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.09));
 }
 
 .theme-light .ux-subtabs {
@@ -5195,7 +5235,7 @@ textarea:focus-visible,
 .variation-segmented-switch {
     display: inline-flex;
     align-items: center;
-    background: rgba(15, 23, 42, 0.65);
+    background: var(--inset-bg, rgba(15, 23, 42, 0.65));
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
     border-radius: 10px;
     padding: 3px;
@@ -5268,7 +5308,7 @@ textarea:focus-visible,
     margin-top: 8px;
     padding: 8px;
     border-radius: 10px;
-    background: rgba(15, 23, 42, 0.55);
+    background: var(--inset-bg, rgba(15, 23, 42, 0.55));
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
     display: flex;
     flex-wrap: wrap;
