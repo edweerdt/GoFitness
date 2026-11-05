@@ -8103,15 +8103,16 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             // Geen statische progression-hint banner
             expect(document.querySelector('.progression-hint')).toBeNull();
 
-            // Laatste set afvinken klapt oefening 1 NIET automatisch in (zodat PR/Overload gloed zichtbaar blijft)
+            // GOF-72: Laatste set afvinken klapt oefening 0 NIET in (zodat resultaat zichtbaar blijft) en klapt oefening 1 automatisch open
             app.toggleSet(0, 0);
             app.toggleSet(0, 1);
             app.toggleSet(0, 2);
             expect(app.collapsedExercises.has(0)).toBe(false);
-
-            // Handmatig uitklappen van oefening 2
-            app.toggleExerciseCollapse(1);
             expect(app.collapsedExercises.has(1)).toBe(false);
+            const card1 = document.querySelector('.exercise-card[data-ex-index="1"]');
+            if (card1) {
+                expect(card1.classList.contains('collapsed')).toBe(false);
+            }
         });
 
         test("4. Schema's (#view-plans): 3 sub-tabs (Mijn Schema's, Ontdek & AI, Oefeningen) en Backup & Sync lade in header", () => {
@@ -8139,6 +8140,144 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
             expect(syncDrawer.classList.contains('hidden')).toBe(true);
             app.togglePlansSyncModal();
             expect(syncDrawer.classList.contains('hidden')).toBe(false);
+        });
+    });
+
+    describe('GOF-72: Workout | Volgende oefening automatisch openklappen na laatste set zonder focusverspringing', () => {
+        let originalActiveWorkout;
+
+        beforeEach(() => {
+            originalActiveWorkout = app.activeWorkout;
+            document.body.innerHTML = `
+                <div id="main-content" style="overflow-y:auto; height:500px;">
+                    <div id="view-workout">
+                        <div id="workout-exercise-list"></div>
+                        <div id="workout-progress-bar" style="width:0%;"></div>
+                        <div id="workout-progress-badge">0 / 4 sets</div>
+                        <div id="workout-progress-track" aria-valuenow="0"></div>
+                        <div id="rest-timer" class="hidden">
+                            <span id="rest-timer-label">01:30</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            app.activeWorkout = {
+                planId: 'plan_gof72',
+                planName: 'Test Schema',
+                session: { id: 'sess_1', name: 'Borst & Triceps' },
+                startTime: new Date(),
+                exercises: [
+                    {
+                        name: 'Barbell Bench Press',
+                        sets: 2,
+                        reps: '8-10',
+                        order: 0,
+                        setsCompleted: [false, false],
+                        weights: ['80', '80'],
+                        actualReps: ['8', '8']
+                    },
+                    {
+                        name: 'Incline Dumbbell Press',
+                        sets: 2,
+                        reps: '10-12',
+                        order: 1,
+                        setsCompleted: [false, false],
+                        weights: ['28', '28'],
+                        actualReps: ['10', '10']
+                    }
+                ]
+            };
+            app._lastCollapsedWorkoutRef = null;
+            app.collapsedExercises = new Set();
+            app.renderWorkoutExercises();
+        });
+
+        afterEach(() => {
+            app.activeWorkout = originalActiveWorkout;
+            if (app.restTimer) app.stopRestTimer();
+        });
+
+        it('begint met de 1e oefening open en de 2e oefening ingeklapt', () => {
+            expect(app.collapsedExercises.has(0)).toBe(false);
+            expect(app.collapsedExercises.has(1)).toBe(true);
+
+            const card0 = document.querySelector('.exercise-card[data-ex-index="0"]');
+            const card1 = document.querySelector('.exercise-card[data-ex-index="1"]');
+            expect(card0.classList.contains('collapsed')).toBe(false);
+            expect(card1.classList.contains('collapsed')).toBe(true);
+        });
+
+        it('klapt de volgende oefening NIET open na een tussenliggende set, maar pas na de allerlaatste set', () => {
+            // Set 1 van oefening 0 afvinken (nog 1 te gaan)
+            app.toggleSet(0, 0);
+
+            // Oefening 0 blijft open, oefening 1 blijft ingeklapt
+            expect(app.collapsedExercises.has(0)).toBe(false);
+            expect(app.collapsedExercises.has(1)).toBe(true);
+            const card1 = document.querySelector('.exercise-card[data-ex-index="1"]');
+            expect(card1.classList.contains('collapsed')).toBe(true);
+
+            // Laatste set (set 2 van oefening 0) afvinken
+            app.toggleSet(0, 1);
+
+            // Oefening 0 blijft open (resultaat zichtbaar!) en oefening 1 klapt automatisch open
+            expect(app.collapsedExercises.has(0)).toBe(false);
+            expect(app.collapsedExercises.has(1)).toBe(false);
+
+            const card0After = document.querySelector('.exercise-card[data-ex-index="0"]');
+            const card1After = document.querySelector('.exercise-card[data-ex-index="1"]');
+            expect(card0After.classList.contains('collapsed')).toBe(false);
+            expect(card1After.classList.contains('collapsed')).toBe(false);
+
+            const chevron1 = document.getElementById('ex-collapse-chevron-1');
+            if (chevron1) expect(chevron1.textContent).toBe('expand_less');
+            const trigger1 = card1After.querySelector('.ex-collapse-trigger');
+            if (trigger1) expect(trigger1.getAttribute('aria-expanded')).toBe('true');
+        });
+
+        it('klapt de volgende oefening automatisch open bij auto-complete via checkAutoCompleteSet', () => {
+            // Zet oefening 0 op nog niet voltooid met 1 set
+            app.activeWorkout.exercises[0].sets = 1;
+            app.activeWorkout.exercises[0].setsCompleted = [false];
+            app.activeWorkout.exercises[0].weights = [''];
+            app.activeWorkout.exercises[0].actualReps = [''];
+            app.renderWorkoutExercises();
+
+            expect(app.collapsedExercises.has(1)).toBe(true);
+
+            // Gewicht en reps invullen via update met finalize=true
+            app.updateWeight(0, 0, '82.5', true);
+            app.updateReps(0, 0, '10', true);
+
+            // Set is auto-completed en oefening 1 klapt automatisch open
+            expect(app.activeWorkout.exercises[0].setsCompleted[0]).toBe(true);
+            expect(app.collapsedExercises.has(0)).toBe(false);
+            expect(app.collapsedExercises.has(1)).toBe(false);
+
+            const card1 = document.querySelector('.exercise-card[data-ex-index="1"]');
+            expect(card1.classList.contains('collapsed')).toBe(false);
+        });
+
+        it('behoudt de geopende staat van de laatste oefening en gooit geen fouten als er geen volgende oefening meer is', () => {
+            // Voltooi alle sets van oefening 0 en set 0 van oefening 1
+            app.toggleSet(0, 0);
+            app.toggleSet(0, 1);
+            app.toggleSet(1, 0);
+
+            // Nu de laatste set van de allerlaatste oefening afvinken
+            expect(() => app.toggleSet(1, 1)).not.toThrow();
+
+            expect(app.collapsedExercises.has(0)).toBe(false);
+            expect(app.collapsedExercises.has(1)).toBe(false);
+        });
+
+        it('behoudt scrollpositie in renderWorkoutExercises zonder naar 0 te verspringen', () => {
+            const scrollContainer = document.getElementById('main-content');
+            scrollContainer.scrollTop = 180;
+
+            app.renderWorkoutExercises();
+
+            expect(scrollContainer.scrollTop).toBe(180);
         });
     });
 

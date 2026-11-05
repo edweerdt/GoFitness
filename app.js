@@ -6601,7 +6601,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.openSubDrawers = new Set();
         this.openActionMenus = new Set();
         this.collapsedExercises = new Set();
-        const sortedForCollapse = [...(this.activeWorkout.exercises || [])].sort((a, b) => (a.order || 99) - (b.order || 99));
+        const sortedForCollapse = [...(this.activeWorkout.exercises || [])].sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
         sortedForCollapse.forEach((exItem, sIdx) => {
             if (sIdx >= 1) {
                 const rawIdx = this.activeWorkout.exercises.indexOf(exItem);
@@ -6623,6 +6623,62 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             this.collapsedExercises.add(exIndex);
         }
         this.renderWorkoutExercises();
+    },
+
+    // --- GOF-72: VOLGENDE OEFENING AUTOMATISCH OPENKLAPPEN NA LAATSTE SET ---
+    checkAndExpandNextExercise(exIndex) {
+        if (!this.activeWorkout || !Array.isArray(this.activeWorkout.exercises)) return;
+        const ex = this.activeWorkout.exercises[exIndex];
+        if (!ex) return;
+
+        // Controleer of alle sets van de huidige oefening zijn voltooid
+        const totalSets = Math.max(0, parseInt(ex.sets, 10) || (Array.isArray(ex.setsCompleted) ? ex.setsCompleted.length : 0));
+        const completedSets = (Array.isArray(ex.setsCompleted) ? ex.setsCompleted : []).filter(Boolean).length;
+        const isAllSetsComplete = totalSets > 0 && completedSets >= totalSets;
+
+        if (!isAllSetsComplete) return;
+
+        if (!(this.collapsedExercises instanceof Set)) {
+            this.collapsedExercises = new Set();
+        }
+
+        // De huidige gedane oefening moet open blijven zodat het resultaat zichtbaar blijft
+        this.collapsedExercises.delete(exIndex);
+        if (typeof document !== 'undefined') {
+            const currentCard = document.querySelector(`.exercise-card[data-ex-index="${exIndex}"]`);
+            if (currentCard && currentCard.classList.contains('collapsed')) {
+                currentCard.classList.remove('collapsed');
+                const curChevron = document.getElementById(`ex-collapse-chevron-${exIndex}`);
+                if (curChevron) curChevron.textContent = 'expand_less';
+                const curTrigger = currentCard.querySelector('.ex-collapse-trigger');
+                if (curTrigger) curTrigger.setAttribute('aria-expanded', 'true');
+            }
+        }
+
+        // Bepaal de volgende oefening in de workout volgorde
+        const sortedExercises = [...this.activeWorkout.exercises].sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+        const currentSortedIdx = sortedExercises.findIndex(e => e === ex || (ex.id && e.id === ex.id));
+
+        if (currentSortedIdx !== -1 && currentSortedIdx < sortedExercises.length - 1) {
+            const nextEx = sortedExercises[currentSortedIdx + 1];
+            const nextRawIdx = this.activeWorkout.exercises.findIndex(e => e === nextEx || (nextEx.id && e.id === nextEx.id));
+            const nextExIndex = nextRawIdx !== -1 ? nextRawIdx : (currentSortedIdx + 1);
+
+            // Klap de volgende oefening open in state
+            this.collapsedExercises.delete(nextExIndex);
+
+            // Klap de volgende oefening direct open in de DOM zonder scroll- of focusverschuiving
+            if (typeof document !== 'undefined') {
+                const nextCard = document.querySelector(`.exercise-card[data-ex-index="${nextExIndex}"]`);
+                if (nextCard && nextCard.classList.contains('collapsed')) {
+                    nextCard.classList.remove('collapsed');
+                    const chevron = document.getElementById(`ex-collapse-chevron-${nextExIndex}`);
+                    if (chevron) chevron.textContent = 'expand_less';
+                    const trigger = nextCard.querySelector('.ex-collapse-trigger');
+                    if (trigger) trigger.setAttribute('aria-expanded', 'true');
+                }
+            }
+        }
     },
 
     toggleExerciseActionMenu(exIndex, event) {
@@ -7247,7 +7303,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     updateCheckBtnDOM(exIndex, setIndex) {
         if (typeof document === 'undefined' || !document.getElementById('workout-exercise-list')) return;
         const anchor = document.querySelector(`#workout-exercise-list input[data-ex="${exIndex}"][data-set="${setIndex}"]`);
-        const checkBtn = anchor && anchor.closest('.set-row') ? anchor.closest('.set-row').querySelector('.check-btn') : null;
+        const checkBtn = (anchor && anchor.closest('.set-row') ? anchor.closest('.set-row').querySelector('.check-btn') : null)
+            || document.querySelector(`#workout-exercise-list .exercise-card[data-ex-index="${exIndex}"] .set-row:nth-child(${setIndex + 1}) .check-btn`)
+            || document.querySelector(`#workout-exercise-list button.check-btn[onclick*="app.toggleSet(${exIndex}, ${setIndex})"]`);
         if (!checkBtn) return;
 
         const ex = this.activeWorkout ? this.activeWorkout.exercises[exIndex] : null;
@@ -7279,6 +7337,10 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.updateWorkoutProgressUI();
         const list = document.getElementById('workout-exercise-list');
         if (!list) return;
+
+        const scrollContainer = document.getElementById('main-content') || (typeof document !== 'undefined' ? (document.scrollingElement || document.documentElement) : null);
+        const prevScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+
         list.innerHTML = '';
         
         if (this.activeWorkout.session && this.activeWorkout.session.warmup) {
@@ -7292,7 +7354,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             }
         }
 
-        const sortedExercises = [...(this.activeWorkout.exercises || [])].sort((a, b) => (a.order || 99) - (b.order || 99));
+        const sortedExercises = [...(this.activeWorkout.exercises || [])].sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
 
         if (sortedExercises.length === 0) {
             const emptyCard = document.createElement('div');
@@ -7742,6 +7804,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             </button>
         `;
         list.appendChild(addBtnContainer);
+        if (scrollContainer && prevScrollTop > 0) {
+            scrollContainer.scrollTop = prevScrollTop;
+        }
     },
 
     // --- GOF-60: BARBELL SCHIJVEN-HELPER (PLATE CALCULATOR) ---
@@ -8113,7 +8178,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
     moveWorkoutExercise(exIndex, direction) {
         if (!this.activeWorkout || !Array.isArray(this.activeWorkout.exercises)) return;
-        const sorted = [...this.activeWorkout.exercises].sort((a, b) => (a.order || 99) - (b.order || 99));
+        const sorted = [...this.activeWorkout.exercises].sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
         const targetEx = this.activeWorkout.exercises[exIndex];
         const currentPos = sorted.indexOf(targetEx);
         if (currentPos === -1) return;
@@ -8355,7 +8420,38 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             this.startRestTimer(ex.restSeconds);
         }
 
-        this.renderWorkoutExercises();
+        // GOF-72: Als de laatste set is afgevinkt klapt de volgende oefening automatisch open
+        if (isTurningOn) {
+            this.checkAndExpandNextExercise(exIndex);
+        }
+
+        // Gericht de DOM van deze set bijwerken zodat focus en scrollpositie intact blijven
+        if (typeof document !== 'undefined' && document.getElementById('workout-exercise-list')) {
+            const anchor = document.querySelector(`#workout-exercise-list input[data-ex="${exIndex}"][data-set="${setIndex}"]`);
+            const checkBtn = (anchor && anchor.closest('.set-row') ? anchor.closest('.set-row').querySelector('.check-btn') : null)
+                || document.querySelector(`#workout-exercise-list .exercise-card[data-ex-index="${exIndex}"] .set-row:nth-child(${setIndex + 1}) .check-btn`)
+                || document.querySelector(`#workout-exercise-list button.check-btn[onclick*="app.toggleSet(${exIndex}, ${setIndex})"]`);
+
+            if (checkBtn) {
+                // Werk eventueel automatisch ingevulde input-waarden bij in de DOM
+                const wInput = document.querySelector(`#workout-exercise-list input[data-ex="${exIndex}"][data-set="${setIndex}"][data-type="weight"]`);
+                if (wInput && ex.weights && ex.weights[setIndex] !== undefined && wInput.value !== String(ex.weights[setIndex])) {
+                    wInput.value = ex.weights[setIndex];
+                }
+                const rInput = document.querySelector(`#workout-exercise-list input[data-ex="${exIndex}"][data-set="${setIndex}"][data-type="reps"]`);
+                if (rInput && ex.actualReps && ex.actualReps[setIndex] !== undefined && rInput.value !== String(ex.actualReps[setIndex])) {
+                    rInput.value = ex.actualReps[setIndex];
+                }
+                const lInput = document.querySelector(`#workout-exercise-list input[data-ex="${exIndex}"][data-set="${setIndex}"][data-type="level"]`);
+                if (lInput && ex.levels && ex.levels[setIndex] !== undefined && lInput.value !== String(ex.levels[setIndex])) {
+                    lInput.value = ex.levels[setIndex];
+                }
+
+                this.updateCheckBtnDOM(exIndex, setIndex);
+            } else {
+                this.renderWorkoutExercises();
+            }
+        }
     },
 
     // --- WAKE LOCK ---
@@ -8707,12 +8803,17 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             if (typeof store !== 'undefined') store.saveActiveWorkoutState(this.activeWorkout);
             if (ex.restSeconds) this.startRestTimer(ex.restSeconds);
 
+            // GOF-72: Als de laatste set is afgevinkt klapt de volgende oefening automatisch open
+            this.checkAndExpandNextExercise(exIndex);
+
             // Gericht alleen de check-knop van deze set bijwerken: een volledige
             // re-render zou de focus (en daarmee de scrollpositie/het toetsenbord
             // op mobiel) slopen terwijl de gebruiker aan het invoeren is
             if (typeof document !== 'undefined' && document.getElementById('workout-exercise-list')) {
                 const anchor = document.querySelector(`#workout-exercise-list input[data-ex="${exIndex}"][data-set="${setIndex}"]`);
-                const checkBtn = anchor && anchor.closest('.set-row') ? anchor.closest('.set-row').querySelector('.check-btn') : null;
+                const checkBtn = (anchor && anchor.closest('.set-row') ? anchor.closest('.set-row').querySelector('.check-btn') : null)
+                    || document.querySelector(`#workout-exercise-list .exercise-card[data-ex-index="${exIndex}"] .set-row:nth-child(${setIndex + 1}) .check-btn`)
+                    || document.querySelector(`#workout-exercise-list button.check-btn[onclick*="app.toggleSet(${exIndex}, ${setIndex})"]`);
                 if (checkBtn) {
                     this.updateCheckBtnDOM(exIndex, setIndex);
                 } else {
@@ -8814,6 +8915,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             if (ex.restSeconds) {
                 this.startRestTimer(ex.restSeconds);
             }
+            // GOF-72: Als de laatste set is afgevinkt klapt de volgende oefening automatisch open
+            this.checkAndExpandNextExercise(exIndex);
         }
 
         // Sluit het virtuele toetsenbord door de focus weg te halen (blur)
