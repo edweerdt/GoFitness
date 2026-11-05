@@ -3018,6 +3018,24 @@ const app = {
     },
 
     isHomeSessionPreviewOpen: false,
+    isHomeAdaptDrawerOpen: false,
+
+    toggleHomeAdaptDrawer() {
+        this.isHomeAdaptDrawerOpen = !this.isHomeAdaptDrawerOpen;
+        const drawer = document.getElementById('home-adapt-drawer');
+        const btn = document.getElementById('btn-toggle-home-adapt');
+        const icon = document.getElementById('home-adapt-toggle-icon');
+        if (drawer) {
+            drawer.classList.toggle('hidden', !this.isHomeAdaptDrawerOpen);
+        }
+        if (btn) {
+            btn.classList.toggle('active', this.isHomeAdaptDrawerOpen);
+            btn.setAttribute('aria-expanded', this.isHomeAdaptDrawerOpen ? 'true' : 'false');
+        }
+        if (icon) {
+            icon.textContent = this.isHomeAdaptDrawerOpen ? 'expand_less' : 'expand_more';
+        }
+    },
 
     toggleHomeSessionPreview() {
         this.isHomeSessionPreviewOpen = !this.isHomeSessionPreviewOpen;
@@ -3090,21 +3108,20 @@ const app = {
         if (metaEl) {
             if (btnEl && btnEl.contains(metaEl)) {
                 // Legacy / Unit test DOM format where button wraps meta span
-                const parts = [exCountText, durationText];
+                const parts = [exCountText];
                 if (musclesText) parts.push(musclesText);
+                parts.push(durationText);
                 metaEl.textContent = parts.join(' • ');
             } else {
-                // Option 2 v3 interactive chips format
+                // GOF-70: Metadata regel (met geschatte tijd achteraan) + uitklapbare oefeningenknop zonder halter-icoon
                 metaEl.innerHTML = `
-                    <button type="button" id="btn-toggle-session-snapshot" class="chip-pill-interactive" onclick="app.toggleHomeSessionPreview()" aria-expanded="${this.isHomeSessionPreviewOpen ? 'true' : 'false'}" title="Klik om oefeningen te bekijken of verbergen">
-                        <span class="material-icons-round chip-icon" style="font-size:14px;" aria-hidden="true">fitness_center</span>
+                    <div class="home-snapshot-meta-line">
+                        <span>${exCountText}</span>${musclesText ? ` • <span class="chip-pill">${this.escapeHTML(musclesText)}</span>` : ''} • <span class="chip-pill">${durationText}</span>
+                    </div>
+                    <button type="button" id="btn-toggle-session-snapshot" class="chip-pill-interactive home-exercises-toggle-btn" onclick="app.toggleHomeSessionPreview()" aria-expanded="${this.isHomeSessionPreviewOpen ? 'true' : 'false'}" title="Klik om oefeningen te bekijken of verbergen">
                         <span id="home-snapshot-count">${exCountText}</span>
-                        <span class="material-icons-round chip-arrow" id="home-snapshot-arrow" style="font-size:15px; margin-left:2px;" aria-hidden="true">${this.isHomeSessionPreviewOpen ? 'expand_less' : 'expand_more'}</span>
+                        <span class="material-icons-round chip-arrow" id="home-snapshot-arrow" style="font-size:16px;" aria-hidden="true">${this.isHomeSessionPreviewOpen ? 'expand_less' : 'expand_more'}</span>
                     </button>
-                    <span class="chip-pill">
-                        <span class="material-icons-round chip-icon" style="font-size:14px;" aria-hidden="true">schedule</span> ${durationText}
-                    </span>
-                    ${musclesText ? `<span class="chip-pill">${this.escapeHTML(musclesText)}</span>` : ''}
                 `;
             }
         }
@@ -3166,7 +3183,8 @@ const app = {
             const badge = document.getElementById('recovery-status');
             if (badge) {
                 const suggestionClass = suggestion ? ' has-suggestion' : '';
-                badge.className = `status-badge ${recStatus.status}${suggestionClass}`;
+                const cellClass = badge.classList.contains('home-status-cell') ? ' home-status-cell' : '';
+                badge.className = `status-badge ${recStatus.status}${suggestionClass}${cellClass}`;
                 const iconEl = badge.querySelector('.status-badge-primary .material-icons-round') || badge.querySelector('.material-icons-round');
                 if (iconEl) {
                     let icon = 'battery_charging_full';
@@ -3214,12 +3232,15 @@ const app = {
         const sessionSelect = document.getElementById('home-session-select');
         const planNameEl = document.getElementById('home-plan-name');
         const cardTitleEl = document.getElementById('recommended-card-title');
+        const heroTitleEl = document.getElementById('home-hero-session-title');
         const sessionNameEl = document.getElementById('recommended-session-name');
         const reasonEl = document.getElementById('recommended-reason');
         const quickAdaptBar = document.getElementById('home-quick-adapt-bar');
+        const adaptToggleBtn = document.getElementById('btn-toggle-home-adapt');
 
         const setCardText = (title, name, reason) => {
             if (cardTitleEl) cardTitleEl.textContent = title;
+            if (heroTitleEl) heroTitleEl.textContent = name;
             if (sessionNameEl) sessionNameEl.textContent = name;
             if (reasonEl) reasonEl.textContent = reason;
         };
@@ -3227,6 +3248,7 @@ const app = {
         if (this.activeWorkout && this.activeWorkout.session) {
             if (pickerWrapper) pickerWrapper.classList.add('hidden');
             if (quickAdaptBar) quickAdaptBar.classList.add('hidden');
+            if (adaptToggleBtn) adaptToggleBtn.classList.add('hidden');
             const choosePresetsBtn = document.getElementById('btn-home-presets');
             if (choosePresetsBtn) choosePresetsBtn.classList.add('hidden');
 
@@ -3258,6 +3280,7 @@ const app = {
             if (!activePlan && store.plans.length === 0) {
                 if (pickerWrapper) pickerWrapper.classList.add('hidden');
                 if (quickAdaptBar) quickAdaptBar.classList.add('hidden');
+                if (adaptToggleBtn) adaptToggleBtn.classList.add('hidden');
                 if (planNameEl) {
                     planNameEl.textContent = "Geen schema actief";
                     planNameEl.classList.remove('hidden');
@@ -3290,6 +3313,7 @@ const app = {
                     choosePresetsBtn.innerHTML = '<span class="material-icons-round" style="font-size:1.1rem; vertical-align:middle; margin-right:4px;">auto_stories</span> Kies uit Preset Bibliotheek';
                     choosePresetsBtn.onclick = () => {
                         this.navigate('plans');
+                        if (this.switchPlansSubTab) this.switchPlansSubTab('discover');
                         setTimeout(() => {
                             const pEl = document.getElementById('preset-plans-container');
                             if (pEl) pEl.scrollIntoView({ behavior: 'smooth' });
@@ -3302,6 +3326,7 @@ const app = {
             } else {
                 const choosePresetsBtn = document.getElementById('btn-home-presets');
                 if (choosePresetsBtn) choosePresetsBtn.classList.add('hidden');
+                if (adaptToggleBtn) adaptToggleBtn.classList.remove('hidden');
 
                 if (pickerWrapper && sessionSelect) {
                     pickerWrapper.classList.remove('hidden');
@@ -3393,7 +3418,7 @@ const app = {
             }
         }
 
-        // Stats
+        // Stats & Geïntegreerde Status-kaart (GOF-70)
         const statCompletedEl = document.getElementById('stat-completed');
         if (statCompletedEl) statCompletedEl.textContent = store.logs.length;
         const statStreakEl = document.getElementById('stat-streak');
@@ -3402,6 +3427,8 @@ const app = {
         // Target sessions per week progress
         const plan = store.getActivePlan();
         const targetSessions = plan ? ((plan.schedule && plan.schedule.targetSessionsPerWeek) ? plan.schedule.targetSessionsPerWeek : plan.targetSessionsPerWeek) : null;
+        const weeklyDisplayEl = document.getElementById('home-weekly-display');
+        const weeklyLabelEl = document.getElementById('home-weekly-label');
         let existingProgress = document.getElementById('home-weekly-progress');
         if (plan && targetSessions) {
             const oneWeekAgo = new Date();
@@ -3411,7 +3438,22 @@ const app = {
 
             const progressText = `${recentLogsCount}/${targetSessions} sessies deze week`;
 
-            // Add or update progress text under the streak stats
+            if (weeklyDisplayEl && weeklyLabelEl) {
+                const safeRecentLogsCount = Number.isFinite(Number(recentLogsCount)) ? Number(recentLogsCount) : 0;
+                const safeTargetSessions = Number.isFinite(Number(targetSessions)) ? Number(targetSessions) : 0;
+                const safeTotalLogs = Number.isFinite(Number(store.logs.length)) ? Number(store.logs.length) : 0;
+
+                weeklyDisplayEl.textContent = `${safeRecentLogsCount} / ${safeTargetSessions} sessies `;
+                const hiddenCompletedEl = document.createElement('span');
+                hiddenCompletedEl.id = 'stat-completed';
+                hiddenCompletedEl.style.display = 'none';
+                hiddenCompletedEl.textContent = String(safeTotalLogs);
+                weeklyDisplayEl.appendChild(hiddenCompletedEl);
+
+                weeklyLabelEl.textContent = `Weekdoel • ${safeTotalLogs} tot.`;
+            }
+
+            // Legacy fallback if .stats-mini is present in unit test DOM
             const statsMini = document.querySelector('.stats-mini');
             if (statsMini) {
                 if (!existingProgress) {
@@ -3422,9 +3464,59 @@ const app = {
                 }
                 existingProgress.innerHTML = `<div class="glass-panel text-center text-sm" style="padding: 8px;"><strong>Doel:</strong> ${this.escapeHTML(progressText)}</div>`;
             }
-        } else if (existingProgress) {
-            // Geen (plan met) weekdoel meer -> oude voortgangsbalk opruimen
-            existingProgress.remove();
+        } else {
+            if (weeklyDisplayEl && weeklyLabelEl) {
+                weeklyDisplayEl.innerHTML = `<span id="stat-completed">${store.logs.length}</span> sessies`;
+                weeklyLabelEl.textContent = 'Voltooid';
+            }
+            if (existingProgress) {
+                existingProgress.remove();
+            }
+        }
+    },
+
+    activePlansSubTab: 'mine',
+    isPlansSyncDrawerOpen: false,
+
+    switchPlansSubTab(tabName) {
+        const validTabs = ['mine', 'discover', 'library'];
+        const nextTab = validTabs.includes(tabName) ? tabName : 'mine';
+        this.activePlansSubTab = nextTab;
+
+        const subtabsEl = document.getElementById('plans-subtabs');
+        if (subtabsEl) {
+            subtabsEl.querySelectorAll('.ux-subtab-btn').forEach(btn => {
+                const isActive = btn.getAttribute('data-subtab') === nextTab;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+        }
+
+        const minePanel = document.getElementById('plans-tab-mine');
+        const discoverPanel = document.getElementById('plans-tab-discover');
+        const libraryPanel = document.getElementById('plans-tab-library');
+        if (minePanel) minePanel.classList.toggle('hidden', nextTab !== 'mine');
+        if (discoverPanel) discoverPanel.classList.toggle('hidden', nextTab !== 'discover');
+        if (libraryPanel) libraryPanel.classList.toggle('hidden', nextTab !== 'library');
+
+        if (nextTab === 'discover') {
+            this.presetPlansExpanded = true;
+            this.renderPresets();
+            this.renderAIGenerator();
+        } else if (nextTab === 'library') {
+            this.renderExerciseLibrary();
+        }
+    },
+
+    togglePlansSyncModal() {
+        this.isPlansSyncDrawerOpen = !this.isPlansSyncDrawerOpen;
+        const drawer = document.getElementById('plans-backup-sync-drawer');
+        const btn = document.getElementById('btn-toggle-sync-drawer');
+        if (drawer) {
+            drawer.classList.toggle('hidden', !this.isPlansSyncDrawerOpen);
+        }
+        if (btn) {
+            btn.setAttribute('aria-expanded', this.isPlansSyncDrawerOpen ? 'true' : 'false');
         }
     },
 
@@ -4432,6 +4524,30 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.showToast("Template JSON gedownload!", "success");
     },
 
+    activeProgressSubTab: 'progress',
+
+    switchProgressSubTab(tabName) {
+        const validTabs = ['progress', 'muscles', 'history'];
+        const nextTab = validTabs.includes(tabName) ? tabName : 'progress';
+        this.activeProgressSubTab = nextTab;
+
+        const subtabsEl = document.getElementById('progress-subtabs');
+        if (subtabsEl) {
+            subtabsEl.querySelectorAll('.ux-subtab-btn').forEach(btn => {
+                const isActive = btn.getAttribute('data-subtab') === nextTab;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+        }
+
+        const progressPanel = document.getElementById('progress-tab-progress');
+        const musclesPanel = document.getElementById('progress-tab-muscles');
+        const historyPanel = document.getElementById('progress-tab-history');
+        if (progressPanel) progressPanel.classList.toggle('hidden', nextTab !== 'progress');
+        if (musclesPanel) musclesPanel.classList.toggle('hidden', nextTab !== 'muscles');
+        if (historyPanel) historyPanel.classList.toggle('hidden', nextTab !== 'history');
+    },
+
     renderProgress() {
         const totalWorkouts = store.logs.length;
         let totalMinutes = 0;
@@ -4445,8 +4561,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const statsGrid = document.getElementById('full-stats-grid');
         if (statsGrid) {
             statsGrid.innerHTML = `
-                <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalWorkouts}</span><span class="stat-label">Trainingen</span></div></div>
-                <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${this.calculateStreak()}</span><span class="stat-label">Weken Streak</span></div></div>
+                <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalWorkouts}</span><span class="stat-label">Sessies</span></div></div>
+                <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${this.calculateStreak()} wkn</span><span class="stat-label">Streak</span></div></div>
                 <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalMinutes}</span><span class="stat-label">Minuten</span></div></div>
                 <div class="stat-box glass-panel"><div class="stat-details"><span class="stat-value">${totalExercises}</span><span class="stat-label">Oefeningen</span></div></div>
             `;
@@ -4946,7 +5062,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             });
         });
 
-        // Generate HTML
+        // Generate HTML (GOF-70 Variant 1: Visuele Horizontale Balken)
         const muscleKeys = Object.keys(stats).sort((a, b) => stats[b].sessions - stats[a].sessions);
         
         if (muscleKeys.length === 0) {
@@ -4954,37 +5070,29 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             return;
         }
 
+        const maxSessions = Math.max(1, ...muscleKeys.map(k => stats[k].sessions || 0));
+
         let html = '';
         muscleKeys.forEach(m => {
             const data = stats[m];
             const meta = this.getMuscleMeta(m);
             const maxWeightDisplay = data.maxWeight > 0 ? `${data.maxWeight} kg` : '-';
+            const barWidthPct = Math.max(6, Math.min(100, Math.round(((data.sessions || 0) / maxSessions) * 100)));
+            const sessionLabel = `${data.sessions} sessie${data.sessions === 1 ? '' : 's'}`;
             
             html += `
-                <div class="glass-panel" style="display:flex; flex-direction:column; gap:12px; padding:16px;">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <div class="stat-icon-wrapper" style="width:36px; height:36px; padding:4px; border-radius:10px; display:grid; place-items:center; background:rgba(255,255,255,0.05); color:${meta.color};">
-                            ${this.getMuscleIconHtml(m, 20)}
+                <div class="glass-panel muscle-bar-card">
+                    <div class="muscle-bar-top">
+                        <div class="muscle-bar-title-group">
+                            <div class="stat-icon-wrapper" style="width:32px; height:32px; padding:4px; border-radius:9px; display:grid; place-items:center; background:rgba(255,255,255,0.05); color:${meta.color};">
+                                ${this.getMuscleIconHtml(m, 18)}
+                            </div>
+                            <div class="muscle-bar-name">${this.escapeHTML(meta.name)}</div>
                         </div>
-                        <div style="font-weight:600; font-size:1rem;">${this.escapeHTML(meta.name)}</div>
+                        <div class="muscle-bar-meta">${sessionLabel} • Max ${maxWeightDisplay} • ${data.reps} reps</div>
                     </div>
-                    <div class="text-muted text-sm" style="display:flex; flex-direction:column; gap:4px;">
-                        <div style="display:flex; justify-content:space-between; gap:8px;">
-                            <span style="white-space:nowrap;">Sessies:</span>
-                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${data.sessions}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; gap:8px;">
-                            <span style="white-space:nowrap;">Reps:</span>
-                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${data.reps}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; gap:8px;">
-                            <span style="white-space:nowrap;">Max gewicht:</span>
-                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${maxWeightDisplay}</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; gap:8px;">
-                            <span style="white-space:nowrap;">Max reps:</span>
-                            <span style="color:var(--text-primary); font-weight:500; text-align:right;">${data.maxReps}</span>
-                        </div>
+                    <div class="muscle-bar-track" role="progressbar" aria-valuenow="${barWidthPct}" aria-valuemin="0" aria-valuemax="100" aria-label="${this.escapeHTML(meta.name)} trainingsfrequentie">
+                        <div class="muscle-bar-fill" style="width:${barWidthPct}%; background:${meta.color || 'var(--accent-color)'};"></div>
                     </div>
                 </div>
             `;
@@ -6491,8 +6599,54 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             })
         };
         this.openSubDrawers = new Set();
+        this.openActionMenus = new Set();
+        this.collapsedExercises = new Set();
+        const sortedForCollapse = [...(this.activeWorkout.exercises || [])].sort((a, b) => (a.order || 99) - (b.order || 99));
+        sortedForCollapse.forEach((exItem, sIdx) => {
+            if (sIdx >= 1) {
+                const rawIdx = this.activeWorkout.exercises.indexOf(exItem);
+                this.collapsedExercises.add(rawIdx !== -1 ? rawIdx : sIdx);
+            }
+        });
+        this._lastCollapsedWorkoutRef = this.activeWorkout;
         store.saveActiveWorkoutState(this.activeWorkout);
         this.openWorkoutView();
+    },
+
+    toggleExerciseCollapse(exIndex) {
+        if (!(this.collapsedExercises instanceof Set)) {
+            this.collapsedExercises = new Set();
+        }
+        if (this.collapsedExercises.has(exIndex)) {
+            this.collapsedExercises.delete(exIndex);
+        } else {
+            this.collapsedExercises.add(exIndex);
+        }
+        this.renderWorkoutExercises();
+    },
+
+    toggleExerciseActionMenu(exIndex, event) {
+        if (event && typeof event.stopPropagation === 'function') {
+            event.stopPropagation();
+        }
+        if (!(this.openActionMenus instanceof Set)) {
+            this.openActionMenus = new Set();
+        }
+        if (this.openActionMenus.has(exIndex)) {
+            this.openActionMenus.delete(exIndex);
+        } else {
+            this.openActionMenus.add(exIndex);
+        }
+        const menuEl = document.getElementById(`ex-action-menu-${exIndex}`);
+        const btnEl = document.getElementById(`ex-menu-btn-${exIndex}`);
+        const isOpen = this.openActionMenus.has(exIndex);
+        if (menuEl) {
+            menuEl.classList.toggle('hidden', !isOpen);
+        }
+        if (btnEl) {
+            btnEl.classList.toggle('active', isOpen);
+            btnEl.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        }
     },
 
     startWorkoutBySessionId(planId, sessionId) {
@@ -7163,6 +7317,19 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             return;
         }
 
+        if (this._lastCollapsedWorkoutRef !== this.activeWorkout) {
+            this._lastCollapsedWorkoutRef = this.activeWorkout;
+            this.collapsedExercises = new Set();
+            sortedExercises.forEach((exItem, sIdx) => {
+                if (sIdx >= 1) {
+                    const rIdx = this.activeWorkout.exercises.findIndex(e => e === exItem || (exItem.id && e.id === exItem.id));
+                    this.collapsedExercises.add(rIdx !== -1 ? rIdx : sIdx);
+                }
+            });
+        }
+
+        const plateSleeveSvg = `<svg class="plate-sleeve-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="2" y1="12" x2="22" y2="12"/><rect x="5" y="4" width="3.5" height="16" rx="1" fill="currentColor" fill-opacity="0.25"/><rect x="10.5" y="6" width="3" height="12" rx="1" fill="currentColor" fill-opacity="0.25"/><rect x="15.5" y="8" width="2.5" height="8" rx="0.8" fill="currentColor" fill-opacity="0.25"/></svg>`;
+
         sortedExercises.forEach((ex, sortedIdx) => {
             const rawIdx = this.activeWorkout.exercises.findIndex(e => e === ex || (ex.id && e.id === ex.id));
             const exIndex = rawIdx !== -1 ? rawIdx : sortedIdx;
@@ -7170,11 +7337,14 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             const isLastEx = sortedIdx === sortedExercises.length - 1;
             const variations = app.getExerciseVariations(ex);
             const activeExerciseName = app.getActiveExerciseName(ex);
-            const prevDetails = this.getPreviousExerciseDetails(activeExerciseName, ex) || [];
+            const isCollapsed = Boolean(this.collapsedExercises && this.collapsedExercises.has(exIndex));
+            const isActionMenuOpen = Boolean(this.openActionMenus && this.openActionMenus.has(exIndex));
 
             if (!ex.setsCompleted) ex.setsCompleted = Array(ex.sets || 1).fill(false);
             if (!ex.weights) ex.weights = Array(ex.sets || 1).fill('');
             if (!ex.actualReps) ex.actualReps = Array(ex.sets || 1).fill('');
+
+            const completedSetsForEx = (ex.setsCompleted || []).filter(Boolean).length;
 
             // Build rep/duration string
             let metaString = `${ex.sets} sets`;
@@ -7185,17 +7355,18 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             else if (ex.duration) metaString += ` • ${ex.duration}`;
             
             if (ex.restSeconds) metaString += ` • ${ex.restSeconds}s rust`;
+            if (isCollapsed && completedSetsForEx > 0) metaString += ` • ${completedSetsForEx}/${ex.sets} klaar`;
 
-            // Build badges (spiergroep vooraan, daarna category, exerciseType)
+            // Build badges (spiergroep zichtbaar vooraan; category/exerciseType verborgen in DOM voor backwards-compatibiliteit)
             let badgesHtml = '';
             const muscleLabel = app.getExerciseMuscleLabel(ex);
             if (muscleLabel) {
                 badgesHtml += `<span class="status-badge muscle-badge" style="padding:2px 6px; font-size:0.7rem; margin-right:4px;">${app.escapeHTML(muscleLabel)}</span>`;
             }
-            if (ex.category) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted); margin-right:4px;">${app.escapeHTML(String(ex.category))}</span>`;
-            if (ex.exerciseType) badgesHtml += `<span class="status-badge" style="padding:2px 6px; font-size:0.7rem; background:rgba(255,255,255,0.1); color:var(--text-muted);">${app.escapeHTML(String(ex.exerciseType))}</span>`;
+            if (ex.category) badgesHtml += `<span class="status-badge" style="display:none;">${app.escapeHTML(String(ex.category))}</span>`;
+            if (ex.exerciseType) badgesHtml += `<span class="status-badge" style="display:none;">${app.escapeHTML(String(ex.exerciseType))}</span>`;
 
-            // Build notes & alternatives
+            // Build notes & alternatives (GOF-70: geen statische 'Vorige keer...' progressive overload banner meer)
             let notesHtml = '';
             if (ex.notes && Array.isArray(ex.notes) && ex.notes.length > 0) {
                 notesHtml += `<ul class="text-sm text-muted mt-2" style="list-style-type: disc; padding-left: 20px;">`;
@@ -7223,7 +7394,6 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         <div class="quick-alternatives-pills">
                             ${quickAlts.map(alt => {
                                 const safeName = app.escapeHTML(alt.name);
-                                const safeId = app.escapeHTML(alt.id || alt.name);
                                 return `
                                     <div style="display:inline-flex; align-items:center; gap:2px;">
                                         <button class="quick-alt-pill" onclick="app.quickSwapActiveExercise(${exIndex}, ${app.jsArg(alt.id || alt.name)})" title="Wissel direct naar ${safeName}">
@@ -7239,18 +7409,6 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         </div>
                     </div>
                 `;
-            }
-
-            // Progressive-overload-advies op basis van de vorige sessie
-            const overload = app.getOverloadSuggestion(ex, prevDetails, store.getActivePlan());
-            if (overload) {
-                let hintText = '';
-                if (overload.allSameWeight) {
-                    hintText = `Vorige keer alle sets op ${app.escapeHTML(String(ex.repsMax))} reps met ${app.escapeHTML(String(overload.maxWeight))} kg. Probeer nu ${app.escapeHTML(String(overload.newWeight))} kg.`;
-                } else {
-                    hintText = `Vorige keer alle sets op ${app.escapeHTML(String(ex.repsMax))} reps (${app.escapeHTML(String(overload.minWeight))}-${app.escapeHTML(String(overload.maxWeight))} kg). Probeer nu ${app.escapeHTML(String(overload.newWeight))} kg op je zwaarste set.`;
-                }
-                notesHtml += `<div class="text-sm mt-2 progression-hint"><span class="material-icons-round" style="font-size:1rem; vertical-align:-3px;">trending_up</span> ${hintText}</div>`;
             }
 
             const isHold = app.isHoldExercise(ex);
@@ -7314,7 +7472,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         onchange="app.updateWeight(${exIndex}, ${i}, this.value, true)"
                         onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'weight');}">`;
                     if (isBarbell) {
-                        inputsHtml += `<button type="button" class="plate-calc-trigger-btn" id="plate-set-btn-${exIndex}-${i}" onclick="app.openPlateCalculatorModal(${exIndex}, ${i})" title="Schijven-helper voor Set ${i + 1}" aria-label="Schijven-helper voor Set ${i + 1}"><span class="material-icons-round" aria-hidden="true">fitness_center</span></button>`;
+                        inputsHtml += `<button type="button" class="plate-calc-trigger-btn" id="plate-set-btn-${exIndex}-${i}" onclick="app.openPlateCalculatorModal(${exIndex}, ${i})" title="Schijven-helper voor Set ${i + 1}" aria-label="Schijven-helper voor Set ${i + 1}">${plateSleeveSvg}</button>`;
                     }
                 }
                 if (wantsReps && !isHold) {
@@ -7356,16 +7514,9 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         onkeydown="if(event.key==='Enter'){event.preventDefault();app.handleInputEnter(event, ${exIndex}, ${i}, 'level');}">`;
                 }
 
-                const removeSetBtn = ex.sets > 1 ? `
-                    <button class="btn-icon" style="background:none; border:none; padding:2px 4px; cursor:pointer; color:var(--text-muted); opacity:0.6;" onclick="app.removeSetFromExercise(${exIndex}, ${i})" title="Set ${i+1} verwijderen">
-                        <span class="material-icons-round" style="font-size:1.1rem; vertical-align:middle;">remove_circle_outline</span>
-                    </button>
-                ` : '';
-
                 setsHtml += `
                     <div class="set-row">
                         <div class="set-info text-muted" style="display:flex; align-items:center; gap:4px;">
-                            ${removeSetBtn}
                             <span>Set ${i+1}</span>
                         </div>
                         <div class="set-actions">
@@ -7379,10 +7530,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             }
 
             const addSetControlsHtml = `
-                <div style="display:flex; justify-content:flex-start; margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.1);">
-                    <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem; display:flex; align-items:center; gap:4px;" onclick="app.addSetToExercise(${exIndex})">
+                <div class="set-controls-row" style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.1);">
+                    <button type="button" class="btn-secondary" style="padding:5px 12px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px;" onclick="app.addSetToExercise(${exIndex})">
                         <span class="material-icons-round" style="font-size:1rem;">add</span> Set Toevoegen
                     </button>
+                    ${ex.sets > 1 ? `
+                    <button type="button" class="btn-remove-last-set" id="btn-remove-set-${exIndex}" onclick="app.removeSetFromExercise(${exIndex}, ${ex.sets - 1})" title="Laatste set verwijderen">
+                        - Set
+                    </button>
+                    ` : ''}
                 </div>
             `;
 
@@ -7439,45 +7595,45 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 }
             }
             
-            // --- Header Pills: Variation pills or Single Exercise pill with 16px search icon (No redundant title text!) ---
+            // --- Header: Segmented Switch i.p.v. titel (bij variaties) of enkele titel + 1 dynamische zoekknop + ••• menu (Geen extra iconen!) ---
             let headerPillsHtml = '';
             if (variations && variations.length > 1) {
                 const chosen = ex.chosenVariation || variations[0];
-                headerPillsHtml = `<div class="exercise-pills-row">`;
-                variations.forEach(v => {
-                    const isActive = chosen === v;
-                    const safeV = app.escapeHTML(v);
-                    headerPillsHtml += `
-                        <div class="exercise-pill-item">
-                            <button class="variation-pill ${isActive ? 'active' : ''}" data-variation="${safeV}" onclick="app.selectVariation(${exIndex}, this.dataset.variation)" title="Selecteer ${safeV}">
-                                <span class="material-icons-round" style="font-size:0.85rem;">${isActive ? 'check_circle' : 'radio_button_unchecked'}</span>
-                                <span>${safeV}</span>
-                            </button>
-                            <button class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch(${app.jsArg(v)}, event, this)" title="Zoek video/uitleg voor ${safeV}">
-                                <span class="material-icons-round">search</span>
-                            </button>
+                const safeChosen = app.escapeHTML(chosen);
+                headerPillsHtml = `
+                    <div class="exercise-pills-row" style="display:flex; align-items:center; gap:6px; width:100%;">
+                        <div class="variation-segmented-switch" role="tablist" aria-label="Kies oefening variatie">
+                            ${variations.map(v => {
+                                const isActive = chosen === v;
+                                const safeV = app.escapeHTML(v);
+                                return `<button type="button" class="variation-pill ${isActive ? 'active' : ''}" data-variation="${safeV}" onclick="app.selectVariation(${exIndex}, this.dataset.variation)" title="Selecteer ${safeV}"><span>${safeV}</span></button>`;
+                            }).join('')}
                         </div>
-                    `;
-                });
-                headerPillsHtml += `</div>`;
+                        <button type="button" class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch(${app.jsArg(chosen)}, event, this)" title="Zoek video/uitleg voor ${safeChosen}" aria-label="Zoek video/uitleg voor ${safeChosen}">
+                            <span class="material-icons-round">search</span>
+                        </button>
+                        <button type="button" id="ex-menu-btn-${exIndex}" class="ex-more-menu-btn${isActionMenuOpen ? ' active' : ''}" onclick="app.toggleExerciseActionMenu(${exIndex}, event)" aria-expanded="${isActionMenuOpen ? 'true' : 'false'}" title="Meer acties voor deze oefening" aria-label="Meer acties">
+                            <span class="material-icons-round">more_horiz</span>
+                        </button>
+                    </div>
+                `;
             } else {
                 const displayName = ex.chosenVariation || ex.name;
                 const safeName = app.escapeHTML(displayName);
                 headerPillsHtml = `
-                    <div class="exercise-pills-row">
-                        <div class="exercise-single-pill">
-                            <span class="material-icons-round" style="font-size:0.85rem;">fitness_center</span>
+                    <div class="exercise-pills-row" style="display:flex; align-items:center; gap:6px; width:100%;">
+                        <div class="exercise-single-pill exercise-single-title">
                             <span>${safeName}</span>
                         </div>
-                        <button class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch(${app.jsArg(displayName)}, event, this)" title="Zoek video/uitleg voor ${safeName}">
+                        <button type="button" class="icon-search-btn" onclick="event.stopPropagation(); app.triggerExerciseSearch(${app.jsArg(displayName)}, event, this)" title="Zoek video/uitleg voor ${safeName}" aria-label="Zoek video/uitleg voor ${safeName}">
                             <span class="material-icons-round">search</span>
+                        </button>
+                        <button type="button" id="ex-menu-btn-${exIndex}" class="ex-more-menu-btn${isActionMenuOpen ? ' active' : ''}" onclick="app.toggleExerciseActionMenu(${exIndex}, event)" aria-expanded="${isActionMenuOpen ? 'true' : 'false'}" title="Meer acties voor deze oefening" aria-label="Meer acties">
+                            <span class="material-icons-round">more_horiz</span>
                         </button>
                     </div>
                 `;
             }
-
-            const chosenName = ex.chosenVariation || '';
-            const safeExName = app.escapeHTML(chosenName || ex.name);
 
             const hasQuickAlts = quickAlts && quickAlts.length > 0;
             const wisselAction = hasQuickAlts 
@@ -7527,40 +7683,48 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             `;
 
             const card = document.createElement('div');
-            card.className = 'glass-panel exercise-card';
+            card.className = `glass-panel exercise-card${isCollapsed ? ' collapsed' : ''}`;
+            card.setAttribute('data-ex-index', String(exIndex));
             card.innerHTML = `
                 <div class="exercise-header">
                     <div class="exercise-header-main">
                         ${headerPillsHtml}
-                        <div class="exercise-meta-row">
+                        <div class="exercise-meta-row ex-collapse-trigger" onclick="app.toggleExerciseCollapse(${exIndex})" role="button" tabindex="0" aria-expanded="${isCollapsed ? 'false' : 'true'}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();app.toggleExerciseCollapse(${exIndex});}">
                             <div class="exercise-badges-group" style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;">
                                 ${badgesHtml ? `<div class="exercise-badges" style="display:inline-flex; gap:4px;">${badgesHtml}</div>` : ''}
                                 <div class="exercise-meta">${app.escapeHTML(metaString)}</div>
                             </div>
-                            <div class="exercise-actions-group">
-                                <button id="wissel-btn-${exIndex}" class="btn-secondary exercise-action-btn${wisselActiveCls}" onclick="${wisselAction}" title="Vervang deze oefening met een alternatief">
-                                    <span class="material-icons-round">swap_horiz</span> Wissel
-                                </button>
-                                <button class="btn-secondary exercise-action-btn" onclick="app.showExerciseHistoryModal(${app.jsArg(activeExerciseName)})" title="Bekijk geschiedenis">
-                                    <span class="material-icons-round">history</span> Historie
-                                </button>
-                                <button id="note-btn-${exIndex}" class="btn-secondary exercise-action-btn${noteBtnActiveCls}" onclick="app.toggleExerciseNoteEditor(${exIndex})" title="Persoonlijke notitie voor deze oefening">
-                                    <span class="material-icons-round">sticky_note_2</span> Notitie
-                                </button>
-                                ${isBarbellCard ? `<button type="button" id="plate-btn-${exIndex}" class="btn-secondary exercise-action-btn" onclick="app.openPlateCalculatorModal(${exIndex})" title="Barbell Schijven-helper"><span class="material-icons-round">fitness_center</span> Schijven</button>` : ''}
+                            <span class="material-icons-round ex-collapse-chevron" id="ex-collapse-chevron-${exIndex}" aria-hidden="true">${isCollapsed ? 'expand_more' : 'expand_less'}</span>
+                        </div>
+                        <div id="ex-action-menu-${exIndex}" class="ex-action-menu-drawer${isActionMenuOpen ? '' : ' hidden'}">
+                            <div class="exercise-actions-group" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px; width:100%; justify-content:space-between;">
+                                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                                    <button id="wissel-btn-${exIndex}" class="btn-secondary exercise-action-btn${wisselActiveCls}" onclick="${wisselAction}" title="Vervang deze oefening met een alternatief">
+                                        <span class="material-icons-round">swap_horiz</span> Wissel
+                                    </button>
+                                    <button class="btn-secondary exercise-action-btn" onclick="app.showExerciseHistoryModal(${app.jsArg(activeExerciseName)})" title="Bekijk geschiedenis">
+                                        <span class="material-icons-round">history</span> Historie
+                                    </button>
+                                    <button id="note-btn-${exIndex}" class="btn-secondary exercise-action-btn${noteBtnActiveCls}" onclick="app.toggleExerciseNoteEditor(${exIndex})" title="Persoonlijke notitie voor deze oefening">
+                                        <span class="material-icons-round">sticky_note_2</span> Notitie
+                                    </button>
+                                    ${isBarbellCard ? `<button type="button" id="plate-btn-${exIndex}" class="btn-secondary exercise-action-btn" onclick="app.openPlateCalculatorModal(${exIndex})" title="Barbell Schijven-helper">${plateSleeveSvg} Schijven</button>` : ''}
+                                </div>
                                 ${orderControlsHtml}
                             </div>
                         </div>
                         ${quickAltsHtml}
                         ${personalNoteHtml}
-                        ${notesHtml}
-                        ${delayBarHtml}
                     </div>
                 </div>
-                <div class="exercise-body">
-                    ${setsHtml}
-                    ${addSetControlsHtml}
-                    ${singleHoldTimerHtml}
+                <div class="exercise-collapsible-body">
+                    ${notesHtml}
+                    ${delayBarHtml}
+                    <div class="exercise-body">
+                        ${setsHtml}
+                        ${addSetControlsHtml}
+                        ${singleHoldTimerHtml}
+                    </div>
                 </div>
             `;
             list.appendChild(card);
