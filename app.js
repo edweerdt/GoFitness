@@ -3202,7 +3202,7 @@ const app = {
                 if (recStatus.hoursSinceLast !== null && recStatus.hoursSinceLast !== undefined) {
                     const hours = Math.round(recStatus.hoursSinceLast);
                     const hoursText = hours < 1 ? '< 1u' : `${hours}u`;
-                    recHoursEl.textContent = `• ${hoursText} geleden`;
+                    recHoursEl.textContent = `${hoursText} geleden`;
                     recHoursEl.style.display = '';
                 } else {
                     recHoursEl.textContent = '';
@@ -3633,15 +3633,15 @@ const app = {
                 el.innerHTML = `
                     <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%; gap:8px;">
-                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1; min-width:0;">
-                                <h3 style="color:var(--text-primary); text-transform:none; font-size:1.1rem; line-height:1.2; margin:0; overflow-wrap:anywhere;">${this.escapeHTML(p.name)}</h3>
+                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; flex:1; min-width:0;">
+                                <h3 style="color:var(--text-primary); text-transform:none; font-size:1rem; line-height:1.25; margin:0; overflow-wrap:break-word;">${this.escapeHTML(p.name)}</h3>
+                                ${isActive ? '<span class="status-badge green" style="padding:2px 7px; font-size:0.68rem; white-space:nowrap;">Actief</span>' : ''}
                                 ${level}
                             </div>
-                            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-                                ${isActive ? '<span class="status-badge green" style="padding:4px 8px; font-size:0.7rem; white-space:nowrap;">Actief</span>' : ''}
-                                <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.openPlanEditor(${this.jsArg(p.id)})" title="Schema bewerken">edit</span>
-                                <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan(${this.jsArg(p.id)})" title="Schema delen">ios_share</span>
-                                <span class="material-icons-round" style="font-size:1.4rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', ${this.jsArg(p.id)})">delete_outline</span>
+                            <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                                <span class="material-icons-round" style="font-size:1.3rem; cursor:pointer; color:var(--text-muted);" onclick="app.openPlanEditor(${this.jsArg(p.id)})" title="Schema bewerken">edit</span>
+                                <span class="material-icons-round" style="font-size:1.3rem; cursor:pointer; color:var(--text-muted);" onclick="app.sharePlan(${this.jsArg(p.id)})" title="Schema delen">ios_share</span>
+                                <span class="material-icons-round" style="font-size:1.3rem; cursor:pointer; color:#ff5252;" onclick="app.showDeleteModal('plan', ${this.jsArg(p.id)})">delete_outline</span>
                             </div>
                         </div>
                         ${desc}
