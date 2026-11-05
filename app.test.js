@@ -1001,7 +1001,7 @@ describe('workout flow', () => {
         app.renderHome();
 
         const recHoursEl = document.getElementById('recovery-hours');
-        expect(recHoursEl.textContent).toBe('• 12u geleden');
+        expect(recHoursEl.textContent).toBe('12u geleden');
     });
 
     it('should set appropriate battery icons and classes for green, orange and red recovery statuses', () => {
