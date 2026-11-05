@@ -3113,10 +3113,10 @@ const app = {
                 parts.push(durationText);
                 metaEl.textContent = parts.join(' • ');
             } else {
-                // GOF-70: Metadata regel (met geschatte tijd achteraan) + uitklapbare oefeningenknop zonder halter-icoon
+                // GOF-70: Metadata regel (spiergroepen + geschatte tijd achteraan) + uitklapbare oefeningenknop zonder dubbele teller of halter-icoon
                 metaEl.innerHTML = `
                     <div class="home-snapshot-meta-line">
-                        <span>${exCountText}</span>${musclesText ? ` • <span class="chip-pill">${this.escapeHTML(musclesText)}</span>` : ''} • <span class="chip-pill">${durationText}</span>
+                        ${musclesText ? `<span class="chip-pill">${this.escapeHTML(musclesText)}</span> • ` : ''}<span class="chip-pill">${durationText}</span>
                     </div>
                     <button type="button" id="btn-toggle-session-snapshot" class="chip-pill-interactive home-exercises-toggle-btn" onclick="app.toggleHomeSessionPreview()" aria-expanded="${this.isHomeSessionPreviewOpen ? 'true' : 'false'}" title="Klik om oefeningen te bekijken of verbergen">
                         <span id="home-snapshot-count">${exCountText}</span>
