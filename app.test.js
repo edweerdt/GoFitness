@@ -7962,4 +7962,184 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
         });
     });
 
+    describe("GOF-70: UX Redesign | Rustigere interface & progressive disclosure over alle 4 hoofdpagina's", () => {
+        test('1. Home (#view-home): Gecombineerde statuskaart (Optie A1), Aanpassen-lade en oefeningenknop zonder halter-icoon', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const htmlContent = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+            document.body.innerHTML = htmlContent;
+
+            store.plans = [{
+                id: 'plan_gof70',
+                name: 'Upper / Lower 4x',
+                targetSessionsPerWeek: 3,
+                sessions: [{
+                    id: 'sess_1',
+                    name: 'Upper Body A',
+                    estimatedMinutes: 45,
+                    exercises: [
+                        { id: 'bp', name: 'Barbell Bench Press', sets: 3, reps: '8-10', muscleGroups: ['chest'] },
+                        { id: 'row', name: 'Barbell Row', sets: 3, reps: '8-10', muscleGroups: ['back'] }
+                    ]
+                }]
+            }];
+            store.activePlanId = 'plan_gof70';
+            store.logs = [];
+
+            app.isHomeAdaptDrawerOpen = false;
+            app.isHomeSessionPreviewOpen = false;
+            app.renderHome();
+
+            const statusCard = document.getElementById('home-status-card');
+            expect(statusCard).not.toBeNull();
+            expect(statusCard.querySelector('#recovery-status')).not.toBeNull();
+            expect(statusCard.querySelector('#recovery-suggestion')).not.toBeNull();
+
+            const heroTitle = document.getElementById('home-hero-session-title');
+            expect(heroTitle).not.toBeNull();
+            expect(heroTitle.textContent).toBe('Upper Body A');
+
+            // Aanpassen-lade standaard ingeklapt, en te openen via toggleHomeAdaptDrawer()
+            const adaptDrawer = document.getElementById('home-adapt-drawer');
+            expect(adaptDrawer.classList.contains('hidden')).toBe(true);
+            app.toggleHomeAdaptDrawer();
+            expect(adaptDrawer.classList.contains('hidden')).toBe(false);
+
+            // Oefeningen-knop bevat GEEN fitness_center icoon en toont geschatte duur achteraan op de metadataregel
+            const toggleSnapshotBtn = document.getElementById('btn-toggle-session-snapshot');
+            expect(toggleSnapshotBtn).not.toBeNull();
+            expect(toggleSnapshotBtn.innerHTML).not.toContain('fitness_center');
+
+            const metaLine = document.querySelector('.home-snapshot-meta-line');
+            expect(metaLine).not.toBeNull();
+            expect(metaLine.textContent.trim().endsWith('~45 min')).toBe(true);
+        });
+
+        test('2. Statistieken (#view-progress): Compacte KPI-strip, 3 sub-tabs en Spiergroepen Variant 1 (horizontale balken)', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const htmlContent = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+            document.body.innerHTML = htmlContent;
+
+            store.logs = [{
+                id: 'log_1',
+                date: new Date().toISOString(),
+                duration: 50,
+                exercisesCompleted: 4,
+                exercises: [
+                    { name: 'Barbell Bench Press', muscleGroups: ['chest'], details: [{ weight: 90, reps: 8 }] },
+                    { name: 'Lat Pulldown', muscleGroups: ['back'], details: [{ weight: 70, reps: 10 }] }
+                ]
+            }];
+
+            app.renderProgress();
+
+            const kpiStrip = document.getElementById('full-stats-grid');
+            expect(kpiStrip.classList.contains('stats-kpi-strip')).toBe(true);
+
+            // Horizontale balken in Spiergroepen (Variant 1)
+            const muscleCards = document.querySelectorAll('#muscle-stats-grid .muscle-bar-card');
+            expect(muscleCards.length).toBe(2);
+            expect(muscleCards[0].querySelector('.muscle-bar-fill')).not.toBeNull();
+
+            // Sub-tab wissel
+            app.switchProgressSubTab('muscles');
+            expect(document.getElementById('progress-tab-muscles').classList.contains('hidden')).toBe(false);
+            expect(document.getElementById('progress-tab-progress').classList.contains('hidden')).toBe(true);
+
+            app.switchProgressSubTab('history');
+            expect(document.getElementById('progress-tab-history').classList.contains('hidden')).toBe(false);
+            expect(document.getElementById('progress-tab-muscles').classList.contains('hidden')).toBe(true);
+        });
+
+        test('3. Actieve Workout (#view-workout): Oefeningen 2..N initieel ingeklapt, variatie-switch met 1 zoekknop, geen overload-banner, - Set onderaan en Barbell-sleeve SVG', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const htmlContent = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+            document.body.innerHTML = htmlContent;
+
+            const session = {
+                id: 's_gof70',
+                name: 'Full Body Test',
+                exercises: [
+                    { id: 'ex1', name: 'Barbell Bench Press of Chest Press Machine', sets: 3, reps: '8-12', repsMax: 12, restSeconds: 90, category: 'compound', exerciseType: 'strength' },
+                    { id: 'ex2', name: 'Barbell Back Squat', sets: 3, reps: '6-8', restSeconds: 120, category: 'compound', exerciseType: 'strength' },
+                    { id: 'ex3', name: 'Lat Pulldown', sets: 3, reps: '10-12', restSeconds: 60, category: 'compound', exerciseType: 'strength' }
+                ]
+            };
+
+            app.startWorkout(session);
+
+            const cards = document.querySelectorAll('#workout-exercise-list .exercise-card');
+            expect(cards.length).toBe(3);
+            // Alleen eerste oefening uitgeklapt, rest initieel ingeklapt
+            expect(cards[0].classList.contains('collapsed')).toBe(false);
+            expect(cards[1].classList.contains('collapsed')).toBe(true);
+            expect(cards[2].classList.contains('collapsed')).toBe(true);
+
+            // Variatie-switch op oefening 1 heeft exact 1 zoekknop die voor de geselecteerde optie geldt
+            const pillsRow0 = cards[0].querySelector('.exercise-pills-row');
+            expect(pillsRow0.querySelector('.variation-segmented-switch')).not.toBeNull();
+            const searchBtns0 = pillsRow0.querySelectorAll('.icon-search-btn');
+            expect(searchBtns0.length).toBe(1);
+            expect(searchBtns0[0].getAttribute('onclick')).toContain('Barbell Bench Press');
+
+            // Wissel variatie -> zoekknop volgt de nieuw geselecteerde variatie
+            app.selectVariation(0, 'Chest Press Machine');
+            const updatedCard0 = document.querySelectorAll('#workout-exercise-list .exercise-card')[0];
+            const updatedSearchBtn = updatedCard0.querySelector('.exercise-pills-row .icon-search-btn');
+            expect(updatedSearchBtn.getAttribute('onclick')).toContain('Chest Press Machine');
+
+            // Terug naar Barbell Bench Press voor schijven-helper SVG controle
+            app.selectVariation(0, 'Barbell Bench Press');
+            const plateTriggerBtn = document.getElementById('plate-set-btn-0-0');
+            expect(plateTriggerBtn).not.toBeNull();
+            expect(plateTriggerBtn.querySelector('svg.plate-sleeve-svg')).not.toBeNull();
+
+            // Geen remove_circle_outline per set-rij, wel - Set onderaan
+            expect(document.getElementById('workout-exercise-list').innerHTML).not.toContain('remove_circle_outline');
+            expect(document.getElementById('btn-remove-set-0')).not.toBeNull();
+
+            // Geen statische progression-hint banner
+            expect(document.querySelector('.progression-hint')).toBeNull();
+
+            // Laatste set afvinken klapt oefening 1 NIET automatisch in (zodat PR/Overload gloed zichtbaar blijft)
+            app.toggleSet(0, 0);
+            app.toggleSet(0, 1);
+            app.toggleSet(0, 2);
+            expect(app.collapsedExercises.has(0)).toBe(false);
+
+            // Handmatig uitklappen van oefening 2
+            app.toggleExerciseCollapse(1);
+            expect(app.collapsedExercises.has(1)).toBe(false);
+        });
+
+        test("4. Schema's (#view-plans): 3 sub-tabs (Mijn Schema's, Ontdek & AI, Oefeningen) en Backup & Sync lade in header", () => {
+            const fs = require('fs');
+            const path = require('path');
+            const htmlContent = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+            document.body.innerHTML = htmlContent;
+
+            app.isPlansSyncDrawerOpen = false;
+            app.renderPlans();
+
+            expect(document.getElementById('plans-tab-mine').classList.contains('hidden')).toBe(false);
+            expect(document.getElementById('plans-tab-discover').classList.contains('hidden')).toBe(true);
+            expect(document.getElementById('plans-tab-library').classList.contains('hidden')).toBe(true);
+
+            app.switchPlansSubTab('discover');
+            expect(document.getElementById('plans-tab-discover').classList.contains('hidden')).toBe(false);
+            expect(document.getElementById('plans-tab-mine').classList.contains('hidden')).toBe(true);
+
+            app.switchPlansSubTab('library');
+            expect(document.getElementById('plans-tab-library').classList.contains('hidden')).toBe(false);
+
+            // Backup & Sync lade via header knop
+            const syncDrawer = document.getElementById('plans-backup-sync-drawer');
+            expect(syncDrawer.classList.contains('hidden')).toBe(true);
+            app.togglePlansSyncModal();
+            expect(syncDrawer.classList.contains('hidden')).toBe(false);
+        });
+    });
+
 });

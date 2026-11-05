@@ -37,76 +37,83 @@
                             <span class="material-icons-round">palette</span>
                         </button>
                     </div>
-                    <div id="recovery-status" class="status-badge green">
-                        <div class="status-badge-primary">
-                            <span class="material-icons-round">battery_charging_full</span>
-                            <span id="recovery-text">Klaar om te trainen</span>
-                            <span id="recovery-hours" class="recovery-hours-text"></span>
+                </header>
+                <div class="content-padded pb-32">
+                    <!-- Gecombineerde Status- & Notificatie-kaart (GOF-70 Optie A1) -->
+                    <div class="home-status-card glass-panel mb-3" id="home-status-card">
+                        <div class="home-status-grid">
+                            <div id="recovery-status" class="status-badge green home-status-cell">
+                                <div class="status-badge-primary">
+                                    <span class="material-icons-round">battery_charging_full</span>
+                                    <div class="home-status-cell-text">
+                                        <span id="recovery-text" class="home-status-main">Klaar om te trainen</span>
+                                        <span id="recovery-hours" class="recovery-hours-text home-status-sub"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="home-status-cell home-status-cell-clickable" id="home-weekly-goal-box" style="cursor: pointer;" role="button" tabindex="0" aria-label="Bekijk je gelogde sessies" onclick="app.navigate('progress'); app.switchProgressSubTab('history');" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                                <div class="home-status-cell-inner">
+                                    <span class="home-status-main" id="home-weekly-display"><span id="stat-completed">0</span> sessies</span>
+                                    <span class="home-status-sub" id="home-weekly-label">Voltooid</span>
+                                </div>
+                            </div>
+                            <div class="home-status-cell">
+                                <div class="home-status-cell-inner">
+                                    <span class="home-status-main">🔥 <span id="stat-streak">0</span> wkn</span>
+                                    <span class="home-status-sub">Streak</span>
+                                </div>
+                            </div>
                         </div>
-                        <button type="button" id="recovery-suggestion" class="status-badge-secondary hidden" onclick="app.showSmartRecoveryModal()" aria-label="Bekijk hersteladvies">
+                        <button type="button" id="recovery-suggestion" class="status-badge-secondary home-status-footer-banner hidden" onclick="app.showSmartRecoveryModal()" aria-label="Bekijk hersteladvies">
                             <span class="material-icons-round suggestion-icon" aria-hidden="true">lightbulb</span>
                             <span id="recovery-suggestion-text" class="suggestion-text"></span>
                             <span class="material-icons-round suggestion-arrow" aria-hidden="true">info_outline</span>
                         </button>
+                        <div id="home-onboarding-container" class="home-status-onboarding hidden"></div>
                     </div>
-                </header>
-                <div class="content-padded pb-32">
-                    <div id="home-onboarding-container" class="hidden"></div>
+
                     <div class="recommended-card glass-panel">
-                        <!-- Schemanaam & Aanbevolen Sessie badge -->
+                        <!-- Schemanaam, Aanbevolen Sessie badge & Aanpassen knop -->
                         <div class="home-plan-header">
                             <div id="home-plan-name" class="home-plan-name">Beginner Gym + Lichaamsgewicht Mix</div>
-                            <div>
+                            <div class="home-plan-header-actions">
                                 <span id="recommended-card-title" class="home-recommended-badge">⚡ Direct Starten</span>
+                                <button type="button" id="btn-toggle-home-adapt" class="home-adapt-toggle-btn" onclick="app.toggleHomeAdaptDrawer()" aria-expanded="false" aria-controls="home-adapt-drawer">
+                                    <span>Aanpassen</span>
+                                    <span class="material-icons-round" id="home-adapt-toggle-icon" style="font-size:1rem;">expand_more</span>
+                                </button>
                             </div>
                         </div>
 
-                        <!-- Fallback/niet-picker titels voor actieve workout of no-plan toestand -->
+                        <!-- Prominente sessietitel in Hero Card -->
+                        <h2 id="home-hero-session-title" class="home-session-title">Beginner Gym + Lichaamsgewicht Mix</h2>
+                        <!-- Fallback/niet-picker titels voor backwards-compatibiliteit -->
                         <h2 id="recommended-session-name" class="home-session-title hidden">Beginner Gym + Lichaamsgewicht Mix</h2>
                         <p id="recommended-reason" class="home-session-reason hidden">Start direct met een beginnersschema of kies een schema uit de preset bibliotheek op het tabblad Schema's.</p>
 
-                        <!-- Sessie Selector direct onder de badge -->
-                        <div id="session-picker-wrapper" class="session-picker-wrapper hidden">
-                            <select id="home-session-select" class="home-session-select" aria-label="Kies een sessie uit je schema"></select>
-                        </div>
-
-                        <!-- Oefeningen & Metadata chips met direct uitklapbare oefeningen pill -->
+                        <!-- Oefeningen & Metadata met uitklapbare oefeningenlijst -->
                         <div id="home-session-snapshot" class="home-session-snapshot hidden">
                             <div id="home-snapshot-meta" class="home-snapshot-chips"></div>
                             <div id="home-snapshot-list" class="home-snapshot-list hidden"></div>
                         </div>
 
-                        <button id="btn-start-session" class="btn-primary w-full mt-3" disabled>Start Nu</button>
+                        <!-- Uitklapbare Aanpassen-sectie (Sessie wisselen + Thuis/Rug quick adapt) -->
+                        <div id="home-adapt-drawer" class="home-adapt-drawer hidden">
+                            <div id="session-picker-wrapper" class="session-picker-wrapper hidden">
+                                <label for="home-session-select" class="home-adapt-drawer-label">Andere sessie kiezen</label>
+                                <select id="home-session-select" class="home-session-select" aria-label="Kies een sessie uit je schema"></select>
+                            </div>
+                            <div id="home-quick-adapt-bar" class="quick-adapt-bar hidden">
+                                <button type="button" class="quick-adapt-btn" onclick="app.quickConvertAndStartSession('home')" title="Vervang apparaten automatisch door thuis-geschikte oefeningen">
+                                    <span class="material-icons-round" style="font-size:1rem; color:#60a5fa;" aria-hidden="true">home</span> Thuis omzetten
+                                </button>
+                                <button type="button" class="quick-adapt-btn" onclick="app.quickConvertAndStartSession('axial')" title="Vervang zware rugbelasting automatisch door rugsparende alternatieven">
+                                    <span class="material-icons-round" style="font-size:1rem; color:#34d399;" aria-hidden="true">shield</span> Rug ontlasten
+                                </button>
+                            </div>
+                        </div>
 
-                        <div id="home-quick-adapt-bar" class="quick-adapt-bar hidden">
-                            <button type="button" class="quick-adapt-btn" onclick="app.quickConvertAndStartSession('home')" title="Vervang apparaten automatisch door thuis-geschikte oefeningen">
-                                <span class="material-icons-round" style="font-size:1rem; color:#60a5fa;" aria-hidden="true">home</span> Thuis omzetten
-                            </button>
-                            <button type="button" class="quick-adapt-btn" onclick="app.quickConvertAndStartSession('axial')" title="Vervang zware rugbelasting automatisch door rugsparende alternatieven">
-                                <span class="material-icons-round" style="font-size:1rem; color:#34d399;" aria-hidden="true">shield</span> Rug ontlasten
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="stats-mini mt-4">
-                        <div class="stat-box glass-panel">
-                            <div class="stat-icon-wrapper text-accent">
-                                <span class="material-icons-round">local_fire_department</span>
-                            </div>
-                            <div class="stat-details">
-                                <span class="stat-value" id="stat-streak">0</span>
-                                <span class="stat-label">Weken Streak</span>
-                            </div>
-                        </div>
-                        <div class="stat-box glass-panel" style="cursor: pointer;" role="button" tabindex="0" aria-label="Bekijk je gelogde sessies" onclick="app.navigate('progress'); setTimeout(() => document.getElementById('history-list').scrollIntoView({behavior: 'smooth'}), 100);" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                            <div class="stat-icon-wrapper text-accent">
-                                <span class="material-icons-round">done_all</span>
-                            </div>
-                            <div class="stat-details">
-                                <span class="stat-value" id="stat-completed">0</span>
-                                <span class="stat-label">Sessies</span>
-                            </div>
-                        </div>
+                        <button id="btn-start-session" class="btn-primary w-full mt-3" disabled>Start Nu</button>
                     </div>
                 </div>
             </section>
@@ -147,132 +154,168 @@
                         </div>
                     </div>
                 </div>
-                <div class="content-padded pb-32 flex-col gap-3" id="workout-exercise-list">
+                <div class="content-padded pb-6 flex-col gap-3" id="workout-exercise-list">
                     <!-- Exercises injected here -->
                 </div>
-                <div class="sticky-footer glass-panel">
+                <div class="sticky-footer workout-static-footer glass-panel">
                     <button id="btn-finish-workout" class="btn-primary w-full">Sessie Afronden</button>
                 </div>
             </section>
 
             <!-- Plans View -->
             <section id="view-plans" class="view">
-                <header class="top-nav">
+                <header class="top-nav" style="display:flex; justify-content:space-between; align-items:center;">
                     <h2>Schema's</h2>
+                    <button type="button" id="btn-toggle-sync-drawer" class="plans-sync-header-btn" onclick="app.togglePlansSyncModal()" aria-expanded="false" aria-controls="plans-backup-sync-drawer">
+                        <span class="plans-sync-dot" id="plans-header-sync-dot"></span>
+                        <span class="material-icons-round" style="font-size:1rem;">cloud_done</span>
+                        <span>Backup &amp; Sync</span>
+                    </button>
                 </header>
-                <div class="content-padded pb-32">
-                    <div class="actions-row">
-                        <button class="btn-secondary flex-1" onclick="app.showImportModal()"><span class="material-icons-round">upload_file</span> Importeer</button>
-                        <button class="btn-secondary flex-1" data-feature="qr-scan" onclick="app.startQrScanner()" title="Scan QR-code van een ander toestel"><span class="material-icons-round">qr_code_scanner</span> Scan QR</button>
-                        <button class="btn-secondary flex-1" onclick="app.exportData()"><span class="material-icons-round">download</span> Backup</button>
-                        <button class="btn-secondary flex-1" onclick="document.getElementById('restore-file').click()"><span class="material-icons-round">restore</span> Herstel</button>
-                    </div>
-                    <input type="file" id="restore-file" accept=".json" class="hidden">
-
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; margin-bottom:8px;">
-                        <h3 style="margin:0;">Mijn Schema's</h3>
-                        <button id="btn-create-plan" class="btn-primary" onclick="app.openPlanEditor()" style="padding:8px 14px; min-height:44px; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px;">
-                            <span class="material-icons-round" style="font-size:1.1rem;">add</span> Nieuw Schema
-                        </button>
-                    </div>
-                    <div id="plans-list" class="flex-col gap-3">
-                        <!-- Plans injected here -->
+                <div class="content-padded pb-32 plans-content-col">
+                    <!-- Segmented Sub-tabs (GOF-70 Optie A) -->
+                    <div class="ux-subtabs" id="plans-subtabs" role="tablist" aria-label="Schema beheer secties">
+                        <button type="button" class="ux-subtab-btn active" data-subtab="mine" role="tab" aria-selected="true" onclick="app.switchPlansSubTab('mine')">Mijn Schema's</button>
+                        <button type="button" class="ux-subtab-btn" data-subtab="discover" role="tab" aria-selected="false" onclick="app.switchPlansSubTab('discover')">Ontdek &amp; AI</button>
+                        <button type="button" class="ux-subtab-btn" data-subtab="library" role="tab" aria-selected="false" onclick="app.switchPlansSubTab('library')">Oefeningen</button>
                     </div>
 
-                    <!-- Preset Bibliotheek (Starterschema's) -->
-                    <div id="preset-plans-container" class="mt-6">
-                        <!-- Injected by JS -->
-                    </div>
-
-                    <!-- AI Schema Assistent (Prompt & Template) -->
-                    <div id="ai-generator-panel" class="mt-4">
-                        <!-- Injected by JS -->
-                    </div>
-
-                    <!-- Oefeningenbibliotheek -->
-                    <div class="glass-panel mt-6">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div>
-                                <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.1rem;">Oefeningenbibliotheek</h3>
-                                <p class="text-sm text-muted mt-1">Beheer ingebouwde en eigen oefeningen</p>
-                            </div>
-                            <button class="btn-primary" onclick="app.showAddExerciseModal()" style="padding:8px 14px; min-height:44px; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px;">
-                                <span class="material-icons-round" style="font-size:1.1rem;">add</span> Nieuw
+                    <!-- Sub-tab 1: Mijn Schema's -->
+                    <div id="plans-tab-mine" class="plans-subtab-panel">
+                        <div class="plans-mine-actions-bar mt-3">
+                            <button id="btn-create-plan" class="btn-primary plans-mine-primary-btn" onclick="app.openPlanEditor()">
+                                <span class="material-icons-round" style="font-size:1.1rem;">add</span> Nieuw Schema
+                            </button>
+                            <button class="btn-secondary plans-mine-sec-btn" onclick="app.showImportModal()">
+                                <span class="material-icons-round" style="font-size:1.05rem;">upload_file</span> Importeer
+                            </button>
+                            <button class="btn-secondary plans-mine-sec-btn" data-feature="qr-scan" onclick="app.startQrScanner()" title="Scan QR-code van een ander toestel">
+                                <span class="material-icons-round" style="font-size:1.05rem;">qr_code_scanner</span> Scan QR
                             </button>
                         </div>
-                        <div style="margin-top:12px;">
-                            <input type="text" id="library-search" class="input-field" placeholder="Zoek op naam of spiergroep..." style="width:100%;" oninput="app.renderExerciseLibrary()">
+                        <div id="plans-list" class="flex-col gap-3 mt-3">
+                            <!-- Plans injected here -->
                         </div>
-                        <div id="exercise-library-list" class="mt-3 flex-col gap-2" style="max-height: 400px; overflow-y: auto;">
+                    </div>
+
+                    <!-- Sub-tab 2: Ontdek & AI -->
+                    <div id="plans-tab-discover" class="plans-subtab-panel plans-discover-flex hidden">
+                        <!-- Preset Bibliotheek (Starterschema's) -->
+                        <div id="preset-plans-container" class="mt-3" style="order: 2;">
+                            <!-- Injected by JS -->
+                        </div>
+
+                        <!-- AI Schema Assistent (Prompt & Template) -->
+                        <div id="ai-generator-panel" class="mt-3" style="order: 1;">
                             <!-- Injected by JS -->
                         </div>
                     </div>
 
-                    <!-- Cloud-sync via Google (Tijdelijk onderaan, zie GOF-27) -->
-                    <div class="glass-panel mt-6" id="sync-panel">
-                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                            <div style="font-weight:600;">Cloud-sync</div>
-                            <span id="sync-status" class="status-badge" style="padding:2px 10px; font-size:0.7rem;">uit</span>
+                    <!-- Sub-tab 3: Oefeningenbibliotheek -->
+                    <div id="plans-tab-library" class="plans-subtab-panel hidden">
+                        <div class="glass-panel mt-3">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <h3 style="margin:0; text-transform:none; color:var(--text-primary); font-size:1.05rem;">Oefeningenbibliotheek</h3>
+                                    <p class="text-sm text-muted mt-1">Beheer ingebouwde en eigen oefeningen</p>
+                                </div>
+                                <button class="btn-primary" onclick="app.showAddExerciseModal()" style="padding:8px 14px; min-height:44px; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px;">
+                                    <span class="material-icons-round" style="font-size:1.1rem;">add</span> Nieuw
+                                </button>
+                            </div>
+                            <div style="margin-top:12px;">
+                                <input type="text" id="library-search" class="input-field" placeholder="Zoek op naam of spiergroep..." style="width:100%;" oninput="app.renderExerciseLibrary()">
+                            </div>
+                            <div id="exercise-library-list" class="mt-3 flex-col gap-2">
+                                <!-- Injected by JS -->
+                            </div>
                         </div>
-                        <div id="sync-detail" class="text-sm text-muted mt-1"></div>
-                        <div class="actions-row mt-3" id="sync-actions"></div>
+                    </div>
+
+                    <!-- Cloud-sync & Lokale Backup lade (via knop in header) -->
+                    <div id="plans-backup-sync-drawer" class="plans-backup-sync-drawer hidden" style="order: -1;">
+                        <div class="glass-panel mb-3" id="sync-panel">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                                <div style="font-weight:600;">Cloud-sync &amp; Lokale Backup</div>
+                                <span id="sync-status" class="status-badge" style="padding:2px 10px; font-size:0.7rem;">uit</span>
+                            </div>
+                            <div id="sync-detail" class="text-sm text-muted mt-1"></div>
+                            <div class="actions-row mt-3" id="sync-actions"></div>
+                            <div class="actions-row mt-3 pt-3" style="border-top: 1px solid var(--border-color);">
+                                <button class="btn-secondary flex-1" onclick="app.exportData()"><span class="material-icons-round">download</span> Backup</button>
+                                <button class="btn-secondary flex-1" onclick="document.getElementById('restore-file').click()"><span class="material-icons-round">restore</span> Herstel</button>
+                            </div>
+                        </div>
+                        <input type="file" id="restore-file" accept=".json" class="hidden">
                     </div>
                 </div>
             </section>
 
             <!-- Progress View (Statistieken) -->
             <section id="view-progress" class="view">
-                <header class="top-nav">
+                <header class="top-nav" style="display:flex; justify-content:space-between; align-items:center;">
                     <h2>Statistieken</h2>
+                    <button id="btn-share-stats" class="weeks-stepper-btn" onclick="app.openShareStatsModal()" title="Statistieken delen" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; min-height:44px; height:auto; width:auto; border-radius:12px; background: rgba(37, 99, 235, 0.15); color: var(--accent-color); border: 1px solid rgba(37, 99, 235, 0.3);">
+                        <span class="material-icons-round" style="font-size:18px;">share</span>
+                        <span style="font-size:13px; font-weight:600;">Delen</span>
+                    </button>
                 </header>
                 <div class="content-padded pb-32">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <h3 style="margin:0;">Statistieken</h3>
-                        <button id="btn-share-stats" class="weeks-stepper-btn" onclick="app.openShareStatsModal()" title="Statistieken delen" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; min-height:44px; height:auto; width:auto; border-radius:12px; background: rgba(37, 99, 235, 0.15); color: var(--accent-color); border: 1px solid rgba(37, 99, 235, 0.3);">
-                            <span class="material-icons-round" style="font-size:18px;">share</span>
-                            <span style="font-size:13px; font-weight:600;">Delen</span>
-                        </button>
-                    </div>
-                    <div class="stats-grid mt-2" id="full-stats-grid">
+                    <div class="stats-grid stats-kpi-strip" id="full-stats-grid">
                         <!-- Stats injected here -->
                     </div>
 
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px; margin-bottom:8px;">
-                        <h3 style="margin:0;">Progressie</h3>
-                        <div class="weeks-stepper">
-                            <button class="weeks-stepper-btn" onclick="app.adjustProgressWeeks(-1)" title="1 week minder">-</button>
-                            <input type="number" id="progress-weeks-input" class="weeks-stepper-input" min="1" max="999" value="4" onchange="app.setProgressWeeks(this.value)" onkeydown="if(event.key==='Enter'){this.blur();}">
-                            <button class="weeks-stepper-btn" onclick="app.adjustProgressWeeks(1)" title="1 week extra">+</button>
-                            <button id="btn-progress-all" class="weeks-stepper-btn all-btn" onclick="app.setProgressWeeks('all')" title="Alle weken tonen">All</button>
-                        </div>
-                    </div>
-                    <div id="exercise-progress-list" class="mt-2 exercise-progress-grid">
-                        <!-- Exercise progress injected here -->
+                    <!-- Segmented Sub-tabs (GOF-70 Voorstel A) -->
+                    <div class="ux-subtabs mt-3" id="progress-subtabs" role="tablist" aria-label="Statistieken secties">
+                        <button type="button" class="ux-subtab-btn active" data-subtab="progress" role="tab" aria-selected="true" onclick="app.switchProgressSubTab('progress')">Progressie</button>
+                        <button type="button" class="ux-subtab-btn" data-subtab="muscles" role="tab" aria-selected="false" onclick="app.switchProgressSubTab('muscles')">Spiergroepen</button>
+                        <button type="button" class="ux-subtab-btn" data-subtab="history" role="tab" aria-selected="false" onclick="app.switchProgressSubTab('history')">Logboek</button>
                     </div>
 
-                    <h3 class="mt-6">Spiergroepen</h3>
-                    <div id="muscle-stats-grid" class="mt-2 muscle-stats-grid">
-                        <!-- Muscle stats injected here -->
-                    </div>
-
-                    <div class="history-header-row mt-6">
-                        <h3 style="margin:0;">Logboek</h3>
-                        <div class="history-view-toggle" role="group" aria-label="Weergave van logboek kiezen">
-                            <button type="button" id="btn-history-view-list" class="history-toggle-btn active" onclick="app.setHistoryViewMode('list')" aria-pressed="true" title="Lijstweergave">
-                                <span class="material-icons-round" aria-hidden="true">format_list_bulleted</span>
-                                <span>Lijst</span>
-                            </button>
-                            <button type="button" id="btn-history-view-calendar" class="history-toggle-btn" onclick="app.setHistoryViewMode('calendar')" aria-pressed="false" title="Kalenderweergave">
-                                <span class="material-icons-round" aria-hidden="true">calendar_month</span>
-                                <span>Kalender</span>
-                            </button>
+                    <!-- Sub-tab 1: Progressie (met bestaande sparkline grafieken) -->
+                    <div id="progress-tab-progress" class="progress-subtab-panel">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; margin-bottom:8px;">
+                            <h3 style="margin:0; font-size:0.9rem;">Progressie per oefening</h3>
+                            <div class="weeks-stepper">
+                                <button class="weeks-stepper-btn" onclick="app.adjustProgressWeeks(-1)" title="1 week minder">-</button>
+                                <input type="number" id="progress-weeks-input" class="weeks-stepper-input" min="1" max="999" value="4" onchange="app.setProgressWeeks(this.value)" onkeydown="if(event.key==='Enter'){this.blur();}">
+                                <button class="weeks-stepper-btn" onclick="app.adjustProgressWeeks(1)" title="1 week extra">+</button>
+                                <button id="btn-progress-all" class="weeks-stepper-btn all-btn" onclick="app.setProgressWeeks('all')" title="Alle weken tonen">All</button>
+                            </div>
+                        </div>
+                        <div id="exercise-progress-list" class="mt-2 exercise-progress-grid">
+                            <!-- Exercise progress injected here -->
                         </div>
                     </div>
-                    <div id="history-list" class="mt-2 flex-col gap-3">
-                        <!-- History injected here -->
+
+                    <!-- Sub-tab 2: Spiergroepen (Variant 1: Horizontale visuele balken) -->
+                    <div id="progress-tab-muscles" class="progress-subtab-panel hidden">
+                        <div id="muscle-stats-grid" class="mt-3 muscle-stats-grid muscle-bars-list">
+                            <!-- Muscle stats injected here -->
+                        </div>
                     </div>
-                    <div id="history-calendar" class="mt-2 hidden">
-                        <!-- Calendar view injected here -->
+
+                    <!-- Sub-tab 3: Logboek (Lijst & Kalender) -->
+                    <div id="progress-tab-history" class="progress-subtab-panel hidden">
+                        <div class="history-header-row mt-3">
+                            <h3 style="margin:0; font-size:0.9rem;">Logboek</h3>
+                            <div class="history-view-toggle" role="group" aria-label="Weergave van logboek kiezen">
+                                <button type="button" id="btn-history-view-list" class="history-toggle-btn active" onclick="app.setHistoryViewMode('list')" aria-pressed="true" title="Lijstweergave">
+                                    <span class="material-icons-round" aria-hidden="true">format_list_bulleted</span>
+                                    <span>Lijst</span>
+                                </button>
+                                <button type="button" id="btn-history-view-calendar" class="history-toggle-btn" onclick="app.setHistoryViewMode('calendar')" aria-pressed="false" title="Kalenderweergave">
+                                    <span class="material-icons-round" aria-hidden="true">calendar_month</span>
+                                    <span>Kalender</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="history-list" class="mt-2 flex-col gap-3">
+                            <!-- History injected here -->
+                        </div>
+                        <div id="history-calendar" class="mt-2 hidden">
+                            <!-- Calendar view injected here -->
+                        </div>
                     </div>
                 </div>
             </section>
