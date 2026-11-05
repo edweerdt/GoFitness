@@ -3439,8 +3439,18 @@ const app = {
             const progressText = `${recentLogsCount}/${targetSessions} sessies deze week`;
 
             if (weeklyDisplayEl && weeklyLabelEl) {
-                weeklyDisplayEl.innerHTML = `${recentLogsCount} / ${targetSessions} sessies <span id="stat-completed" style="display:none;">${store.logs.length}</span>`;
-                weeklyLabelEl.textContent = `Weekdoel • ${store.logs.length} tot.`;
+                const safeRecentLogsCount = Number.isFinite(Number(recentLogsCount)) ? Number(recentLogsCount) : 0;
+                const safeTargetSessions = Number.isFinite(Number(targetSessions)) ? Number(targetSessions) : 0;
+                const safeTotalLogs = Number.isFinite(Number(store.logs.length)) ? Number(store.logs.length) : 0;
+
+                weeklyDisplayEl.textContent = `${safeRecentLogsCount} / ${safeTargetSessions} sessies `;
+                const hiddenCompletedEl = document.createElement('span');
+                hiddenCompletedEl.id = 'stat-completed';
+                hiddenCompletedEl.style.display = 'none';
+                hiddenCompletedEl.textContent = String(safeTotalLogs);
+                weeklyDisplayEl.appendChild(hiddenCompletedEl);
+
+                weeklyLabelEl.textContent = `Weekdoel • ${safeTotalLogs} tot.`;
             }
 
             // Legacy fallback if .stats-mini is present in unit test DOM
