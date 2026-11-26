@@ -8281,4 +8281,226 @@ describe('GOF-38: Customizable Color Palettes & Theme Modal', () => {
         });
     });
 
+    describe('Exercise TrackMetrics & Input Fields Reliability', () => {
+        beforeEach(() => {
+            document.body.innerHTML = `
+                <div id="main-content">
+                    <div id="view-workout">
+                        <div id="workout-exercise-list"></div>
+                        <div id="workout-progress-bar" style="width:0%;"></div>
+                        <div id="workout-progress-badge">0 / 0 sets</div>
+                        <div id="workout-progress-track" aria-valuenow="0"></div>
+                    </div>
+                </div>
+                <div id="modal-substitute-exercise" class="hidden">
+                    <input type="checkbox" id="sub-modal-save-to-plan">
+                </div>
+            `;
+            store.customExercises = [];
+            store.plans = [];
+            store.logs = [];
+            app.activeWorkout = null;
+        });
+
+        it('werkt trackMetrics en exerciseType bij wanneer een bodyweight-oefening via quickSwapActiveExercise wordt gewisseld naar Cable Fly', () => {
+            const session = {
+                id: 'sess-swap-cable-fly',
+                name: 'Borst',
+                exercises: [
+                    {
+                        id: 'ex-pushup',
+                        name: 'Push-up',
+                        sets: 2,
+                        exerciseType: 'bodyweight_reps',
+                        trackMetrics: ['reps', 'completed']
+                    }
+                ]
+            };
+
+            app.startWorkout(session);
+            app.renderWorkoutExercises();
+
+            // Voor de wissel: alleen reps-invoervelden, geen gewicht
+            expect(document.querySelectorAll('#workout-exercise-list input[data-type="weight"]').length).toBe(0);
+            expect(document.querySelectorAll('#workout-exercise-list input[data-type="reps"]').length).toBe(2);
+
+            // Wissel naar Cable Fly / Crossover
+            app.quickSwapActiveExercise(0, 'cable-fly');
+
+            const swapped = app.activeWorkout.exercises[0];
+            expect(swapped.exerciseType).toBe('weight_reps');
+            expect(swapped.trackMetrics).toEqual(['weight', 'reps']);
+
+            // Na de wissel: zowel gewicht (kg) als reps invoervelden zichtbaar
+            expect(document.querySelectorAll('#workout-exercise-list input[data-type="weight"]').length).toBe(2);
+            expect(document.querySelectorAll('#workout-exercise-list input[data-type="reps"]').length).toBe(2);
+        });
+
+        it('werkt trackMetrics bij en ruimt oude duration-velden op bij applySubstitution (ook bij opslaan in schema)', () => {
+            const plan = {
+                id: 'plan-sub-metrics',
+                name: 'Test Plan',
+                sessions: [
+                    {
+                        id: 's1',
+                        name: 'Sessie 1',
+                        exercises: [
+                            {
+                                id: 'ex-plank',
+                                name: 'Plank',
+                                sets: 2,
+                                durationSecondsMin: 30,
+                                durationSecondsMax: 60,
+                                exerciseType: 'duration',
+                                trackMetrics: ['duration_seconds']
+                            }
+                        ]
+                    }
+                ]
+            };
+            store.plans = [plan];
+            app.startWorkout(plan.sessions[0], plan);
+
+            app.subModalState = {
+                targetExerciseName: 'Plank',
+                targetExerciseId: 'ex-plank',
+                exIndex: 0,
+                planId: 'plan-sub-metrics',
+                sessionId: 's1',
+                mode: 'activeWorkout',
+                context: {}
+            };
+
+            const saveCb = document.getElementById('sub-modal-save-to-plan');
+            if (saveCb) saveCb.checked = true;
+
+            // Vervang Plank door Cable Crunch
+            app.applySubstitution('cable-crunch');
+
+            const activeEx = app.activeWorkout.exercises[0];
+            expect(activeEx.name).toBe('Cable Crunch');
+            expect(activeEx.exerciseType).toBe('weight_reps');
+            expect(activeEx.trackMetrics).toEqual(['weight', 'reps']);
+            expect(activeEx.durationSecondsMin).toBeUndefined();
+            expect(app.isHoldExercise(activeEx)).toBe(false);
+
+            // Controleer DOM: gewicht + reps en geen timer
+            expect(document.querySelectorAll('#workout-exercise-list input[data-type="weight"]').length).toBe(2);
+            expect(document.querySelectorAll('#workout-exercise-list input[data-type="reps"]').length).toBe(2);
+            expect(document.querySelectorAll('#workout-exercise-list .hold-delay-bar').length).toBe(0);
+
+            // Ook opgeslagen in het schema zelf
+            if (saveCb) {
+                const savedPlanEx = store.plans[0].sessions[0].exercises[0];
+                expect(savedPlanEx.exerciseType).toBe('weight_reps');
+                expect(savedPlanEx.trackMetrics).toEqual(['weight', 'reps']);
+                expect(savedPlanEx.durationSecondsMin).toBeUndefined();
+            }
+        });
+
+        it('herstelt automatisch het kg-veld voor reeds opgeslagen Cable Fly met foutieve trackMetrics: ["reps"], maar laat pure bodyweight ongemoeid', () => {
+            const session = {
+                id: 'sess-self-heal',
+                name: 'Self Heal',
+                exercises: [
+                    { id: 'ex-cf', name: 'Cable Fly', sets: 1, exerciseType: 'bodyweight_reps', trackMetrics: ['reps'] },
+                    { id: 'ex-pu', name: 'Push-Up', sets: 1, exerciseType: 'bodyweight_reps', trackMetrics: ['reps'] },
+                    { id: 'ex-aw', name: 'Ab Wheel Rollout', sets: 1, exerciseType: 'bodyweight_reps', trackMetrics: ['reps'] }
+                ]
+            };
+
+            app.startWorkout(session);
+            app.collapsedExercises = new Set(); // alles openklappen voor DOM-check
+            app.renderWorkoutExercises();
+
+            const card0 = document.querySelector('.exercise-card[data-ex-index="0"]');
+            const card1 = document.querySelector('.exercise-card[data-ex-index="1"]');
+            const card2 = document.querySelector('.exercise-card[data-ex-index="2"]');
+
+            // Cable Fly krijgt 2 velden (kg + reps)
+            expect(card0.querySelectorAll('input[data-type="weight"]').length).toBe(1);
+            expect(card0.querySelectorAll('input[data-type="reps"]').length).toBe(1);
+
+            // Push-Up en Ab Wheel Rollout houden 1 veld (alleen reps)
+            expect(card1.querySelectorAll('input[data-type="weight"]').length).toBe(0);
+            expect(card1.querySelectorAll('input[data-type="reps"]').length).toBe(1);
+            expect(card2.querySelectorAll('input[data-type="weight"]').length).toBe(0);
+            expect(card2.querySelectorAll('input[data-type="reps"]').length).toBe(1);
+        });
+
+        it('behoudt weight + reps bij buildExerciseFromLog ("Herhalen") voor Cable Fly en Cable Crunch ook als eerder zonder gewicht is gelogd', () => {
+            const cfEx = app.buildExerciseFromLog({
+                name: 'Cable Fly',
+                totalSets: 3,
+                details: [{ setNumber: 1, weight: '', reps: '12' }]
+            });
+            expect(cfEx.exerciseType).toBe('weight_reps');
+            expect(cfEx.trackMetrics).toEqual(['weight', 'reps']);
+
+            const ccEx = app.buildExerciseFromLog({
+                name: 'Cable Crunch',
+                totalSets: 3,
+                details: [{ setNumber: 1, weight: '0', reps: '15' }]
+            });
+            expect(ccEx.exerciseType).toBe('weight_reps');
+            expect(ccEx.trackMetrics).toEqual(['weight', 'reps']);
+
+            const puEx = app.buildExerciseFromLog({
+                name: 'Push-Up',
+                totalSets: 3,
+                details: [{ setNumber: 1, weight: '', reps: '15' }]
+            });
+            expect(puEx.exerciseType).toBe('bodyweight_reps');
+            expect(puEx.trackMetrics).toEqual(['reps']);
+
+            const weightedPuEx = app.buildExerciseFromLog({
+                name: 'Push-Up',
+                totalSets: 3,
+                details: [{ setNumber: 1, weight: '10', reps: '12' }]
+            });
+            expect(weightedPuEx.trackMetrics).toEqual(['weight', 'reps']);
+        });
+
+        it('herkent gewichts- en kabeloefeningen correct in detectExerciseType en isHoldExercise', () => {
+            expect(app.detectExerciseType('Cable Crunch').exerciseType).toBe('weight_reps');
+            expect(app.detectExerciseType('Kneeling Cable Crunch').exerciseType).toBe('weight_reps');
+            expect(app.detectExerciseType('Rope Crunch').exerciseType).toBe('weight_reps');
+            expect(app.detectExerciseType('Machine Crunch').exerciseType).toBe('weight_reps');
+            expect(app.detectExerciseType('Dumbbell Hanging Leg Raise').exerciseType).toBe('weight_reps');
+            expect(app.detectExerciseType('Weighted Pull-Up').exerciseType).toBe('weight_reps');
+            expect(app.detectExerciseType('Assisted Dip').exerciseType).toBe('weight_reps');
+            expect(app.detectExerciseType('Low Row Machine').exerciseType).toBe('weight_reps');
+            expect(app.detectExerciseType('Seated Row Machine').exerciseType).toBe('weight_reps');
+            expect(app.detectExerciseType('Row Machine (Roeimachine)').exerciseType).toBe('duration');
+
+            expect(app.isHoldExercise({ name: 'Cable Side Raise' })).toBe(false);
+            expect(app.isHoldExercise({ name: 'DB Side Raise' })).toBe(false);
+            expect(app.isHoldExercise({ name: 'Low Row Machine' })).toBe(false);
+            expect(app.isHoldExercise({ name: 'Seated Row Machine' })).toBe(false);
+            expect(app.isHoldExercise({ name: 'Row Machine (Roeimachine)' })).toBe(true);
+            expect(app.isHoldExercise({ name: 'Side Raise' })).toBe(true);
+        });
+
+        it('behoudt gewicht-veld voor Dips en Pull-Ups bij opslaan van een schema via saveCustomPlan', () => {
+            const saved = store.saveCustomPlan({
+                name: 'Upper Lower Copy',
+                sessions: [
+                    {
+                        id: 's1',
+                        name: 'Upper',
+                        exercises: [
+                            { id: 'e1', name: 'Chest / Tricep Dips', sets: 3, reps: '8-12', exerciseType: 'bodyweight_reps' },
+                            { id: 'e2', name: 'Pull-Up / Chin-Up', sets: 3, reps: '6-12', exerciseType: 'bodyweight_reps' },
+                            { id: 'e3', name: 'Push-Up', sets: 3, reps: '10-15', exerciseType: 'bodyweight_reps' }
+                        ]
+                    }
+                ]
+            });
+
+            expect(saved.sessions[0].exercises[0].trackMetrics).toEqual(['weight', 'reps']);
+            expect(saved.sessions[0].exercises[1].trackMetrics).toEqual(['weight', 'reps']);
+            expect(saved.sessions[0].exercises[2].trackMetrics).toEqual(['reps']);
+        });
+    });
+
 });
