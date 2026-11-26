@@ -254,7 +254,7 @@ const PRESET_PLANS = [
                     { id: "home-pushups", name: "Push-Up", sets: 3, repsMin: 8, repsMax: 15, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["chest", "triceps", "shoulders"] },
                     { id: "home-lunges", name: "Bulgarian Split Squat", alternatives: ["Walking Lunges", "Bodyweight Lunges"], sets: 3, repsMin: 10, repsMax: 15, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["legs", "glutes"] },
                     { id: "home-plank", name: "Plank", sets: 3, durationSecondsMin: 30, durationSecondsMax: 60, restSeconds: 45, exerciseType: "duration", category: "isometric", muscleGroups: ["core"] },
-                    { id: "home-dips", name: "Chest / Tricep Dips", alternatives: ["Chair Dips", "Bench Dips"], sets: 3, repsMin: 8, repsMax: 12, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["triceps", "chest"] }
+                    { id: "home-dips", name: "Chest / Tricep Dips", alternatives: ["Chair Dips", "Bench Dips"], sets: 3, repsMin: 8, repsMax: 12, restSeconds: 60, exerciseType: "bodyweight_reps", trackMetrics: ["weight", "reps"], category: "bodyweight", muscleGroups: ["triceps", "chest"] }
                 ]
             },
             {
@@ -264,7 +264,7 @@ const PRESET_PLANS = [
                 description: "Balans, schouderstabiliteit en corekracht zonder gewichten.",
                 estimatedDurationMinutes: 35,
                 exercises: [
-                    { id: "home-pullup-row", name: "Pull-Up / Chin-Up", alternatives: ["Doorframe Row", "Towel Row", "Inverted Row"], sets: 3, repsMin: 8, repsMax: 12, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["back", "biceps"] },
+                    { id: "home-pullup-row", name: "Pull-Up / Chin-Up", alternatives: ["Doorframe Row", "Towel Row", "Inverted Row"], sets: 3, repsMin: 8, repsMax: 12, restSeconds: 60, exerciseType: "bodyweight_reps", trackMetrics: ["weight", "reps"], category: "bodyweight", muscleGroups: ["back", "biceps"] },
                     { id: "home-glute-bridge", name: "Conventional Deadlift", alternatives: ["Glute Bridge", "Single-Leg Glute Bridge"], sets: 3, repsMin: 12, repsMax: 20, restSeconds: 45, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["glutes", "legs"] },
                     { id: "home-pike-pushups", name: "Overhead Press (OHP)", alternatives: ["Pike Push-Up", "Elevated Pike Push-Up"], sets: 3, repsMin: 6, repsMax: 12, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["shoulders", "triceps"] },
                     { id: "home-side-plank", name: "Plank", alternatives: ["Side Plank"], sets: 2, durationSecondsMin: 20, durationSecondsMax: 45, restSeconds: 45, exerciseType: "duration", category: "isometric", muscleGroups: ["core"] }
@@ -322,7 +322,7 @@ const PRESET_PLANS = [
                     { id: "u-a-ohp", name: "Overhead Press (OHP)", sets: 3, repsMin: 8, repsMax: 10, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["shoulders", "triceps"] },
                     { id: "u-a-pulldown", name: "Lat Pulldown", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "biceps"] },
                     { id: "u-a-curls", name: "Dumbbell Bicep Curl", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["biceps"] },
-                    { id: "u-a-dips", name: "Chest / Tricep Dips", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 60, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["triceps", "chest"] }
+                    { id: "u-a-dips", name: "Chest / Tricep Dips", sets: 3, repsMin: 8, repsMax: 12, restSeconds: 60, exerciseType: "bodyweight_reps", trackMetrics: ["weight", "reps"], category: "bodyweight", muscleGroups: ["triceps", "chest"] }
                 ]
             },
             {
@@ -347,7 +347,7 @@ const PRESET_PLANS = [
                 estimatedDurationMinutes: 45,
                 exercises: [
                     { id: "u-b-incline", name: "Incline Dumbbell Press", sets: 4, repsMin: 8, repsMax: 12, restSeconds: 90, exerciseType: "weight_reps", category: "compound", muscleGroups: ["chest", "shoulders", "triceps"] },
-                    { id: "u-b-pullup", name: "Pull-Up / Chin-Up", sets: 3, repsMin: 6, repsMax: 12, restSeconds: 90, exerciseType: "bodyweight_reps", category: "bodyweight", muscleGroups: ["back", "biceps"] },
+                    { id: "u-b-pullup", name: "Pull-Up / Chin-Up", sets: 3, repsMin: 6, repsMax: 12, restSeconds: 90, exerciseType: "bodyweight_reps", trackMetrics: ["weight", "reps"], category: "bodyweight", muscleGroups: ["back", "biceps"] },
                     { id: "u-b-latraise", name: "Dumbbell Lateral Raise", sets: 4, repsMin: 12, repsMax: 15, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["shoulders"] },
                     { id: "u-b-cable-row", name: "Seated Row", sets: 3, repsMin: 10, repsMax: 12, restSeconds: 75, exerciseType: "weight_reps", category: "compound", muscleGroups: ["back", "biceps"] },
                     { id: "u-b-fly", name: "Dumbbell Chest Fly", sets: 3, repsMin: 12, repsMax: 15, restSeconds: 60, exerciseType: "weight_reps", category: "isolation", muscleGroups: ["chest"] }
@@ -689,9 +689,18 @@ class DataStore {
 
                 let trackMetrics = ex.trackMetrics;
                 if (!trackMetrics || !Array.isArray(trackMetrics)) {
-                    if (ex.exerciseType === 'duration') trackMetrics = ['duration_seconds'];
-                    else if (ex.exerciseType === 'bodyweight_reps') trackMetrics = ['reps'];
-                    else trackMetrics = ['weight', 'reps'];
+                    if (ex.exerciseType === 'duration') {
+                        trackMetrics = (typeof app !== 'undefined' && app.isCardioRowMachineName && app.isCardioRowMachineName(exName))
+                            ? ['duration_seconds', 'level']
+                            : ['duration_seconds'];
+                    } else if (ex.exerciseType === 'bodyweight_reps') {
+                        const resolved = (typeof app !== 'undefined' && app.resolveExerciseMetrics) ? app.resolveExerciseMetrics(exName) : null;
+                        trackMetrics = (resolved && resolved.trackMetrics && resolved.trackMetrics.includes('weight'))
+                            ? ['weight', 'reps']
+                            : ['reps'];
+                    } else {
+                        trackMetrics = ['weight', 'reps'];
+                    }
                 }
 
                 return {
@@ -852,12 +861,27 @@ class DataStore {
     addCustomExercise(exData) {
         if (!exData.name || !exData.name.trim()) throw new Error("Oefeningnaam is verplicht.");
         const id = 'custom_ex_' + Date.now();
+        const trimmedName = exData.name.trim();
+        let trackMetrics = exData.trackMetrics;
+        if (!trackMetrics) {
+            if (exData.exerciseType === 'duration') {
+                trackMetrics = (typeof app !== 'undefined' && app.isCardioRowMachineName && app.isCardioRowMachineName(trimmedName))
+                    ? ['duration_seconds', 'level']
+                    : ['duration_seconds'];
+            } else if (exData.exerciseType === 'bodyweight_reps') {
+                trackMetrics = (typeof app !== 'undefined' && app.isWeightSupportedBodyweightName && app.isWeightSupportedBodyweightName(trimmedName))
+                    ? ['weight', 'reps']
+                    : ['reps'];
+            } else {
+                trackMetrics = ['weight', 'reps'];
+            }
+        }
         const newEx = {
             id,
-            name: exData.name.trim(),
+            name: trimmedName,
             muscleGroups: exData.muscleGroups || [],
             exerciseType: exData.exerciseType || 'weight_reps',
-            trackMetrics: exData.trackMetrics || (exData.exerciseType === 'duration' ? ['duration_seconds'] : (exData.exerciseType === 'bodyweight_reps' ? ['reps'] : ['weight', 'reps'])),
+            trackMetrics,
             category: exData.category || 'custom',
             alternatives: exData.alternatives || [],
             isCustom: true
@@ -4118,13 +4142,14 @@ const app = {
         const resolvedReps = (defaultReps !== null && defaultReps !== undefined && String(defaultReps).trim() !== '')
             ? String(defaultReps).trim()
             : ((exerciseData && exerciseData.defaultReps !== undefined && exerciseData.defaultReps !== null) ? String(exerciseData.defaultReps) : (exerciseData.reps || '8-12'));
+        const resolvedMetrics = !exerciseData.trackMetrics ? this.resolveExerciseMetrics(exerciseData.name) : null;
         const exObj = {
             id: 'ex_' + Math.random().toString(36).slice(2, 11),
             order: session.exercises.length + 1,
             name: exerciseData.name,
             muscleGroups: exerciseData.muscleGroups || [],
-            exerciseType: exerciseData.exerciseType || 'weight_reps',
-            trackMetrics: exerciseData.trackMetrics || (exerciseData.exerciseType === 'duration' ? ['duration_seconds'] : (exerciseData.exerciseType === 'bodyweight_reps' ? ['reps'] : ['weight', 'reps'])),
+            exerciseType: exerciseData.exerciseType || (resolvedMetrics ? resolvedMetrics.exerciseType : 'weight_reps'),
+            trackMetrics: exerciseData.trackMetrics ? [...exerciseData.trackMetrics] : (exerciseData.exerciseType === 'duration' ? (this.isCardioRowMachineName(exerciseData.name) ? ['duration_seconds', 'level'] : ['duration_seconds']) : (exerciseData.exerciseType === 'bodyweight_reps' ? (this.isWeightSupportedBodyweightName(exerciseData.name) ? ['weight', 'reps'] : ['reps']) : ['weight', 'reps'])),
             category: exerciseData.category || 'compound',
             alternatives: exerciseData.alternatives || [],
             sets: sets,
@@ -5602,11 +5627,14 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         const details = Array.isArray(logEx.details) ? logEx.details : [];
         const hasWeight = details.some(d => num(d && d.weight) > 0);
         const hasLevel = details.some(d => isNonEmpty(d && d.level));
-        const typeInfo = this.detectExerciseType(logEx.originalName || logEx.name);
-        let trackMetrics;
-        if (typeInfo.exerciseType === 'duration') trackMetrics = ['duration_seconds'];
-        else if (typeInfo.exerciseType === 'bodyweight_reps' || (!hasWeight && details.length > 0)) trackMetrics = ['reps'];
-        else trackMetrics = ['weight', 'reps'];
+        const lookupName = logEx.chosenVariation || logEx.originalName || logEx.name;
+        const resolved = this.resolveExerciseMetrics(lookupName);
+        let trackMetrics = [...resolved.trackMetrics];
+        if (hasWeight && resolved.exerciseType !== 'duration' && !trackMetrics.includes('weight')) {
+            trackMetrics = ['weight', ...trackMetrics];
+        } else if (!hasWeight && details.length > 0 && resolved.exerciseType === 'weight_reps' && !this.isKnownWeightedExercise(lookupName)) {
+            trackMetrics = ['reps'];
+        }
         if (hasLevel && !trackMetrics.includes('level')) trackMetrics.push('level');
 
         const firstReps = details.find(d => isNonEmpty(d && d.reps));
@@ -5614,8 +5642,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             id: 'ex_' + Math.random().toString(36).slice(2, 11),
             name: logEx.originalName || logEx.name,
             muscleGroups: logEx.muscleGroups || [],
-            exerciseType: typeInfo.exerciseType,
-            category: typeInfo.category,
+            exerciseType: resolved.exerciseType,
+            category: resolved.category,
             trackMetrics,
             sets: Math.max(parseInt(logEx.totalSets, 10) || 0, details.length, 1)
         };
@@ -6133,14 +6161,192 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         this.startWorkout(customSession, customPlan);
     },
 
+    isCardioRowMachineName(name) {
+        const n = String(name || '').toLowerCase().trim();
+        if (!n) return false;
+        if (n.includes('seated row') || n.includes('seated cable row') || n.includes('low row') || n.includes('chest supported row') || n.includes('t-bar row') || n.includes('cable row')) {
+            return false;
+        }
+        return n.includes('row machine') || n.includes('roeimachine') || n.includes('rower') || n.includes('concept2');
+    },
+
+    hasWeightedEquipmentKeyword(name) {
+        const n = ' ' + String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ') + ' ';
+        return /\b(cable|kabel|dumbbell|dumbell|db|barbell|bb|kettlebell|kb|machine|pec deck|leg press|lat pulldown|smith|weighted|assisted|rope|ez bar|trap bar|plate|schijf|halter)\b/.test(n);
+    },
+
+    isWeightSupportedBodyweightName(name) {
+        const n = String(name || '').toLowerCase().trim();
+        if (!n || n.includes('inverted row')) return false;
+        return /\b(pull-?ups?|chin-?ups?|dips?)\b/.test(n);
+    },
+
+    isKnownWeightedExercise(name, dbEx = null) {
+        const rawName = String(name || '').trim();
+        if (!rawName || this.isCardioRowMachineName(rawName)) return false;
+
+        const norm = typeof normalizeExerciseName === 'function' ? normalizeExerciseName(rawName) : rawName.toLowerCase();
+        const defMatch = DEFAULT_EXERCISES.find(d =>
+            normalizeExerciseName(d.name) === norm ||
+            (Array.isArray(d.alternatives) && d.alternatives.some(a => normalizeExerciseName(a) === norm))
+        );
+        if (defMatch && Array.isArray(defMatch.trackMetrics)) {
+            return defMatch.trackMetrics.includes('weight');
+        }
+
+        let resolvedDbEx = dbEx;
+        if (!resolvedDbEx && this.substitutionEngine && typeof this.substitutionEngine.getExercise === 'function') {
+            resolvedDbEx = this.substitutionEngine.getExercise(rawName);
+        }
+        if (resolvedDbEx && Array.isArray(resolvedDbEx.required_equipment) && resolvedDbEx.required_equipment.length > 0) {
+            const hasBodyweightOnly = resolvedDbEx.required_equipment.some(g =>
+                Array.isArray(g) && g.length > 0 && g.every(eq => ['bodyweight', 'mat', 'box', 'ab_wheel', 'trx', 'pullup_bar', 'dip_station'].includes(eq))
+            );
+            if (!hasBodyweightOnly) return true;
+        }
+
+        if (this.hasWeightedEquipmentKeyword(rawName)) return true;
+        if (this.isWeightSupportedBodyweightName(rawName)) return true;
+        return false;
+    },
+
+    resolveExerciseMetrics(name, dbEx = null) {
+        const rawName = String(name || '').trim();
+        const norm = typeof normalizeExerciseName === 'function' ? normalizeExerciseName(rawName) : rawName.toLowerCase();
+
+        // 1. Respecteer expliciete custom exercise instellingen van de gebruiker
+        if (typeof store !== 'undefined' && store && Array.isArray(store.customExercises)) {
+            const customMatch = store.customExercises.find(c => c && c.name && normalizeExerciseName(c.name) === norm);
+            if (customMatch && Array.isArray(customMatch.trackMetrics) && customMatch.trackMetrics.length > 0) {
+                return {
+                    exerciseType: customMatch.exerciseType || 'weight_reps',
+                    trackMetrics: [...customMatch.trackMetrics],
+                    category: customMatch.category || 'custom'
+                };
+            }
+        }
+
+        // 2. Match tegen DEFAULT_EXERCISES (naam of alias)
+        const defMatch = DEFAULT_EXERCISES.find(d =>
+            normalizeExerciseName(d.name) === norm ||
+            (Array.isArray(d.alternatives) && d.alternatives.some(a => normalizeExerciseName(a) === norm))
+        );
+        if (defMatch && Array.isArray(defMatch.trackMetrics) && defMatch.trackMetrics.length > 0) {
+            return {
+                exerciseType: defMatch.exerciseType || 'weight_reps',
+                trackMetrics: [...defMatch.trackMetrics],
+                category: defMatch.category || 'compound'
+            };
+        }
+
+        // 3. Gebruik SubstitutionEngine / EXERCISE_DATABASE + naamdetectie
+        let resolvedDbEx = dbEx;
+        if (!resolvedDbEx && this.substitutionEngine && typeof this.substitutionEngine.getExercise === 'function' && rawName) {
+            resolvedDbEx = this.substitutionEngine.getExercise(rawName);
+        }
+
+        const detected = this.detectExerciseType(rawName);
+
+        if (detected.exerciseType === 'duration') {
+            const tm = this.isCardioRowMachineName(rawName) ? ['duration_seconds', 'level'] : ['duration_seconds'];
+            return { exerciseType: 'duration', trackMetrics: tm, category: detected.category };
+        }
+
+        if (resolvedDbEx) {
+            const reqGroups = Array.isArray(resolvedDbEx.required_equipment) ? resolvedDbEx.required_equipment : [];
+            const hasBodyweightOnlyOption = reqGroups.some(group =>
+                Array.isArray(group) && group.length > 0 && group.every(eq => ['bodyweight', 'mat', 'box', 'ab_wheel', 'trx', 'pullup_bar', 'dip_station'].includes(eq))
+            );
+            const hasWeightedEquipmentOption = reqGroups.some(group =>
+                Array.isArray(group) && group.some(eq => !['bodyweight', 'mat', 'box', 'ab_wheel', 'bench', 'trx', 'pullup_bar', 'dip_station', 'resistance_band', 'back_extension_bench'].includes(eq))
+            );
+            const rawCat = resolvedDbEx.type ? String(resolvedDbEx.type).toLowerCase() : detected.category;
+            const cat = rawCat === 'isolatie' ? 'isolation' : (rawCat || detected.category);
+
+            if (hasWeightedEquipmentOption && !hasBodyweightOnlyOption) {
+                return {
+                    exerciseType: 'weight_reps',
+                    trackMetrics: ['weight', 'reps'],
+                    category: cat
+                };
+            }
+            if (this.isWeightSupportedBodyweightName(rawName)) {
+                return {
+                    exerciseType: 'bodyweight_reps',
+                    trackMetrics: ['weight', 'reps'],
+                    category: 'bodyweight'
+                };
+            }
+            if (hasWeightedEquipmentOption) {
+                return {
+                    exerciseType: 'weight_reps',
+                    trackMetrics: ['weight', 'reps'],
+                    category: cat
+                };
+            }
+        }
+
+        if (detected.exerciseType === 'bodyweight_reps') {
+            return {
+                exerciseType: 'bodyweight_reps',
+                trackMetrics: this.isWeightSupportedBodyweightName(rawName) ? ['weight', 'reps'] : ['reps'],
+                category: detected.category
+            };
+        }
+
+        return {
+            exerciseType: detected.exerciseType,
+            trackMetrics: ['weight', 'reps'],
+            category: detected.category
+        };
+    },
+
+    getEffectiveTrackMetrics(ex) {
+        if (!ex) return ['weight', 'reps'];
+        const isHold = this.isHoldExercise(ex);
+        const activeName = this.getActiveExerciseName ? this.getActiveExerciseName(ex) : (ex.chosenVariation || ex.name || '');
+
+        let metrics;
+        if (Array.isArray(ex.trackMetrics) && ex.trackMetrics.length > 0) {
+            metrics = [...ex.trackMetrics];
+        } else if (isHold || ex.exerciseType === 'duration') {
+            metrics = ['duration_seconds'];
+        } else if (ex.exerciseType === 'bodyweight_reps') {
+            metrics = this.isWeightSupportedBodyweightName(activeName) ? ['weight', 'reps'] : ['reps'];
+        } else {
+            metrics = ['weight', 'reps'];
+        }
+
+        if (this.isCardioRowMachineName(activeName) && !metrics.includes('level') && !metrics.includes('stand')) {
+            metrics.push('level');
+        }
+
+        // Self-heal: als een oefening zonder 'weight' staat opgeslagen (bijv. na eerdere swap vanaf
+        // een bodyweight-oefening of 'Herhalen' zonder ingevuld gewicht), maar aantoonbaar een
+        // gewicht-/apparaat-oefening is (en niet expliciet als custom bodyweight overschreven), herstel 'weight'.
+        if (!isHold && !metrics.includes('weight') && activeName) {
+            const norm = typeof normalizeExerciseName === 'function' ? normalizeExerciseName(activeName) : activeName.toLowerCase();
+            const customOverride = (typeof store !== 'undefined' && store && Array.isArray(store.customExercises))
+                ? store.customExercises.find(c => c && c.name && normalizeExerciseName(c.name) === norm)
+                : null;
+            const customExplicitlyNoWeight = !!(customOverride && Array.isArray(customOverride.trackMetrics) && !customOverride.trackMetrics.includes('weight'));
+
+            if (!customExplicitlyNoWeight && this.isKnownWeightedExercise(activeName)) {
+                metrics = ['weight', ...metrics];
+            }
+        }
+
+        return metrics;
+    },
+
     detectExerciseType(name) {
         const n = String(name || '').toLowerCase().trim();
         if (!n) return { exerciseType: 'weight_reps', category: 'compound' };
 
-        if (n.includes('seated row') || n.includes('seated cable row')) {
+        if (n.includes('seated row') || n.includes('seated cable row') || n.includes('low row') || n.includes('chest supported row') || n.includes('t-bar row') || n.includes('cable row')) {
             return { exerciseType: 'weight_reps', category: 'compound' };
         }
-        if (n.includes('row machine') || n.includes('roeimachine') || n.includes('rower') || n.includes('concept2')) {
+        if (this.isCardioRowMachineName(n)) {
             return { exerciseType: 'duration', category: 'cardio' };
         }
         if (n.includes('plank') || n.includes('hold') || n.includes('wall sit') || n.includes('statisch') || n.includes('l-sit') || n.includes('hollow body') || n.includes('dead bug')) {
@@ -6148,6 +6354,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         }
         if (n.includes('hardlopen') || n.includes('running') || n.includes('fietsen') || n.includes('roeien') || n.includes('treadmill') || n.includes('crosstrainer') || n.includes('wandelen')) {
             return { exerciseType: 'duration', category: 'cardio' };
+        }
+        if (this.hasWeightedEquipmentKeyword(n)) {
+            if (n.includes('curl') || n.includes('raise') || n.includes('fly') || n.includes('extension') || n.includes('kickback') || n.includes('pushdown') || n.includes('crunch')) {
+                return { exerciseType: 'weight_reps', category: 'isolation' };
+            }
+            return { exerciseType: 'weight_reps', category: 'compound' };
         }
         if (n.includes('pull-up') || n.includes('chin-up') || n.includes('push-up') || n.includes('dip') || n.includes('crunch') || n.includes('leg raise') || n.includes('bodyweight') || n.includes('tong twister') || n.includes('tongue twister')) {
             return { exerciseType: 'bodyweight_reps', category: 'bodyweight' };
@@ -6306,9 +6518,14 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             .map(s => s.trim())
             .filter(Boolean);
 
-        const trackMetrics = (exerciseType === 'duration' || category === 'isometric')
-            ? ['duration_seconds']
-            : (exerciseType === 'bodyweight_reps' ? ['reps'] : ['weight', 'reps']);
+        let trackMetrics;
+        if (exerciseType === 'duration' || category === 'isometric') {
+            trackMetrics = this.isCardioRowMachineName(name) ? ['duration_seconds', 'level'] : ['duration_seconds'];
+        } else if (exerciseType === 'bodyweight_reps') {
+            trackMetrics = this.isWeightSupportedBodyweightName(name) ? ['weight', 'reps'] : ['reps'];
+        } else {
+            trackMetrics = ['weight', 'reps'];
+        }
 
         const exData = {
             name,
@@ -6508,11 +6725,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 ? exerciseData.defaultSets
                 : ((exerciseData && exerciseData.name && exerciseData.name.toLowerCase().includes('row machine')) ? 1 : 3));
 
-        let trackMetrics = exerciseData.trackMetrics;
+        let trackMetrics = exerciseData.trackMetrics ? [...exerciseData.trackMetrics] : null;
         if (!trackMetrics) {
-            if (exerciseData.exerciseType === 'duration') trackMetrics = ['duration_seconds'];
-            else if (exerciseData.exerciseType === 'bodyweight_reps') trackMetrics = ['reps'];
-            else trackMetrics = ['weight', 'reps'];
+            if (exerciseData.exerciseType === 'duration') {
+                trackMetrics = this.isCardioRowMachineName(exerciseData.name) ? ['duration_seconds', 'level'] : ['duration_seconds'];
+            } else if (exerciseData.exerciseType === 'bodyweight_reps') {
+                trackMetrics = this.isWeightSupportedBodyweightName(exerciseData.name) ? ['weight', 'reps'] : ['reps'];
+            } else {
+                trackMetrics = ['weight', 'reps'];
+            }
         }
 
         const exObj = {
@@ -7513,11 +7734,12 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 const weightPlaceholder = (prevSet && prevSet.weight) ? prevSet.weight : 'kg';
                 const repsPlaceholder = (prevSet && prevSet.reps) ? prevSet.reps : (ex.reps || 'reps');
 
-                // TrackMetrics check for dynamic inputs
-                const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : true;
-                let wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : false;
-                let wantsDuration = (ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false) || isHold;
-                const wantsLevel = (ex.trackMetrics ? (ex.trackMetrics.includes('level') || ex.trackMetrics.includes('stand')) : false) || activeExerciseName.toLowerCase().includes('row machine') || activeExerciseName.toLowerCase().includes('roeimachine');
+                // TrackMetrics check for dynamic inputs (met self-heal voor gewichts-oefeningen)
+                const effectiveMetrics = app.getEffectiveTrackMetrics(ex);
+                const wantsWeight = effectiveMetrics.includes('weight');
+                let wantsReps = effectiveMetrics.includes('reps');
+                let wantsDuration = effectiveMetrics.includes('duration_seconds') || isHold;
+                const wantsLevel = effectiveMetrics.includes('level') || effectiveMetrics.includes('stand') || app.isCardioRowMachineName(activeExerciseName);
                 const isBarbell = app.isBarbellExercise ? app.isBarbellExercise(ex) : false;
 
                 if (!wantsReps && !wantsDuration) {
@@ -8596,8 +8818,11 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (ex.durationSeconds || ex.durationSecondsMin || ex.durationSecondsMax || ex.durationText || ex.duration) return true;
         
         const name = String(ex.name || '').toLowerCase();
-        const keywords = ['plank', 'hold', 'side raise', 'wall sit', 'statisch', 'hollow body', 'dead bug', 'isometric', 'l-sit', 'row machine', 'roeimachine'];
+        if (this.isCardioRowMachineName(name)) return true;
+        const keywords = ['plank', 'hold', 'wall sit', 'statisch', 'hollow body', 'dead bug', 'isometric', 'l-sit'];
         if (keywords.some(k => name.includes(k))) return true;
+        // 'side raise' alleen als hold behandelen wanneer het geen gewicht-/kabel-oefening is (bijv. Cable Side Raise / DB Side Raise)
+        if (name.includes('side raise') && !this.hasWeightedEquipmentKeyword(name)) return true;
         return false;
     },
 
@@ -8786,11 +9011,13 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (!this.activeWorkout || !this.activeWorkout.exercises[exIndex]) return;
         const ex = this.activeWorkout.exercises[exIndex];
         const isHold = this.isHoldExercise(ex);
+        const activeName = this.getActiveExerciseName ? this.getActiveExerciseName(ex) : (ex.chosenVariation || ex.name || '');
+        const effectiveMetrics = this.getEffectiveTrackMetrics(ex);
 
-        const wantsWeight = ex.trackMetrics ? ex.trackMetrics.includes('weight') : !isHold;
-        const wantsReps = ex.trackMetrics ? ex.trackMetrics.includes('reps') : !isHold;
-        const wantsDuration = (ex.trackMetrics ? ex.trackMetrics.includes('duration_seconds') : false) || isHold;
-        const wantsLevel = (ex.trackMetrics ? (ex.trackMetrics.includes('level') || ex.trackMetrics.includes('stand')) : false) || (ex.name && (ex.name.toLowerCase().includes('row machine') || ex.name.toLowerCase().includes('roeimachine')));
+        const wantsWeight = effectiveMetrics.includes('weight');
+        const wantsReps = effectiveMetrics.includes('reps') && !isHold;
+        const wantsDuration = effectiveMetrics.includes('duration_seconds') || isHold;
+        const wantsLevel = effectiveMetrics.includes('level') || effectiveMetrics.includes('stand') || this.isCardioRowMachineName(activeName);
 
         const hasWeight = !wantsWeight || (ex.weights && String(ex.weights[setIndex] || '').trim() !== '');
         const hasReps = !wantsReps || (ex.actualReps && String(ex.actualReps[setIndex] || '').trim() !== '');
@@ -12958,6 +13185,19 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
 
         const oldName = this.subModalState.targetExerciseName;
         const newName = newEx.name;
+        const resolvedMetrics = this.resolveExerciseMetrics(newName, newEx);
+
+        const applyMetricsToExercise = (target) => {
+            target.exerciseType = resolvedMetrics.exerciseType;
+            target.trackMetrics = [...resolvedMetrics.trackMetrics];
+            if (resolvedMetrics.exerciseType !== 'duration') {
+                delete target.durationSeconds;
+                delete target.durationSecondsMin;
+                delete target.durationSecondsMax;
+                delete target.durationText;
+                delete target.duration;
+            }
+        };
 
         if (this.subModalState.mode === 'activeWorkout') {
             const exIndex = this.subModalState.exIndex;
@@ -12970,6 +13210,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 ex.category = newEx.type.toLowerCase();
                 ex.movementPattern = newEx.movement_pattern;
                 ex.muscleGroups = (newEx.primary_muscles || []).map(m => m.toLowerCase());
+                applyMetricsToExercise(ex);
 
                 const setCount = ex.sets || 1;
                 if (!ex.setsCompleted || !ex.setsCompleted.some(Boolean)) {
@@ -12995,6 +13236,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                         if (session && session.exercises && session.exercises[exIndex]) {
                             session.exercises[exIndex].name = newName;
                             session.exercises[exIndex].id = newEx.id;
+                            applyMetricsToExercise(session.exercises[exIndex]);
                             store.touchPlan(plan); store.savePlans();
                         }
                     }
@@ -13012,6 +13254,7 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 if (session && session.exercises && session.exercises[exIndex]) {
                     session.exercises[exIndex].name = newName;
                     session.exercises[exIndex].id = newEx.id;
+                    applyMetricsToExercise(session.exercises[exIndex]);
                     store.touchPlan(plan); store.savePlans();
                     this.renderPlans();
                     this.showToast(`🔄 ${oldName} permanent vervangen door ${newName} in ${session.name}`);
@@ -13054,14 +13297,25 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
                 if (subs.length > 0) {
                     convertedCount++;
                     const topSub = subs[0].exercise;
-                    return {
+                    const resolvedMetrics = this.resolveExerciseMetrics(topSub.name, topSub);
+                    const nextEx = {
                         ...ex,
                         name: topSub.name,
                         chosenVariation: topSub.name,
                         id: topSub.id,
                         category: topSub.type.toLowerCase(),
+                        exerciseType: resolvedMetrics.exerciseType,
+                        trackMetrics: [...resolvedMetrics.trackMetrics],
                         notes: [`Aangepast voor ${mode === 'home' ? 'thuis workout' : 'rugontlasting'} (${ex.name} ➔ ${topSub.name})`]
                     };
+                    if (resolvedMetrics.exerciseType !== 'duration') {
+                        delete nextEx.durationSeconds;
+                        delete nextEx.durationSecondsMin;
+                        delete nextEx.durationSecondsMax;
+                        delete nextEx.durationText;
+                        delete nextEx.duration;
+                    }
+                    return nextEx;
                 }
             }
             return ex;
@@ -13192,9 +13446,10 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         let targetPattern = '';
         let targetCategory = '';
         let targetMuscles = [];
+        let dbEx = null;
 
         if (this.substitutionEngine) {
-            const dbEx = this.substitutionEngine.getExercise(newExerciseIdOrName);
+            dbEx = this.substitutionEngine.getExercise(newExerciseIdOrName);
             if (dbEx) {
                 targetName = dbEx.name;
                 targetId = dbEx.id;
@@ -13204,6 +13459,8 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
             }
         }
 
+        const resolvedMetrics = this.resolveExerciseMetrics(targetName, dbEx);
+
         if (!ex.originalName) ex.originalName = ex.name;
         ex.name = targetName;
         ex.chosenVariation = targetName;
@@ -13211,6 +13468,15 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
         if (targetPattern) ex.movementPattern = targetPattern;
         if (targetCategory) ex.category = targetCategory;
         if (targetMuscles.length > 0) ex.muscleGroups = targetMuscles;
+        ex.exerciseType = resolvedMetrics.exerciseType;
+        ex.trackMetrics = [...resolvedMetrics.trackMetrics];
+        if (resolvedMetrics.exerciseType !== 'duration') {
+            delete ex.durationSeconds;
+            delete ex.durationSecondsMin;
+            delete ex.durationSecondsMax;
+            delete ex.durationText;
+            delete ex.duration;
+        }
 
         const setCount = ex.sets || 1;
         if (!ex.setsCompleted || !ex.setsCompleted.some(Boolean)) {
