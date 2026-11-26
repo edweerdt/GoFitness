@@ -13435,11 +13435,18 @@ GOFITNESS SCHEMA v2.0 JSON STRUCTUUR:
     },
 
     quickSwapActiveExercise(exIndex, newExerciseIdOrName) {
-        if (!this.activeWorkout || !this.activeWorkout.exercises || !this.activeWorkout.exercises[exIndex]) return;
+        if (!this.activeWorkout || !this.activeWorkout.exercises) return;
+        const exercises = this.activeWorkout.exercises;
+        const validatedExIndex = typeof exIndex === 'number'
+            ? exIndex
+            : (typeof exIndex === 'string' && /^(0|[1-9]\d*)$/.test(exIndex) ? Number(exIndex) : NaN);
+        if (!Number.isInteger(validatedExIndex) || validatedExIndex < 0 ||
+            validatedExIndex >= exercises.length ||
+            !Object.prototype.hasOwnProperty.call(exercises, validatedExIndex)) return;
         if (this.openSubDrawers) this.openSubDrawers.delete(exIndex);
         this.initSubstitutionEngine();
 
-        const ex = this.activeWorkout.exercises[exIndex];
+        const ex = exercises[validatedExIndex];
 
         let targetName = newExerciseIdOrName;
         let targetId = newExerciseIdOrName;
